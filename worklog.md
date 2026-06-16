@@ -406,3 +406,31 @@ Stage Summary:
 - Cartes : nom commercial, DCI, dosage, forme, prix FCFA "À partir de", nb pharmacies, bouton Voir détails
 - Données réalistes Abidjan : Paracétamol, Amoxicilline, Augmentin, Smecta, Vitamine C, etc.
 - Responsive desktop filtres latéraux / mobile repliable, boutons faciles à cliquer
+
+---
+Task ID: 13
+Agent: main (orchestrator)
+Task: Page Détail médicament complète — refonte avec fiche enrichie, pharmacies, alternatives, prudence
+
+Work Log:
+- Fiche médicament refondue : layout 2 colonnes (visuel icône catégorie colorée + infos), badges élégants (catégorie, statut global Disponible/Stock faible/Rupture/À confirmer via MedicationStatusBadge, Ordonnance requise/Libre accès), grille info 4 colonnes (DCI, Dosage, Forme, Conditionnement), blocs prix/pharmacies/dernière MAJ, description, boutons Estimer ordonnance/Partager/Favori
+- Zone recherche rapide : Input avec autocomplétion (debounce 250ms) en haut à droite, permet de rechercher un autre médicament sans revenir à la liste, dropdown de suggestions cliquables, bouton retour "Retour aux médicaments"
+- Section "Pharmacies disponibles" : PharmacyMedCard custom avec en-tête (nom + note badge + commune + quartier + badges Ouvert/Fermé/De garde/24/7), grille 3 colonnes (prix indicatif, distance km, stock En stock/Rupture), ligne MAJ + horaires, 4 boutons d'action (Voir la pharmacie / Appeler tel: / Itinéraire Google Maps / Ordonnance → navigate prescription + toast). Tri par stock puis distance
+- Section "Alternatives ou équivalents" : fetch médicaments de même DCI (genericName), grille 4 cartes (icône catégorie, nom, forme+dosage, prix, statut), note informative "Section informative uniquement, pas de conseil médical"
+- Bloc prudence : AlertMessage variant warning "Les informations affichées sont indicatives. Demandez toujours conseil à un pharmacien ou à un professionnel de santé avant toute utilisation."
+- Design system utilisé : Heading, Eyebrow, Price, PriceRange, Muted, MedicationStatusBadge, AlertMessage, FavoriteButton, Button (brand-gradient/outline), Card
+- Vérification Agent Browser :
+  * desktop 1440px : fiche Paracétamol complète (DCI, 500 mg, Comprimé, 100-150 FCFA, 12/12 pharmacies, MAJ 16 juin 2026), 12 cartes pharmacies avec boutons Voir/Appeler/Itinéraire/Ordonnance, alternatives Efferalgan+Paracétamol Sirop — VLM confirme "fiche complète, badges élégants, pharmacies avec boutons, alternatives, bloc prudence, identité premium"
+  * recherche rapide "Amox" → suggestions Amoxicilline
+  * bouton Ordonnance → navigate prescription + toast succès
+  * mobile 390px : infos empilées, cartes lisibles, 4 boutons faciles à cliquer — VLM confirme "empilement propre, boutons bien espacés, design clair adapté mobile"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Détail médicament premium, responsive, complète conforme aux spécifications
+- Fiche : nom commercial, DCI, dosage, forme, catégorie, prix indicatif (fourchette), statut global, dernière MAJ, description + 5 badges élégants
+- Pharmacies : cartes enrichies (nom, commune, quartier, distance, prix, statut ouvert/fermé, garde, stock, MAJ, horaires) + 4 boutons (Voir/Appeler/Itinéraire/Ordonnance)
+- Alternatives : mêmes DCI avec note informative
+- Bloc prudence discret mais sérieux
+- Recherche rapide + bouton retour
+- Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Adjamé, Treichville

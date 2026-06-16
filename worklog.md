@@ -1383,3 +1383,23 @@ Stage Summary:
 - Navigation : Portefeuille dans bottom-nav, header avec badge crédits + Recharger
 - Profil : section restrictions, Wallet : services bloqués
 - Couleurs pleines, pas de dégradé, contrastes vérifiés
+
+---
+Task ID: 33
+Agent: main (orchestrator)
+Task: Textes super responsive — anti-débordement
+
+Work Log:
+- Correction StatBlock : suppression de `truncate` sur le label (coupait "Pharmacies pa...", "Médicaments r...") → texte complet visible
+- CSS global (globals.css) : ajout `overflow-wrap: break-word; word-wrap: break-word` sur p, span, li, td, th, label, button, a pour empêcher tout débordement de texte
+- Vérification Agent Browser mobile 390px :
+  * Accueil : "Les textes ne débordent pas, ne sont pas coupés. Bien formatés, tous les éléments visibles et lisibles."
+  * Médicaments + Pharmacies : "Aucun débordement ou coupure de texte. Textes bien affichés et adaptés au mobile."
+  * Overflow horizontal : 0px
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Tous les textes de la plateforme sont super responsive et ne débordent plus
+- Règle CSS globale anti-débordement sur tous les éléments texte
+- StatBlock corrigé (labels complets visibles)
+- 0 overflow horizontal sur mobile

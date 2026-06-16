@@ -57,7 +57,7 @@ export function StatBlock({
           <p className="text-xl font-extrabold tabular-nums text-brand-dark">
             {value}
           </p>
-          <p className="truncate text-[11px] leading-tight text-muted-foreground">
+          <p className="text-[11px] leading-tight text-muted-foreground">
             {label}
           </p>
         </div>

@@ -434,3 +434,34 @@ Stage Summary:
 - Bloc prudence discret mais sérieux
 - Recherche rapide + bouton retour
 - Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Adjamé, Treichville
+
+---
+Task ID: 14
+Agent: main (orchestrator)
+Task: Page Pharmacies complète — refonte avec garde, carte, filtres, cartes enrichies
+
+Work Log:
+- Grande zone de recherche : Input avec placeholder "Rechercher une pharmacie, une commune ou un quartier" + bouton "Rechercher" brand-gradient + texte aide "Exemple : Cocody, Yopougon, Marcory, Pharmacie de garde, Riviera…" + 4 chips filtres rapides (Toutes/Ouvertes maintenant/De garde/À proximité)
+- Section "Pharmacies de garde proches" mise en évidence : Card bordée ambre avec en-tête gradient ambre, icône Timer, sous-titre "Actuellement de garde à Abidjan — pour vos urgences", 3 OnDutyMiniCard compacts (nom, quartier+commune+distance, badges Ouvert/24/7), bouton "Voir tout"
+- Bloc carte de localisation : placeholder moderne avec motif grille façon carte, 4 points colorés (pharmacies), overlay centré "Carte des pharmacies proches — Visualisation cartographique bientôt disponible" avec icône MapPinned
+- Filtres latéraux desktop (sticky 270px) / repliables mobile (bouton Filtres + badge compteur) : commune (Select 12 communes), quartier (Input), disponibilité (toggles Ouverte maintenant/De garde/Proche de moi), distance max (Select ≤2/5/10/20 km), disponibilité médicament (Input avec icône Pill), services (Select 24/7/garde/parking/livraison)
+- Chips de filtres actifs + bouton "Tout effacer"
+- Cartes pharmacies PharmacyResultCard : bandeau bg-brand-gradient avec icône Plus + note badge + badges De garde/24/7, corps avec nom + commune + quartier, badges statut (Ouvert/Fermé avec point pulsant, Disponible aujourd'hui, À proximité si ≤5km), grille distance+horaires, téléphone lien tel:, 4 boutons (Voir détails brand-gradient / Appeler tel: / Itinéraire Google Maps / Médicaments → détail pharmacie)
+- Tri intelligent : nearMe par distance, sinon on-duty puis rating
+- Design system utilisé : Heading, Eyebrow, EmptyState, Button (brand-gradient/outline), Card, Badge, Select, Input
+- Vérification Agent Browser :
+  * desktop 1440px : zone recherche + chips + section garde (3 pharmacies Cocody) + carte placeholder + filtres latéraux + cartes avec 4 boutons — VLM confirme "grande zone recherche, section garde visible, carte placeholder moderne, filtres organisés, cartes élégantes avec badges et 4 boutons, identité premium"
+  * filtre "De garde" → 5-6 pharmacies de garde
+  * recherche "Cocody" → filtre pharmacies Cocody
+  * mobile 390px : bouton Filtres repliable avec tous les filtres, cartes lisibles, 4 boutons faciles à cliquer — VLM confirme "empilement propre, cartes lisibles, boutons bien espacés et ergonomiques"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Pharmacies premium, responsive, complète conforme aux spécifications
+- Zone recherche + bouton Rechercher + texte aide + 4 chips filtres rapides
+- Section "Pharmacies de garde proches" en évidence (urgences) avec 3 cartes compactes
+- Bloc carte de localisation (placeholder moderne avec motif grille + points)
+- 8 filtres latéraux (commune, quartier, ouvert, garde, proche, distance, médicament, services)
+- Cartes élégantes : nom, commune, quartier, adresse, distance, téléphone, statut (Ouvert/Fermé/De garde/24/7/Disponible aujourd'hui/À proximité), horaires + 4 boutons (Voir détails/Appeler/Itinéraire/Médicaments)
+- Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Treichville, Bingerville, Koumassi
+- Responsive desktop filtres latéraux / mobile repliable, boutons faciles à cliquer

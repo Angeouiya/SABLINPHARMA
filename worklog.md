@@ -881,3 +881,27 @@ Stage Summary:
 - Image utilisée directement comme logo partout (header, footer, auth, mobile)
 - Favicon mis à jour avec l'image originale
 - Plus aucun SVG ou texte "SABLIN PHARMA" ajouté artificiellement
+
+---
+Task ID: 28
+Agent: main (orchestrator)
+Task: Arrangement du logo sur la barre de navigation supérieure
+
+Work Log:
+- Mise à jour composant Logo (src/components/logo.tsx) :
+  * variant default : conteneur rounded-lg bg-background px-1.5 py-1 ring-1 ring-border/60 (fond blanc, bordure légère arrondie)
+  * variant light (sur fond vert) : conteneur rounded-xl bg-white px-2 py-1.5 shadow-premium (fond blanc plein, ombre légère, coins arrondis)
+  * LogoMark variant light : rounded-lg bg-white px-1.5 py-1 shadow-sm
+- Ajustement taille logo header : size=32 (au lieu de 38) pour s'harmoniser dans le conteneur bordé
+- Ajustement taille logo footer : size=34 (au lieu de 40) pour cohérence
+- Hover : transition-opacity hover:opacity-95
+- Vérification Agent Browser + VLM :
+  * Desktop : "Logo bien placé à gauche, conteneur arrondi, fond blanc et bordure légère, harmonisé avec la barre (couleurs vert/blanc), proportionné, s'intègre élégamment"
+  * Mobile : "Logo bien bordé et harmonisé avec le header, lisible et cohérent"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Logo SABLIN PHARMA arrangé dans la barre de navigation avec jolis bords (conteneur arrondi, fond blanc, bordure légère ring-1)
+- Taille ajustée (32px header, 34px footer) pour harmonie
+- Variant light (fond vert) : conteneur blanc plein avec ombre premium
+- Logo bien proportionné et harmonisé sur desktop et mobile

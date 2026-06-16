@@ -82,10 +82,10 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:px-8">
         <button
           onClick={() => go("home")}
-          className="flex items-center transition-opacity hover:opacity-90"
+          className="flex items-center transition-opacity hover:opacity-95"
           aria-label="Accueil SABLIN PHARMA"
         >
-          <Logo size={38} />
+          <Logo size={32} />
         </button>
 
         <nav className="ml-4 hidden items-center gap-1 lg:flex">

@@ -497,3 +497,36 @@ Stage Summary:
 - Services : 7 cartes (conseils, Mobile Money, garde, bébé, parapharmacie, tension, urgence)
 - Message rassurant discret mais sérieux
 - Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Bingerville
+
+---
+Task ID: 16
+Agent: main (orchestrator)
+Task: Page Ordonnance complète — refonte avec formulaire, récapitulatif, trouver pharmacie
+
+Work Log:
+- Section intro rassurante : Card bg-brand-gradient avec icône ClipboardList, titre "Estimez votre ordonnance", texte explicatif, bouton "Ajouter un médicament" (toggle formulaire)
+- Formulaire d'ajout détaillé (Card animate-fade-up) : nom avec autocomplétion (debounce 250ms, dropdown suggestions avec icône catégorie), DCI, dosage, forme (Select 11 formes), quantité (steppers -/+), durée du traitement, remarque (Textarea), bouton "Ajouter à l'ordonnance". Mémorisation selectedMed pour récupérer slug/prix/pharmacies riches
+- Liste médicaments ajoutés : cards avec numéro, icône catégorie colorée, nom + badge Rx + badge statut (Disponible/Stock faible/À confirmer/Rupture), DCI+forme+dosage+durée, remarque italique, steppers quantité, prix total (Price), boutons modifier (Pencil) + supprimer (Trash2)
+- Bloc récapitulatif (sticky right) : grille 6 StatBox colorés (Médicaments, Unités, Disponibles, Stock faible, À confirmer, Rupture), coût estimatif total (PriceRange si estimation sinon Price), bouton "Estimer le coût" (POST /api/prescription/estimate → fourchette min-max + détail par ligne), boutons "Enregistrer" (localStorage + redirect auth si non connecté) + "Nouvelle" (confirm + reset)
+- Upsell Premium (Card amber) : Crown, 500 FCFA/mois, 3 avantages (estimations illimitées, ordonnances sauvegardées, alertes disponibilité), bouton S'abonner → navigate subscription
+- Section "Trouver une pharmacie" : Card avec icône Store, texte explicatif, bouton "Voir les résultats" → navigate pharmacies, si estimation affiche "X pharmacies peuvent fournir tous vos médicaments"
+- Message de prudence : AlertMessage warning "Cette estimation est indicative. Vérifiez toujours les disponibilités et demandez conseil à un pharmacien ou professionnel de santé."
+- Layout responsive : desktop grid [1fr_360px] (formulaire+liste left, récap+premium right sticky), mobile empilé
+- Design system : Heading, Eyebrow, Price, PriceRange, AlertMessage, EmptyState, Button (brand-gradient/outline), Card, Badge, Select, Label, Textarea, CategoryIcon
+- Vérification Agent Browser :
+  * desktop 1440px : intro + formulaire 7 champs + autocomplétion Paracétamol → ajout → récap (1 médicament, 150 FCFA, Disponible) → ajout Amoxicilline → récap (2 médicaments, 1 disponible, 1 stock faible, 1350 FCFA) → estimation (100-150 FCFA, détail, POST 200) — VLM confirme "intro, formulaire, liste cartes, récap stats + coût FCFA, trouver pharmacie, Enregistrer/Nouvelle, prudence, premium"
+  * bouton Enregistrer → toast "Connectez-vous" (non connecté)
+  * mobile 390px : sections empilées, boutons faciles à cliquer — VLM confirme "empilement, lisibilité, ergonomique"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Ordonnance premium, responsive, complète conforme aux spécifications
+- Intro rassurante + bouton Ajouter un médicament
+- Formulaire détaillé : nom (autocomplétion), DCI, dosage, forme, quantité, durée, remarque + bouton Ajouter à l'ordonnance
+- Liste médicaments : cards avec nom, dosage, forme, qté (steppers), prix, statut, modifier, supprimer
+- Récapitulatif : 6 stats (disponibles/stock faible/à confirmer/rupture) + coût total FCFA + estimation fourchette min-max
+- Trouver une pharmacie + bouton Voir les résultats
+- Enregistrer l'ordonnance (localStorage + auth) + Nouvelle ordonnance
+- Upsell Premium 500 FCFA/mois (valeur de l'abonnement mise en avant)
+- Message de prudence discret
+- Données réalistes : Paracétamol, Amoxicilline, Vitamine C, Smecta, Sérum physiologique, Bétadine, Doliprane

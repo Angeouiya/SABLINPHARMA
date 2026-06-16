@@ -598,3 +598,35 @@ Stage Summary:
 - Bloc confiance : 4 bénéfices (médicaments, ordonnances, garde, favoris) + badge sécurité
 - Messages succès : "Connexion réussie", "Compte créé avec succès"
 - Layout : desktop panneau brand + formulaire, mobile centré
+
+---
+Task ID: 19
+Agent: main (orchestrator)
+Task: Page Profil utilisateur complète — refonte avec abonnement, historique, ordonnances, favoris, notifications
+
+Work Log:
+- Carte profil élégante : header bg-brand-gradient avec avatar initiales (size-20 cercle blanc/15), nom, téléphone, email, commune, badge statut (Premium actif gradient amber OU Compte gratuit brand-light), bouton Paramètres. Stats strip 3 colonnes (Médicaments consultés, Ordonnances estimées, Pharmacies favorites)
+- Section Abonnement : si premium → Card bordée amber avec en-tête gradient (Crown + "Premium actif" + badge "Payé"), grille 4 infos (Prix 500 FCFA/mois, Début, Expiration, Statut Actif), boutons "Renouveler mon abonnement" + "Historique paiements". Si gratuit → Card brand-light avec Crown, description, prix 500 FCFA/mois, bouton "Passer à Premium"
+- Section Notifications personnalisées : 3 dernières notifications (NotifRow avec icône tonalisée selon type, titre, message, point non lu), bouton "Tout voir" → notifications
+- Section Historique des recherches : si historique réel → HistoryRow (médicament, dosage, date, badge Disponible, bouton "Rechercher à nouveau"). Sinon → FictiveHistory (Paracétamol, Amoxicilline, Vitamine C, Smecta avec statuts variés)
+- Section Ordonnances enregistrées : si localStorage → cards (nom, nb médicaments, coût Price, date, bouton "Voir le détail"). Sinon → FictivePrescriptions (Ordonnance rhume 2150 FCFA, Traitement paludisme 4000 FCFA)
+- Section Pharmacies favorites : si favoris réels → FavPharmacyCard (nom, commune, quartier, distance, badges Ouvert/De garde, bouton "Voir la pharmacie"). Sinon → FictiveFavorites (Pharmacie de la Rivière Cocody, Pharmacie du Plateau)
+- Menu Paramètres latéral (Card) : 7 liens (Modifier mes informations, Changer le mot de passe, Gérer les notifications, Gérer mon abonnement, Confidentialité, Aide et support, Conditions d'utilisation) + séparateur + bouton "Se déconnecter" (red, Loader2 pendant logout)
+- Layout responsive : desktop grid [260px_1fr] (menu left + sections right), mobile empilé
+- Design system : Heading, Eyebrow, Muted, Price, Button (brand-gradient/outline), Card, Badge, Skeleton, SectionTitle custom
+- Correction bug : icône FileShield inexistante remplacée par ShieldCheck
+- Vérification Agent Browser :
+  * desktop 1440px : carte profil Aïcha Koné (Premium actif) + menu latéral 7 liens + Abonnement (Premium actif, 500 FCFA/mois, 16 juin - 16 juillet, Payé) + notifications + historique (Paracétamol/Amoxicilline/Vitamine C/Smecta) + ordonnances (Ordonnance rhume 2150F, Traitement paludisme 4000F) + favorites — VLM confirme "carte profil élégante, abonnement, historique, ordonnances, favorites, menu profil latéral, identité premium"
+  * mobile 390px : sections empilées, menu lisible, cartes faciles à cliquer — VLM confirme "empilement propre, icônes claires, bien adapté"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Profil premium, responsive, complète conforme aux spécifications
+- Carte profil : nom, téléphone, email, commune, avatar initiales, badge statut (Gratuit/Premium actif)
+- Abonnement : formule, 500 FCFA/mois, dates début/expiration, statut paiement, bouton Renouveler/Passer Premium
+- Historique des recherches : médicaments consultés avec dosage, date, statut, bouton Rechercher à nouveau
+- Ordonnances enregistrées : nom, nb médicaments, coût total, date, bouton Voir le détail
+- Pharmacies favorites : nom, commune, quartier, distance, statut ouvert/fermé, garde, bouton Voir la pharmacie
+- Notifications personnalisées : rappel abonnement, disponibilité médicament, pharmacie de garde, mise à jour
+- Menu Paramètres : modifier infos, mot de passe, notifications, abonnement, confidentialité, aide, conditions, déconnexion
+- Layout : desktop menu latéral + contenu, mobile empilé

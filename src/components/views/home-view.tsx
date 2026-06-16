@@ -115,11 +115,6 @@ export function HomeView() {
               <Logo size={44} variant="light" />
             </div>
 
-            <Badge className="border-0 bg-white/15 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
-              <span className="mr-1.5 flex size-1.5 rounded-full bg-amber-300 animate-pulse" />
-              Plateforme d&apos;information santé · Côte d&apos;Ivoire
-            </Badge>
-
             <h1 className="mt-4 text-3xl font-extrabold leading-[1.08] tracking-tight sm:text-4xl lg:text-5xl">
               Trouvez vos médicaments{" "}
               <span className="text-amber-300">plus rapidement</span>{" "}

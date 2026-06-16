@@ -661,3 +661,36 @@ Stage Summary:
 - Pourquoi passer à Premium : 5 cartes (gagner temps, éviter déplacements, budget, garde, alertes)
 - FAQ : 4 questions (paiement, annulation, expiration, prix garantis)
 - Layout : desktop carte Premium sticky + contenu, mobile empilé
+
+---
+Task ID: 21
+Agent: main (orchestrator)
+Task: Page Paiement complète — refonte avec 4 moyens ivoiriens, états, modale, historique
+
+Work Log:
+- Header : titre "Paiement de l'abonnement Premium" + sous-texte rassurant (recherche illimitée, estimation, garde, favoris, historique, alertes) + badge Crown Premium
+- Carte récapitulative (sticky right) : formule Premium, montant 500 FCFA, durée 1 mois, frais 0, statut "En attente", total à payer 500 FCFA (Price lg), bouton "Confirmer le paiement"
+- 4 moyens de paiement ivoiriens : Wave (sky-500 "W"), Orange Money (orange-500 "OM"), MTN Money (yellow-400 "MTN"), Moov Money (blue-600 "Moov") en cartes sélectionnables 2x2 (grid sm:4) avec état actif (border-brand ring-2 + CheckCircle2)
+- Formulaire de paiement : opérateur sélectionné (read-only display), numéro téléphone Mobile Money (format 07 00 00 00 00), nom titulaire, montant 500 FCFA (read-only brand-light), bouton "Payer maintenant 500 FCFA" (brand-gradient h-12), bouton "Annuler"
+- Bloc sécurité : Card brand-light/20 avec ShieldCheck + 3 SecurityItem (Paiement sécurisé chiffré, Vos informations protégées, Activation automatique après paiement confirmé) + note "Environnement de démonstration"
+- États de paiement : StateBanner pour pending (Loader2 spin "Paiement en attente"), failed (XCircle danger "Paiement échoué" + bouton Réessayer), cancelled (AlertCircle warning "Transaction annulée" + bouton Reprendre)
+- Modale de confirmation (Dialog) : header bg-brand-gradient avec CheckCircle2 animate-scale-in + "Paiement confirmé !" + "Abonnement Premium activé", grille 4 détails (Montant payé 500 FCFA, Date paiement, Date expiration, Moyen), référence transaction (mono + bouton Copy), boutons "Accéder à mon compte" (→ profile) + "Retour à l'accueil"
+- Section historique des paiements : tableau 6 colonnes (Date, Formule, Montant, Moyen, Statut, Référence) avec 4 lignes fictives (Orange Money/Wave/MTN/Moov, statuts Réussi/Échoué), références cliquables (copie presse-papiers)
+- Layout responsive : desktop grid [1fr_380px] (formulaire left, récap sticky right), mobile empilé
+- Vérification Agent Browser :
+  * desktop 1440px : titre + 4 moyens (Wave/Orange/MTN/Moov) + formulaire (numéro, titulaire, montant, Payer) + sécurité 3 messages + récap (Confirmer) + historique — VLM confirme "titre, 4 moyens, formulaire, sécurité 3 messages, récap Confirmer, historique, identité premium"
+  * paiement complet (numéro 0700000000 + Jean Test) → modale confirmation (Paiement confirmé, 500 FCFA, 16 juin - 16 juillet, Orange Money, référence SPL-) — VLM confirme "icône succès, titre, détails, bouton Accéder à mon compte, identité premium"
+  * mobile 390px : moyens sélectionnables, bouton Payer visible, sections empilées — VLM confirme "moyens clairs, bouton visible, empilement, intuitif"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Paiement premium, responsive, sécurisée, complète conforme aux spécifications
+- Titre "Paiement de l'abonnement Premium" + sous-texte rassurant
+- Carte récapitulative : formule Premium, 500 FCFA, durée 1 mois, total, statut, bouton Confirmer
+- 4 moyens ivoiriens : Wave, Orange Money, MTN Money, Moov Money (cartes sélectionnables)
+- Formulaire : numéro téléphone, nom titulaire, opérateur, montant, bouton Payer maintenant
+- Bloc sécurité : 3 messages (Paiement sécurisé, Informations protégées, Activation automatique)
+- États : en attente, réussi, échoué, annulé, abonnement activé (bannières + icônes)
+- Modale confirmation : paiement confirmé, abonnement activé, montant, dates, référence, bouton Accéder à mon compte
+- Historique : date, formule, montant, moyen, statut, référence (4 lignes fictives)
+- Layout : desktop formulaire + récap sticky, mobile empilé

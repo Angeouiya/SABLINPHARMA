@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   ChevronLeft,
+  ChevronRight,
   CreditCard,
   Smartphone,
   Lock,
@@ -10,28 +11,35 @@ import {
   Loader2,
   CheckCircle2,
   Crown,
-  ChevronRight,
+  XCircle,
+  AlertCircle,
+  Clock,
+  Zap,
+  Receipt,
+  Copy,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
-import { formatFCFA } from "@/lib/format";
+import { formatFCFA, formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
-type Method = "mobile_money" | "card";
-type Provider = "orange" | "mtn" | "moov";
+type Provider = "wave" | "orange" | "mtn" | "moov";
+type PaymentState = "idle" | "pending" | "success" | "failed" | "cancelled";
 
 const PROVIDERS: {
   id: Provider;
@@ -39,68 +47,99 @@ const PROVIDERS: {
   short: string;
   bgClass: string;
   textClass: string;
+  desc: string;
 }[] = [
+  {
+    id: "wave",
+    label: "Wave",
+    short: "W",
+    bgClass: "bg-sky-500",
+    textClass: "text-white",
+    desc: "Transfert instantané, sans frais",
+  },
   {
     id: "orange",
     label: "Orange Money",
     short: "OM",
     bgClass: "bg-orange-500",
     textClass: "text-white",
+    desc: "Orange Money, partout en CI",
   },
   {
     id: "mtn",
-    label: "MTN MoMo",
+    label: "MTN Money",
     short: "MTN",
     bgClass: "bg-yellow-400",
     textClass: "text-black",
+    desc: "MTN MoMo, rapide et sûr",
   },
   {
     id: "moov",
     label: "Moov Money",
     short: "Moov",
-    bgClass: "bg-blue-500",
+    bgClass: "bg-blue-600",
     textClass: "text-white",
+    desc: "Moov Money, facile et fiable",
   },
 ];
 
 const PRICE = 500;
 
+// Fictive payment history
+const PAYMENT_HISTORY = [
+  {
+    date: "2026-06-16",
+    formule: "Premium mensuel",
+    montant: 500,
+    moyen: "Orange Money",
+    statut: "success" as const,
+    reference: "SPL-202606161435",
+  },
+  {
+    date: "2026-05-16",
+    formule: "Premium mensuel",
+    montant: 500,
+    moyen: "Wave",
+    statut: "success" as const,
+    reference: "SPL-202605160912",
+  },
+  {
+    date: "2026-04-16",
+    formule: "Premium mensuel",
+    montant: 500,
+    moyen: "MTN Money",
+    statut: "success" as const,
+    reference: "SPL-202604161820",
+  },
+  {
+    date: "2026-03-16",
+    formule: "Premium mensuel",
+    montant: 500,
+    moyen: "Moov Money",
+    statut: "failed" as const,
+    reference: "SPL-202603161104",
+  },
+];
+
 export function PaymentView() {
   const { navigate } = useNav();
   const { user, premium, setPremium, fetchMe } = useAuth();
 
-  const [method, setMethod] = useState<Method>("mobile_money");
   const [provider, setProvider] = useState<Provider>("orange");
-
-  // Mobile money state
   const [phone, setPhone] = useState("");
-
-  // Card state
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvc, setCvc] = useState("");
-  const [cardName, setCardName] = useState("");
-
-  const [loading, setLoading] = useState(false);
+  const [holderName, setHolderName] = useState(user?.name ?? "");
+  const [state, setState] = useState<PaymentState>("idle");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [transactionRef, setTransactionRef] = useState("");
+  const [paymentDate, setPaymentDate] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
 
   const formattedPhone = useMemo(() => {
-    // Strip non-digits, group by 2 digits
     const digits = phone.replace(/\D/g, "").slice(0, 10);
     return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
   }, [phone]);
 
-  const formattedCard = useMemo(() => {
-    const digits = cardNumber.replace(/\D/g, "").slice(0, 16);
-    return digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
-  }, [cardNumber]);
-
-  const formattedExpiry = useMemo(() => {
-    const digits = expiry.replace(/\D/g, "").slice(0, 4);
-    if (digits.length <= 2) return digits;
-    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  }, [expiry]);
-
-  // If not connected
+  // Not connected
   if (!user) {
     return (
       <div className="mx-auto flex min-h-[60vh] w-full max-w-md items-center px-4 py-12">
@@ -112,8 +151,7 @@ export function PaymentView() {
             Connectez-vous pour continuer
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Vous devez être connecté à votre compte SABLIN PHARMA pour souscrire
-            à l&apos;abonnement Premium.
+            Vous devez être connecté pour souscrire à l&apos;abonnement Premium.
           </p>
           <Button
             className="mt-6 w-full bg-brand-gradient text-white hover:opacity-90"
@@ -122,101 +160,35 @@ export function PaymentView() {
           >
             Se connecter
           </Button>
-          <Button
-            variant="ghost"
-            className="mt-2 w-full text-muted-foreground"
-            onClick={() => navigate("subscription")}
-          >
-            Retour à l&apos;abonnement
-          </Button>
-        </Card>
-      </div>
-    );
-  }
-
-  // If already premium
-  if (premium) {
-    return (
-      <div className="mx-auto flex min-h-[60vh] w-full max-w-md items-center px-4 py-12">
-        <Card className="w-full border-brand/30 bg-gradient-to-br from-brand-light/60 to-card p-8 text-center shadow-premium">
-          <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand-gradient text-white">
-            <CheckCircle2 className="size-7" />
-          </span>
-          <h1 className="mt-5 text-xl font-extrabold text-foreground sm:text-2xl">
-            Vous êtes déjà Premium
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Votre abonnement Premium est actif. Aucun paiement supplémentaire
-            n&apos;est nécessaire pour le moment.
-          </p>
-          <div className="mt-5 flex flex-col gap-2">
-            <Button
-              className="w-full bg-brand-gradient text-white hover:opacity-90"
-              size="lg"
-              onClick={() => navigate("profile")}
-            >
-              Voir mon profil
-              <ChevronRight className="size-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full text-muted-foreground"
-              onClick={() => navigate("home")}
-            >
-              Retour à l&apos;accueil
-            </Button>
-          </div>
         </Card>
       </div>
     );
   }
 
   const handlePay = async () => {
-    // Basic client-side validation (mock)
-    if (method === "mobile_money") {
-      const digits = phone.replace(/\D/g, "");
-      if (digits.length !== 10) {
-        toast.error("Numéro de téléphone invalide", {
-          description: "Saisissez un numéro ivoirien à 10 chiffres (07 XX XX XX XX).",
-        });
-        return;
-      }
-    } else {
-      const digits = cardNumber.replace(/\D/g, "");
-      if (digits.length !== 16) {
-        toast.error("Numéro de carte invalide", {
-          description: "Saisissez les 16 chiffres de votre carte.",
-        });
-        return;
-      }
-      if (!/^\d{2}\/\d{2}$/.test(expiry)) {
-        toast.error("Date d&apos;expiration invalide", {
-          description: "Format attendu : MM/AA.",
-        });
-        return;
-      }
-      if (cvc.replace(/\D/g, "").length !== 3) {
-        toast.error("CVC invalide", {
-          description: "Le cryptogramme visuel comporte 3 chiffres.",
-        });
-        return;
-      }
-      if (cardName.trim().length < 3) {
-        toast.error("Nom du titulaire manquant", {
-          description: "Saisissez le nom inscrit sur la carte.",
-        });
-        return;
-      }
+    // Validation
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length !== 10) {
+      toast.error("Numéro de téléphone invalide", {
+        description: "Saisissez un numéro ivoirien à 10 chiffres (07 XX XX XX XX).",
+      });
+      return;
+    }
+    if (holderName.trim().length < 3) {
+      toast.error("Nom du titulaire manquant", {
+        description: "Saisissez le nom du titulaire du compte.",
+      });
+      return;
     }
 
-    setLoading(true);
+    setState("pending");
     try {
       const res = await fetch("/api/subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          method,
-          provider: method === "mobile_money" ? provider : "card",
+          method: "mobile_money",
+          provider,
         }),
       });
 
@@ -225,23 +197,45 @@ export function PaymentView() {
         throw new Error(data?.error ?? "Échec du paiement");
       }
 
+      const result = await res.json();
+      const ref = `SPL-${Date.now()}`;
+      const now = new Date();
+      const exp = new Date();
+      exp.setMonth(exp.getMonth() + 1);
+
+      setTransactionRef(ref);
+      setPaymentDate(now.toISOString());
+      setExpiryDate(exp.toISOString());
       setPremium(true);
       await fetchMe();
-      toast.success("Paiement réussi ! Abonnement activé", {
-        description: "Bienvenue dans l&apos;expérience Premium SABLIN PHARMA.",
+      setState("success");
+      setShowSuccess(true);
+      toast.success("Paiement réussi ! Abonnement Premium activé", {
+        description: "Bienvenue dans l'expérience Premium SABLIN PHARMA.",
       });
-      navigate("success");
+      void result;
     } catch (err) {
+      setState("failed");
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
       toast.error("Paiement échoué", { description: msg });
-    } finally {
-      setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    setState("cancelled");
+    toast.info("Transaction annulée", {
+      description: "Vous pouvez réessayer à tout moment.",
+    });
+  };
+
+  const resetState = () => {
+    setState("idle");
+    setPhone("");
   };
 
   return (
     <div className="flex flex-col">
-      {/* HEADER */}
+      {/* ============ HEADER ============ */}
       <section className="relative overflow-hidden bg-gradient-to-br from-amber-50 via-background to-brand-light/40">
         <div className="absolute -right-16 -top-16 size-72 rounded-full bg-amber-300/20 blur-3xl" />
         <div className="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
@@ -259,324 +253,530 @@ export function PaymentView() {
               Premium
             </Badge>
             <h1 className="mt-3 text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl">
-              Paiement de l&apos;abonnement
+              Paiement de l&apos;abonnement Premium
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Réglez votre abonnement mensuel en toute sécurité. Activation
-              immédiate après confirmation du paiement.
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
+              Activez votre accès aux fonctionnalités avancées : recherche illimitée,
+              estimation d&apos;ordonnance, pharmacies de garde, favoris, historique et
+              alertes. Simple, rapide et sécurisé.
             </p>
           </div>
         </div>
       </section>
 
       <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-        <div className="grid gap-8 lg:grid-cols-[1fr_380px] lg:gap-8">
-          {/* LEFT — Payment method */}
-          <div className="flex flex-col gap-6">
-            <Card className="border-border/70 p-6 sm:p-7">
-              <CardHeader className="px-0 pt-0">
-                <CardTitle className="flex items-center gap-2 text-lg font-extrabold text-foreground">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
-                    <CreditCard className="size-4" />
-                  </span>
-                  Méthode de paiement
-                </CardTitle>
-              </CardHeader>
+        {/* ============ PAYMENT STATE BANNERS ============ */}
+        {state === "pending" && (
+          <StateBanner
+            icon={Loader2}
+            iconClass="animate-spin text-brand"
+            title="Paiement en attente"
+            message="Veuillez patienter pendant le traitement de votre paiement..."
+            tone="info"
+          />
+        )}
+        {state === "failed" && (
+          <StateBanner
+            icon={XCircle}
+            iconClass="text-danger"
+            title="Paiement échoué"
+            message="Le paiement n'a pas pu aboutir. Vérifiez votre solde et réessayez."
+            tone="danger"
+            action={{ label: "Réessayer", onClick: resetState }}
+          />
+        )}
+        {state === "cancelled" && (
+          <StateBanner
+            icon={AlertCircle}
+            iconClass="text-warning-foreground"
+            title="Transaction annulée"
+            message="Vous avez annulé la transaction. Vous pouvez réessayer quand vous voulez."
+            tone="warning"
+            action={{ label: "Reprendre", onClick: resetState }}
+          />
+        )}
 
-              <CardContent className="px-0">
-                <RadioGroup
-                  value={method}
-                  onValueChange={(v) => setMethod(v as Method)}
-                  className="grid gap-3 sm:grid-cols-2"
-                >
-                  <label
-                    htmlFor="method-mm"
-                    className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-all ${
-                      method === "mobile_money"
-                        ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
-                        : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
-                    }`}
-                  >
-                    <RadioGroupItem value="mobile_money" id="method-mm" />
-                    <span className="flex size-10 items-center justify-center rounded-lg bg-brand-gradient text-white">
-                      <Smartphone className="size-5" />
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-foreground">
-                        Mobile Money
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Orange, MTN, Moov
-                      </p>
-                    </div>
-                  </label>
+        <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_380px] lg:gap-8">
+          {/* LEFT — Payment form */}
+          <div className="space-y-6">
+            {/* Moyens de paiement */}
+            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+                  <Smartphone className="size-4" />
+                </span>
+                <h2 className="text-base font-bold text-foreground">
+                  Choisissez votre moyen de paiement
+                </h2>
+              </div>
 
-                  <label
-                    htmlFor="method-card"
-                    className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-all ${
-                      method === "card"
-                        ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
-                        : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
-                    }`}
-                  >
-                    <RadioGroupItem value="card" id="method-card" />
-                    <span className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 text-white">
-                      <CreditCard className="size-5" />
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-foreground">
-                        Carte bancaire
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Visa, Mastercard
-                      </p>
-                    </div>
-                  </label>
-                </RadioGroup>
-              </CardContent>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {PROVIDERS.map((p) => {
+                  const active = provider === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setProvider(p.id)}
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-all",
+                        active
+                          ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+                          : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
+                      )}
+                      aria-pressed={active}
+                    >
+                      <span
+                        className={cn(
+                          "flex size-11 items-center justify-center rounded-xl text-xs font-extrabold shadow-sm",
+                          p.bgClass,
+                          p.textClass
+                        )}
+                      >
+                        {p.short}
+                      </span>
+                      <span className="text-[11px] font-bold leading-tight text-foreground">
+                        {p.label}
+                      </span>
+                      {active && (
+                        <CheckCircle2 className="size-3.5 text-brand" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </Card>
 
-            {/* Mobile Money details */}
-            {method === "mobile_money" && (
-              <Card className="border-border/70 p-6 sm:p-7">
-                <CardHeader className="px-0 pt-0">
-                  <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
-                    <Smartphone className="size-4 text-brand" />
-                    Choisissez votre opérateur
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-0 space-y-5">
-                  <div className="grid grid-cols-3 gap-3">
-                    {PROVIDERS.map((p) => {
-                      const active = provider === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setProvider(p.id)}
-                          className={`flex flex-col items-center gap-2 rounded-xl border p-3 transition-all ${
-                            active
-                              ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
-                              : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
-                          }`}
-                          aria-pressed={active}
-                        >
-                          <span
-                            className={`flex size-11 items-center justify-center rounded-xl text-xs font-extrabold shadow-sm ${p.bgClass} ${p.textClass}`}
-                          >
-                            {p.short}
-                          </span>
-                          <span className="text-center text-[11px] font-semibold leading-tight text-foreground">
-                            {p.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+            {/* Formulaire de paiement */}
+            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+                  <CreditCard className="size-4" />
+                </span>
+                <h2 className="text-base font-bold text-foreground">
+                  Informations de paiement
+                </h2>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-sm font-semibold">
-                      Numéro Mobile Money
-                    </Label>
+              <div className="space-y-4">
+                {/* Opérateur sélectionné (read-only display) */}
+                <div className="space-y-1.5">
+                  <Label>Opérateur sélectionné</Label>
+                  <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                    <span
+                      className={cn(
+                        "flex size-7 items-center justify-center rounded-lg text-[10px] font-extrabold",
+                        PROVIDERS.find((p) => p.id === provider)?.bgClass,
+                        PROVIDERS.find((p) => p.id === provider)?.textClass
+                      )}
+                    >
+                      {PROVIDERS.find((p) => p.id === provider)?.short}
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {PROVIDERS.find((p) => p.id === provider)?.label}
+                    </span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      {PROVIDERS.find((p) => p.id === provider)?.desc}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Numéro de téléphone */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone">
+                    Numéro de téléphone Mobile Money <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Smartphone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="phone"
                       inputMode="tel"
                       placeholder="07 00 00 00 00"
                       value={formattedPhone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="text-base tracking-wide"
+                      className="h-11 pl-9 text-base tracking-wide"
                       maxLength={19}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Saisissez le numéro ivoirien lié à votre compte{" "}
-                      {PROVIDERS.find((p) => p.id === provider)?.label}.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Card details */}
-            {method === "card" && (
-              <Card className="border-border/70 p-6 sm:p-7">
-                <CardHeader className="px-0 pt-0">
-                  <CardTitle className="flex items-center gap-2 text-base font-bold text-foreground">
-                    <CreditCard className="size-4 text-brand" />
-                    Informations de la carte
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-0 space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="card-number" className="text-sm font-semibold">
-                      Numéro de carte
-                    </Label>
-                    <Input
-                      id="card-number"
-                      inputMode="numeric"
-                      placeholder="0000 0000 0000 0000"
-                      value={formattedCard}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      className="text-base tracking-widest"
-                      maxLength={19}
+                      disabled={state === "pending"}
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Saisissez le numéro ivoirien lié à votre compte{" "}
+                    {PROVIDERS.find((p) => p.id === provider)?.label}.
+                  </p>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="expiry" className="text-sm font-semibold">
-                        Date d&apos;expiration
-                      </Label>
-                      <Input
-                        id="expiry"
-                        inputMode="numeric"
-                        placeholder="MM/AA"
-                        value={formattedExpiry}
-                        onChange={(e) => setExpiry(e.target.value)}
-                        className="text-base"
-                        maxLength={5}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cvc" className="text-sm font-semibold">
-                        CVC
-                      </Label>
-                      <Input
-                        id="cvc"
-                        inputMode="numeric"
-                        placeholder="000"
-                        value={cvc}
-                        onChange={(e) =>
-                          setCvc(
-                            e.target.value
-                              .replace(/\D/g, "")
-                              .slice(0, 3)
-                          )
-                        }
-                        className="text-base tracking-widest"
-                        maxLength={3}
-                        type="password"
-                      />
-                    </div>
-                  </div>
+                {/* Nom du titulaire */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="holder">
+                    Nom du titulaire <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="holder"
+                    placeholder="Nom complet du titulaire"
+                    value={holderName}
+                    onChange={(e) => setHolderName(e.target.value)}
+                    className="h-11"
+                    disabled={state === "pending"}
+                  />
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="card-name" className="text-sm font-semibold">
-                      Nom sur la carte
-                    </Label>
-                    <Input
-                      id="card-name"
-                      placeholder="JEAN KOUASSI"
-                      value={cardName}
-                      onChange={(e) => setCardName(e.target.value)}
-                      className="text-base uppercase"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* RIGHT — Récapitulatif (sticky) */}
-          <div className="lg:sticky lg:top-24 lg:self-start">
-            <Card className="border-border/70 p-6 shadow-premium sm:p-7">
-              <CardHeader className="px-0 pt-0">
-                <CardTitle className="text-lg font-extrabold text-foreground">
-                  Récapitulatif
-                </CardTitle>
-              </CardHeader>
-
-              <CardContent className="px-0 space-y-4">
-                <div className="flex items-start gap-3 rounded-xl bg-brand-light/40 p-4">
-                  <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white">
-                    <Crown className="size-5" />
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-foreground">
-                      Abonnement Premium
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      1 mois · Activation immédiate
-                    </p>
+                {/* Montant (read-only) */}
+                <div className="space-y-1.5">
+                  <Label>Montant à payer</Label>
+                  <div className="flex items-center justify-between rounded-lg border border-brand/20 bg-brand-light/30 px-3 py-2.5">
+                    <span className="text-sm text-muted-foreground">Abonnement Premium · 1 mois</span>
+                    <Price amount={PRICE} size="md" variant="brand" />
                   </div>
                 </div>
 
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sous-total</span>
-                    <span className="font-semibold text-foreground">
-                      {formatFCFA(PRICE)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Frais</span>
-                    <span className="font-semibold text-foreground">0 FCFA</span>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="flex items-baseline justify-between">
-                  <span className="text-base font-bold text-foreground">
-                    Total
-                  </span>
-                  <span className="text-2xl font-extrabold text-brand-dark">
-                    {formatFCFA(PRICE)}
-                  </span>
-                </div>
-
+                {/* Bouton Payer maintenant */}
                 <Button
-                  className="w-full bg-brand-gradient text-white hover:opacity-90"
-                  size="lg"
-                  disabled={loading}
+                  className="h-12 w-full bg-brand-gradient text-base font-semibold text-white shadow-premium hover:opacity-90"
                   onClick={handlePay}
+                  disabled={state === "pending"}
                 >
-                  {loading ? (
+                  {state === "pending" ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
-                      Traitement...
+                      Traitement en cours…
                     </>
                   ) : (
                     <>
                       <Lock className="size-4" />
-                      Payer {formatFCFA(PRICE)}
+                      Payer maintenant {formatFCFA(PRICE)}
                     </>
                   )}
                 </Button>
 
-                <div className="flex items-start gap-2 rounded-xl border border-brand/20 bg-brand-light/30 p-3">
-                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand" />
-                  <div className="text-xs">
-                    <p className="font-semibold text-foreground">
-                      Paiement 100% sécurisé
-                    </p>
-                    <p className="text-muted-foreground">
-                      Vos données sont chiffrées et ne sont jamais stockées sur
-                      nos serveurs.
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-                  Il s&apos;agit d&apos;un environnement de démonstration. Aucun
-                  débit réel n&apos;est effectué.
-                </p>
-              </CardContent>
-
-              <CardFooter className="px-0 pb-0 pt-2">
                 <Button
                   variant="ghost"
                   className="w-full text-muted-foreground"
-                  onClick={() => navigate("subscription")}
-                  disabled={loading}
+                  onClick={handleCancel}
+                  disabled={state === "pending"}
                 >
-                  <ChevronLeft className="size-4" />
-                  Modifier l&apos;offre
+                  Annuler
                 </Button>
-              </CardFooter>
+              </div>
+            </Card>
+
+            {/* Bloc sécurité */}
+            <Card className="border-brand/20 bg-brand-light/20 p-5">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="size-5 text-brand" />
+                <h3 className="text-sm font-bold text-foreground">
+                  Paiement sécurisé et protégé
+                </h3>
+              </div>
+              <ul className="mt-3 space-y-2">
+                <SecurityItem text="Paiement sécurisé — toutes les transactions sont chiffrées." />
+                <SecurityItem text="Vos informations sont protégées et ne sont jamais partagées." />
+                <SecurityItem text="Activation automatique après paiement confirmé." />
+              </ul>
+              <p className="mt-3 rounded-lg bg-background/60 px-3 py-2 text-[11px] text-muted-foreground">
+                Environnement de démonstration — aucun débit réel n&apos;est effectué.
+              </p>
+            </Card>
+          </div>
+
+          {/* RIGHT — Récapitulatif (sticky) */}
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+              <div className="flex items-center gap-2">
+                <Receipt className="size-4 text-brand" />
+                <h2 className="text-base font-bold text-foreground">
+                  Récapitulatif
+                </h2>
+              </div>
+
+              <div className="mt-4 flex items-start gap-3 rounded-xl bg-brand-light/40 p-4">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white">
+                  <Crown className="size-5" />
+                </span>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-foreground">Abonnement Premium</p>
+                  <p className="text-xs text-muted-foreground">
+                    Formule mensuelle · Activation immédiate
+                  </p>
+                </div>
+                <Badge className="border-0 bg-success text-white">
+                  <CheckCircle2 className="size-3" /> À payer
+                </Badge>
+              </div>
+
+              <div className="mt-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Formule</span>
+                  <span className="font-semibold text-foreground">Premium</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Montant</span>
+                  <span className="font-semibold text-foreground">{formatFCFA(PRICE)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Durée</span>
+                  <span className="font-semibold text-foreground">1 mois</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Frais</span>
+                  <span className="font-semibold text-foreground">0 FCFA</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Statut</span>
+                  <span className="font-semibold text-foreground">En attente</span>
+                </div>
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="flex items-baseline justify-between">
+                <span className="text-base font-bold text-foreground">Total à payer</span>
+                <Price amount={PRICE} size="lg" variant="brand" />
+              </div>
+
+              <Button
+                className="mt-4 w-full bg-brand-gradient text-white hover:opacity-90"
+                size="lg"
+                onClick={handlePay}
+                disabled={state === "pending"}
+              >
+                {state === "pending" ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" /> Traitement…
+                  </>
+                ) : (
+                  <>
+                    <Lock className="size-4" /> Confirmer le paiement
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                className="mt-2 w-full text-muted-foreground"
+                onClick={() => navigate("subscription")}
+                disabled={state === "pending"}
+              >
+                <ChevronLeft className="size-4" /> Modifier l&apos;offre
+              </Button>
             </Card>
           </div>
         </div>
+
+        {/* ============ HISTORIQUE DES PAIEMENTS ============ */}
+        <section className="mt-12">
+          <div className="mb-4 flex items-center gap-2.5">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
+              <Receipt className="size-5" />
+            </span>
+            <div>
+              <Eyebrow>Transparence</Eyebrow>
+              <Heading level="h2">Historique des paiements</Heading>
+            </div>
+          </div>
+
+          <Card className="overflow-hidden border-border/70 py-0 shadow-card">
+            <div className="overflow-x-auto scroll-thin">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className="border-b border-border/60 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-5 py-3.5 font-semibold">Date</th>
+                    <th className="px-5 py-3.5 font-semibold">Formule</th>
+                    <th className="px-5 py-3.5 font-semibold">Montant</th>
+                    <th className="px-5 py-3.5 font-semibold">Moyen</th>
+                    <th className="px-5 py-3.5 font-semibold">Statut</th>
+                    <th className="px-5 py-3.5 font-semibold">Référence</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {PAYMENT_HISTORY.map((row, i) => (
+                    <tr key={i} className="transition-colors hover:bg-accent/30">
+                      <td className="px-5 py-3.5 text-muted-foreground">
+                        {formatDate(row.date)}
+                      </td>
+                      <td className="px-5 py-3.5 font-semibold text-foreground">
+                        {row.formule}
+                      </td>
+                      <td className="px-5 py-3.5 font-bold text-brand-dark">
+                        {formatFCFA(row.montant)}
+                      </td>
+                      <td className="px-5 py-3.5 text-muted-foreground">{row.moyen}</td>
+                      <td className="px-5 py-3.5">
+                        {row.statut === "success" ? (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-success-light px-2 py-0.5 text-[10px] font-bold text-success">
+                            <CheckCircle2 className="size-2.5" /> Réussi
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-danger-light px-2 py-0.5 text-[10px] font-bold text-danger">
+                            <XCircle className="size-2.5" /> Échoué
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard?.writeText(row.reference);
+                            toast.success("Référence copiée");
+                          }}
+                          className="inline-flex items-center gap-1 font-mono text-xs text-brand hover:underline"
+                        >
+                          {row.reference}
+                          <Copy className="size-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </section>
       </div>
+
+      {/* ============ MODALE DE CONFIRMATION ============ */}
+      <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+        <DialogContent className="max-w-md border-brand/30 p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Paiement confirmé</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-hidden rounded-xl">
+            {/* Header succès */}
+            <div className="relative flex flex-col items-center bg-brand-gradient px-6 py-8 text-center text-white">
+              <div className="absolute inset-0 bg-dotted-white opacity-15" />
+              <span className="relative flex size-16 items-center justify-center rounded-full bg-white/15 ring-8 ring-white/10 backdrop-blur-sm animate-scale-in">
+                <CheckCircle2 className="size-9 text-white" />
+              </span>
+              <h2 className="relative mt-4 text-xl font-extrabold">
+                Paiement confirmé !
+              </h2>
+              <p className="relative mt-1 text-sm text-white/85">
+                Abonnement Premium activé avec succès
+              </p>
+            </div>
+
+            {/* Détails */}
+            <div className="space-y-3 p-6">
+              <div className="grid grid-cols-2 gap-3">
+                <DetailItem label="Montant payé" value={formatFCFA(PRICE)} />
+                <DetailItem label="Date de paiement" value={paymentDate ? formatDate(paymentDate) : "—"} />
+                <DetailItem label="Date d'expiration" value={expiryDate ? formatDate(expiryDate) : "—"} />
+                <DetailItem label="Moyen de paiement" value={PROVIDERS.find((p) => p.id === provider)?.label ?? "—"} />
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  Référence de transaction
+                </p>
+                <div className="mt-0.5 flex items-center justify-between">
+                  <span className="font-mono text-sm font-bold text-foreground">
+                    {transactionRef}
+                  </span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard?.writeText(transactionRef);
+                      toast.success("Référence copiée");
+                    }}
+                    className="text-brand hover:underline"
+                  >
+                    <Copy className="size-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                className="w-full bg-brand-gradient text-white hover:opacity-90"
+                size="lg"
+                onClick={() => {
+                  setShowSuccess(false);
+                  navigate("profile");
+                }}
+              >
+                Accéder à mon compte <ArrowRight className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground"
+                onClick={() => {
+                  setShowSuccess(false);
+                  navigate("home");
+                }}
+              >
+                Retour à l&apos;accueil
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ============================================================
+   StateBanner — bannière d'état de paiement
+   ============================================================ */
+function StateBanner({
+  icon: Icon,
+  iconClass,
+  title,
+  message,
+  tone,
+  action,
+}: {
+  icon: typeof Loader2;
+  iconClass: string;
+  title: string;
+  message: string;
+  tone: "info" | "danger" | "warning" | "success";
+  action?: { label: string; onClick: () => void };
+}) {
+  const tones = {
+    info: "border-brand/30 bg-brand-light/30 text-brand-dark",
+    danger: "border-danger/30 bg-danger-light text-danger",
+    warning: "border-warning/30 bg-warning-light text-warning-foreground",
+    success: "border-success/30 bg-success-light text-success",
+  };
+  return (
+    <div className={cn("flex items-center gap-3 rounded-xl border p-4", tones[tone])}>
+      <Icon className={cn("size-6 shrink-0", iconClass)} />
+      <div className="flex-1">
+        <p className="text-sm font-bold">{title}</p>
+        <p className="text-xs opacity-90">{message}</p>
+      </div>
+      {action && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-current"
+          onClick={action.onClick}
+        >
+          {action.label}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   SecurityItem — élément de la liste sécurité
+   ============================================================ */
+function SecurityItem({ text }: { text: string }) {
+  return (
+    <li className="flex items-start gap-2 text-xs text-foreground/80">
+      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-brand" />
+      <span>{text}</span>
+    </li>
+  );
+}
+
+/* ============================================================
+   DetailItem — détail dans la modale de confirmation
+   ============================================================ */
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border/50 bg-background px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-semibold text-foreground">{value}</p>
     </div>
   );
 }

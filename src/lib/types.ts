@@ -16,7 +16,8 @@ export type View =
   | "notifications"
   | "history"
   | "favorites"
-  | "settings";
+  | "settings"
+  | "design-system";
 
 export interface NavParams {
   slug?: string;

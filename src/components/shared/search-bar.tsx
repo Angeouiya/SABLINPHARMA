@@ -107,7 +107,10 @@ export function SearchBar({ variant = "compact", initialQuery = "", placeholder 
         )}
         <Button
           size={variant === "hero" ? "lg" : "default"}
-          className="shrink-0 bg-brand-gradient text-white hover:opacity-90"
+          className={cn(
+            "shrink-0 bg-brand-gradient text-white hover:opacity-90",
+            variant === "hero" && "h-12 px-5"
+          )}
           onClick={() => submit()}
         >
           <Search className="size-4" />

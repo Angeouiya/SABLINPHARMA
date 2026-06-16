@@ -275,3 +275,72 @@ Stage Summary:
 - Navigation complète : header desktop + bottom-nav mobile + footer + menu compte + accès rapide profil
 - Données persistantes : notifications, historique, favoris, paramètres (Prisma SQLite)
 - Aucune icône interdite (étoile/feuille/bâtiment) ; notes en badges numériques
+
+---
+Task ID: 32
+Agent: Agent 32 (Design System Showcase View)
+Task: Construire la page "Design System Showcase" de SABLIN PHARMA (documentation vivante de l'identité visuelle et des composants réutilisables, en FRANÇAIS).
+
+Work Log:
+- Lecture du worklog partagé (Tasks 1, 7-a, 7-c, 7-d, 7-e, 8, 9, 23-a, 23-b) pour comprendre le design system vert brand premium, les contraintes d'icônes (aucune étoile/feuille/bâtiment), les stores useNav, les composants partagés et shadcn/ui disponibles.
+- Lecture approfondie des composants cibles : typography.tsx (Heading h1-h4, Eyebrow, Text, Muted, Price, PriceRange), button.tsx (9 variantes + 4 tailles), status-badge.tsx (MedicationStatusBadge, PharmacyStatusBadge, Open247Badge), stat-block.tsx (StatBlock, StatGrid, 6 tons), alert-message.tsx (4 variants), empty-state.tsx, loader.tsx (Loader/FullLoader/ButtonLoader), section-header.tsx, payment-summary.tsx, medication-card.tsx (MedicationCard), pharmacy-card.tsx (PharmacyCard), favorite-button.tsx, logo.tsx (Logo + LogoMark).
+- Lecture des composants shadcn/ui utilisés : card.tsx, badge.tsx, button.tsx, input.tsx, label.tsx, switch.tsx, checkbox.tsx, skeleton.tsx, separator.tsx, select.tsx, table.tsx.
+- Lecture de globals.css pour récupérer les variables CSS exactes (oklch) et les classes utilitaires (bg-brand-gradient, bg-brand-soft, bg-dotted, bg-dotted-white, shadow-premium, shadow-premium-lg, shadow-card, scroll-thin, no-scrollbar, animate-fade-up, animate-scale-in, animate-pulse-ring, glass-card).
+- Lecture des types Medication/Pharmacy/MedicationStatus et du store useNav pour préparer les données fictives correctement typées.
+- Écriture de src/components/views/design-system-view.tsx (export nommé DesignSystemView, 'use client') — structure complète :
+  * Hero plein écran bg-brand-gradient avec bg-dotted-white en overlay, Logo variant="light" size=56, Eyebrow "Plateforme santé", titre h1 "Design System", sous-titre descriptif, bouton retour "Accueil" (ChevronLeft → navigate('home')), badge "Version v1.0" avec icône LayoutGrid dans conteneur blanc/15 backdrop-blur.
+  * Layout 2 colonnes desktop (lg:flex) : aside w-56 sticky top-24 caché sur mobile avec sommaire cliquable (11 ancres + bloc brand-light "Composants réutilisables" avec icône Zap) ; main flex-1 space-y-12.
+  * Section 1 "Couleurs" (Card avec Eyebrow "Fondations" + Heading h2 + Muted) : Palette principale (6 swatches Brand/Brand Dark/Brand Light/Background/Muted/Foreground avec valeurs oklch) ; Statuts (10 swatches Success/Warning/Danger/Info/Neutral + variantes light) ; Dégradés & utilitaires (3 cartes bg-brand-gradient, bg-brand-soft, bg-dotted).
+  * Section 2 "Typographie" : démonstration Heading h1/h2/h3/h4 "Santé pour tous" dans encart brand-light ; tailles Text xs/sm/md/lg ; Muted ; Price sm/md/lg/xl + variantes brand/dark/muted + with `from` ; PriceRange 100 — 150 FCFA.
+  * Section 3 "Boutons" : 9 variantes (default/brand-gradient/outline/secondary/ghost/destructive/success/warning/link) ; 4 tailles (sm/default/lg/icon avec Plus) ; 6 boutons avec icônes (Rechercher Search, Voir détails Eye, S'abonner Crown, Estimer ordonnance ClipboardList, Appeler Phone, Itinéraire Navigation) ; états normal + disabled.
+  * Section 4 "Badges" : Médicaments (4 MedicationStatusBadge size md), Pharmacies (3 PharmacyStatusBadge + Open247Badge), Badges shadcn classiques (default/secondary/outline/destructive).
+  * Section 5 "Cartes" : MedicationCard x2 (Paracétamol catégorie Thermometer #ef4444 sans Rx, Amoxicilline catégorie ShieldCheck #0d9488 avec requiresRx) ; PharmacyCard x2 (Pharmacie de la Riviera isOnDuty=true openNow=true rating 4.8, Pharmacie du Plateau isOnDuty=false openNow=false rating 4.6) ; Card shadcn basique avec CardHeader/CardTitle/CardDescription/CardContent.
+  * Section 6 "Statistiques" : StatGrid principale 4 blocs (12 Pharmacies brand, 33+ Médicaments success, 24/7 De garde warning, Abidjan Couverture info) ; StatGrid tonalités & tendances 4 blocs (+18% Recherches success avec trend up, -3% Ruptures danger avec trend down, 4 Non lues warning, 1 240 Premium neutral).
+  * Section 7 "Alertes" : 4 AlertMessage (info "Information" demande d'estimation prise en compte, success "Estimation terminée" avec fourchette 3 200 — 4 100 FCFA, warning "Stock faible" dans 3 pharmacies, error "Erreur d'estimation").
+  * Section 8 "États" : EmptyState "Aucun résultat" avec icône Search dans encart brand-light/20 ; 3 Loader (sm/md/lg avec labels) dans cartes ; boutons avec ButtonLoader (default + outline disabled) ; FullLoader dans conteneur max-h-48 overflow-hidden ; 3 cartes Skeleton (h-28 + lignes h-4/h-3/h-6 avec Card border).
+  * Section 9 "Abonnement Premium" : Card premium avec en-tête bg-brand-gradient + bg-dotted-white overlay, Eyebrow "Abonnement Premium" text-amber-200, titre "Passez Premium", Crown dans cercle blanc/15 backdrop-blur, prix 500 FCFA/mois en text-4xl extrabold ; CardContent avec liste de 5 avantages (CheckCircle2 brand) + Separator + 2 boutons (S'abonner bg-brand-gradient avec Crown + En savoir plus outline) + muted "Annulable à tout moment".
+  * Section 10 "Tableau" : Table shadcn avec en-tête bg-brand-light/40 (Médicament, Dosage, Prix moyen, Pharmacies, Statut) et 5 lignes fictives (Paracétamol 500mg 150F 12 dispo available, Amoxicilline 500mg 1200F 8 dispo available, Ibuprofène 400mg 350F 5 dispo low-stock, Coartem 20/120mg 2500F 0 dispo out-of-stock, Aspirine 100mg 200F 3 dispo to-confirm) avec MedicationStatusBadge dans la colonne Statut.
+  * Section 11 "Formulaire" : Card avec 2 inputs (E-mail + Téléphone) en grid sm:grid-cols-2, Select commune (8 communes d'Abidjan), Separator, bloc Switch "Notifications push" dans border avec Label + Muted, Checkbox conditions d'utilisation avec Label long, 2 boutons (Envoyer la demande bg-brand-gradient avec Lock + Réinitialiser outline).
+  * Footer du showcase : note "SABLIN PHARMA Design System v1.0 — Composants réutilisables pour une plateforme pharmaceutique moderne et premium." avec icône Globe brand + badge "Documentation vivante" avec point pulse brand.
+- Composants réutilisables existants utilisés (zéro duplication) : Logo, Heading, Eyebrow, Text, Muted, Price, PriceRange, Button, Card (+Header/Title/Description/Content), Badge, Input, Label, Switch, Checkbox, Skeleton, Separator, Select (+Trigger/Value/Content/Item), Table (+Header/Body/Row/Head/Cell), MedicationStatusBadge, PharmacyStatusBadge, Open247Badge, StatBlock, StatGrid, AlertMessage, EmptyState, Loader, FullLoader, ButtonLoader, MedicationCard, PharmacyCard.
+- Helpers locaux (Swatch, SubTitle, SectionShell) définis dans le fichier pour la mise en page showcase uniquement.
+- Contraintes d'icônes strictement respectées : uniquement des icônes autorisées (Search, Pill, Plus, MapPin, Timer, Crown, Bell, CheckCircle2, Phone, Navigation, ClipboardList, ChevronRight, ChevronLeft, Mail, Lock, Zap, TrendingUp, TrendingDown, Globe, LayoutGrid, Eye). AUCUNE étoile (Star/StarHalf/Sparkles), AUCUNE feuille (Leaf/Sprout), AUCUN bâtiment (Building/Hospital/Home). Notes des PharmacyCard en badges numériques (cercle bg-brand-dark + point ambre) sans étoiles, conformément au composant existant.
+- TypeScript strict, export nommé exact DesignSystemView, 'use client', données fictives Medication/Pharmacy construites en local (pas de fetch API), pas de z-ai-web-dev-sdk côté client, pas de tests.
+- Layout responsive mobile-first : sidebar hidden lg:block, grilles grid-cols-2 sm:grid-cols-3, flex-wrap pour boutons, max-w-6xl mx-auto px-4 py-8, scroll-mt-24 sur chaque section pour ancres.
+- Vérification Agent Browser (desktop 1440x900 + mobile 390x844) via URL hash temporaire : hero rendu correctement, navigation latérale sticky fonctionnelle, toutes les sections (Couleurs, Typographie, Boutons, Badges, Cartes, Stats, Alertes, États, Abonnement, Tableau, Formulaire) affichées sans débordement horizontal, footer showcase visible. Screenshots VLM analysés (hero, mid1, mid2, mid3, stats, form, footer, mobile). Aucun problème visuel majeur.
+- Ajustement post-VLM : raccourcissement des labels StatBlock ("Pharmacies partenaires" → "Pharmacies", "Médicaments référencés" → "Médicaments", etc.) pour éviter la troncature par la classe `truncate` du composant existant.
+- Revert du hack temporaire dans page.tsx (effet hash → useNav.setState) après tests.
+- `bun run lint` : exit code 0, 0 erreur, 0 warning sur tout le projet. Dev server compile sans erreur.
+
+Stage Summary:
+- Vue showcase livrée et lint-clean : src/components/views/design-system-view.tsx (DesignSystemView, 'use client') — documentation vivante premium de l'identité visuelle SABLIN PHARMA, 11 sections organisées (Couleurs, Typographie, Boutons, Badges, Cartes, Statistiques, Alertes, États, Abonnement Premium, Tableau, Formulaire) + hero bg-brand-gradient + footer showcase.
+- Maximisation de la réutilisation des composants existants : 25+ composants partagés et shadcn/ui démontrés sans duplication (Logo, Typography x6, Button x9 variantes, StatusBadge x8, StatBlock x8, AlertMessage x4, EmptyState, Loader x3, MedicationCard, PharmacyCard, Card shadcn, Table, formulaire complet Input/Label/Select/Switch/Checkbox/Button).
+- Design system intégralement respecté : vert brand dominant (bg-brand-gradient, bg-brand-light, text-brand, text-brand-dark, shadow-premium, shadow-premium-lg, shadow-card), classes utilitaires premium (bg-dotted, bg-dotted-white, animate-pulse), cartes border-border/70 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg, statuts colorés (success/warning/danger/info/neutral).
+- Contraintes critiques d'icônes intégralement respectées (aucune étoile/feuille/bâtiment ; uniquement des icônes autorisées parmi Search/Pill/Plus/MapPin/Timer/Crown/Bell/CheckCircle2/Phone/Navigation/ClipboardList/ChevronRight/ChevronLeft/Mail/Lock/Zap/TrendingUp/TrendingDown/Globe/LayoutGrid/Eye). Notes en badges numériques sans étoiles.
+- Layout responsive mobile-first : sidebar sticky desktop-only (hidden lg:block) avec sommaire cliquable, contenu principal flex-1 space-y-12, grilles adaptatives, scroll-mt-24 pour ancres, footer showcase avec note de version.
+- Vérification Agent Browser + VLM : rendu correct sur desktop (1440x900) et mobile (390x844), aucune régression visuelle, toutes sections affichées sans débordement, labels StatBlock raccourcis pour éviter la troncature. Hack temporaire page.tsx reverté. `bun run lint` exit 0.
+
+---
+Task ID: 10
+Agent: main (orchestrator)
+Task: Design System complet SABLIN PHARMA — tokens, primitives, showcase
+
+Work Log:
+- globals.css renforcé : palette de statuts complète (success/warning/danger/info/neutral avec variants light/foreground), headings default color brand-dark, nouveaux utilitaires (text-brand-gradient, shadow-card, bg-dotted, bg-dotted-white, animate-fade-up, animate-scale-in)
+- Primitives typographiques créées (src/components/ui/typography.tsx) : Heading (h1-h4), Eyebrow, Text (xs/sm/md/lg + weights), Muted, Price (sm/md/lg/xl + variant brand/dark/muted + from + numericOnly), PriceRange
+- Button system formalisé (src/components/ui/button.tsx) : 9 variantes (default, brand-gradient, outline, secondary, ghost, destructive, success, warning, link), 4 tailles (sm/default/lg/icon), coins rounded-lg, active:scale, focus ring
+- StatBlock + StatGrid créés (src/components/shared/stat-block.tsx) : icône tonalisée (brand/success/warning/danger/info/neutral) + valeur + label + trend optionnel
+- Vue DesignSystemView créée (déléguée sous-agent 32) : 14 sections showcase (hero, nav latérale sticky, couleurs, typographie, boutons, badges, cartes, stats, alertes, états, abonnement, tableau, formulaire, footer)
+- Route "design-system" ajoutée au type View + routeur page.tsx
+- Point d'entrée : lien "Design System" dans le footer
+- Correction alignement bouton recherche hero (h-12 au lieu de h-10 par défaut)
+- Vérification Agent Browser : showcase complet rendu (Couleurs/Typo/Boutons/Badges/Cartes/Stats/Alertes/États/Abonnement/Tableau/Formulaire), 0 erreur console, responsive mobile OK
+- VLM confirme : identité vert/blanc premium cohérente, palette statuts claire, typographie hiérarchisée, boutons unifiés, cartes élégantes, impression de confiance
+- Lint 0 erreur / 0 warning
+
+Stage Summary:
+- Design system SABLIN PHARMA formalisé et documenté via une page showcase vivante accessible depuis le footer
+- Tokens complets : couleurs (brand 4 niveaux + 5 statuts x 3 variantes), typographie (Heading/Eyebrow/Text/Muted/Price/PriceRange), ombres (card/premium/premium-lg), animations (fade-up/scale-in/pulse-ring), utilitaires (brand-gradient/brand-soft/dotted/glass)
+- Composants réutilisables : Button (9 variantes), StatusBadge (8 statuts), StatBlock (6 tons), AlertMessage (4 variantes), EmptyState, Loader, SearchBar, SectionHeader, FavoriteButton, PaymentSummary, MedicationCard/Row, PharmacyCard/Row, Heading/Eyebrow/Text/Muted/Price/PriceRange
+- Showcase démontre : palette organisée, hiérarchie typographique, tous les boutons (Rechercher/Voir détails/S'abonner/Estimer ordonnance/Appeler/Itinéraire), badges statuts, cartes premium, stats, alertes, états vides/loaders, bloc abonnement, tableau, formulaire
+- Design cohérent, premium, professionnel, rassurant — prêt pour MVP public ivoirien

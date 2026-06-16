@@ -3,6 +3,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ============================================================
+   SABLIN PHARMA — Design System
+   Palette santé/pharmacie : vert principal, blanc dominant,
+   gris clair, vert foncé pour titres, touches douces pour statuts.
+   ============================================================ */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -41,6 +47,21 @@
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-light: var(--brand-light);
   --color-brand-dark: var(--brand-dark);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-light: var(--success-light);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-light: var(--warning-light);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-light: var(--danger-light);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-light: var(--info-light);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-light: var(--neutral-light);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -50,15 +71,17 @@
 
 :root {
   --radius: 0.875rem;
-  /* Brand pharmacy greens */
-  --brand: oklch(0.58 0.14 156);
-  --brand-foreground: oklch(0.985 0.01 156);
-  --brand-light: oklch(0.95 0.03 156);
-  --brand-dark: oklch(0.42 0.1 156);
 
-  --background: oklch(0.995 0.004 156);
-  --foreground: oklch(0.22 0.02 156);
-  --card: oklch(1 0 0);
+  /* ===== Brand pharmacy greens ===== */
+  --brand: oklch(0.58 0.14 156);            /* vert principal santé */
+  --brand-foreground: oklch(0.985 0.01 156); /* blanc sur vert */
+  --brand-light: oklch(0.95 0.03 156);      /* vert très clair (fonds) */
+  --brand-dark: oklch(0.34 0.08 156);       /* vert foncé (titres) */
+
+  /* ===== Surfaces ===== */
+  --background: oklch(0.995 0.004 156);     /* blanc dominant légèrement teinté */
+  --foreground: oklch(0.22 0.02 156);       /* texte foncé */
+  --card: oklch(1 0 0);                      /* cartes blanches pures */
   --card-foreground: oklch(0.22 0.02 156);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.22 0.02 156);
@@ -66,19 +89,40 @@
   --primary-foreground: oklch(0.99 0.01 156);
   --secondary: oklch(0.96 0.02 156);
   --secondary-foreground: oklch(0.3 0.03 156);
-  --muted: oklch(0.965 0.008 156);
-  --muted-foreground: oklch(0.52 0.02 156);
+  --muted: oklch(0.965 0.008 156);          /* gris très clair arrière-plans */
+  --muted-foreground: oklch(0.52 0.02 156); /* texte secondaire */
   --accent: oklch(0.95 0.03 156);
   --accent-foreground: oklch(0.32 0.05 156);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.92 0.01 156);
   --input: oklch(0.92 0.01 156);
   --ring: oklch(0.58 0.14 156);
+
+  /* ===== Status palette (touches douces) ===== */
+  --success: oklch(0.6 0.13 150);           /* Disponible / Ouvert */
+  --success-foreground: oklch(0.99 0.01 150);
+  --success-light: oklch(0.95 0.04 150);
+  --warning: oklch(0.72 0.15 75);           /* Stock faible / De garde */
+  --warning-foreground: oklch(0.28 0.05 75);
+  --warning-light: oklch(0.96 0.05 75);
+  --danger: oklch(0.6 0.21 25);             /* Rupture / Fermé */
+  --danger-foreground: oklch(0.99 0.01 25);
+  --danger-light: oklch(0.96 0.04 25);
+  --info: oklch(0.6 0.13 240);              /* À confirmer / info */
+  --info-foreground: oklch(0.99 0.01 240);
+  --info-light: oklch(0.95 0.04 240);
+  --neutral: oklch(0.55 0.01 156);          /* neutre */
+  --neutral-foreground: oklch(0.99 0.01 156);
+  --neutral-light: oklch(0.96 0.005 156);
+
+  /* ===== Charts ===== */
   --chart-1: oklch(0.58 0.14 156);
   --chart-2: oklch(0.7 0.12 180);
   --chart-3: oklch(0.65 0.1 120);
   --chart-4: oklch(0.75 0.13 90);
   --chart-5: oklch(0.6 0.09 200);
+
+  /* ===== Sidebar ===== */
   --sidebar: oklch(0.99 0.005 156);
   --sidebar-foreground: oklch(0.22 0.02 156);
   --sidebar-primary: oklch(0.58 0.14 156);
@@ -112,6 +156,21 @@
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.68 0.14 156);
+  --success: oklch(0.68 0.14 150);
+  --success-foreground: oklch(0.18 0.03 150);
+  --success-light: oklch(0.3 0.05 150);
+  --warning: oklch(0.75 0.15 75);
+  --warning-foreground: oklch(0.2 0.04 75);
+  --warning-light: oklch(0.3 0.05 75);
+  --danger: oklch(0.65 0.2 25);
+  --danger-foreground: oklch(0.18 0.03 25);
+  --danger-light: oklch(0.3 0.06 25);
+  --info: oklch(0.68 0.13 240);
+  --info-foreground: oklch(0.18 0.03 240);
+  --info-light: oklch(0.3 0.05 240);
+  --neutral: oklch(0.7 0.01 156);
+  --neutral-foreground: oklch(0.18 0.01 156);
+  --neutral-light: oklch(0.28 0.01 156);
   --chart-1: oklch(0.68 0.14 156);
   --chart-2: oklch(0.72 0.12 180);
   --chart-3: oklch(0.7 0.1 120);
@@ -136,10 +195,15 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
+  /* Headings default to brand-dark for premium pharmacy feel */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--brand-dark);
+    letter-spacing: -0.01em;
+  }
 }
 
 @layer utilities {
-  /* Premium scrollbar */
+  /* ===== Premium scrollbar ===== */
   .scroll-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -159,29 +223,39 @@
     text-wrap: balance;
   }
 
-  /* Gradient brand background */
+  /* ===== Brand gradients ===== */
   .bg-brand-gradient {
     background-image: linear-gradient(135deg, oklch(0.58 0.14 156) 0%, oklch(0.5 0.13 165) 50%, oklch(0.45 0.12 175) 100%);
   }
   .bg-brand-soft {
     background-image: linear-gradient(135deg, oklch(0.97 0.03 156) 0%, oklch(0.95 0.04 160) 100%);
   }
+  .text-brand-gradient {
+    background-image: linear-gradient(135deg, oklch(0.45 0.12 156), oklch(0.58 0.14 165));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 
-  /* Glass card */
+  /* ===== Glass card ===== */
   .glass-card {
     background: oklch(1 0 0 / 0.7);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
 
+  /* ===== Shadows ===== */
   .shadow-premium {
     box-shadow: 0 1px 2px oklch(0.58 0.14 156 / 0.04), 0 8px 24px oklch(0.58 0.14 156 / 0.08);
   }
   .shadow-premium-lg {
     box-shadow: 0 4px 12px oklch(0.58 0.14 156 / 0.08), 0 20px 48px oklch(0.58 0.14 156 / 0.12);
   }
+  .shadow-card {
+    box-shadow: 0 1px 3px oklch(0 0 0 / 0.04), 0 1px 2px oklch(0 0 0 / 0.03);
+  }
 
-  /* Hide scrollbar for horizontal scroll */
+  /* ===== Hide scrollbar ===== */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -190,6 +264,7 @@
     scrollbar-width: none;
   }
 
+  /* ===== Animations ===== */
   @keyframes pulse-ring {
     0% { box-shadow: 0 0 0 0 oklch(0.58 0.14 156 / 0.4); }
     70% { box-shadow: 0 0 0 8px oklch(0.58 0.14 156 / 0); }
@@ -197,5 +272,31 @@
   }
   .animate-pulse-ring {
     animation: pulse-ring 2s infinite;
+  }
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-up {
+    animation: fade-up 0.4s ease-out both;
+  }
+
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .animate-scale-in {
+    animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  /* Dotted pattern (subtle pharmacy texture) */
+  .bg-dotted {
+    background-image: radial-gradient(circle, oklch(0.58 0.14 156 / 0.12) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+  .bg-dotted-white {
+    background-image: radial-gradient(circle, oklch(1 / 0.18) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 }

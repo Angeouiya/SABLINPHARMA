@@ -99,6 +99,10 @@ export function Footer() {
             </button>
             <span>·</span>
             <button className="hover:text-brand">Confidentialité</button>
+            <span>·</span>
+            <button onClick={() => go("design-system")} className="hover:text-brand">
+              Design System
+            </button>
           </div>
         </div>
       </div>

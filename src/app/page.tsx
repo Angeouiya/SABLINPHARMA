@@ -25,6 +25,7 @@ import { NotificationsView } from "@/components/views/notifications-view";
 import { HistoryView } from "@/components/views/history-view";
 import { FavoritesView } from "@/components/views/favorites-view";
 import { SettingsView } from "@/components/views/settings-view";
+import { DesignSystemView } from "@/components/views/design-system-view";
 
 export default function Home() {
   const { view } = useNav();
@@ -67,6 +68,7 @@ export default function Home() {
         {view === "history" && <HistoryView />}
         {view === "favorites" && <FavoritesView />}
         {view === "settings" && <SettingsView />}
+        {view === "design-system" && <DesignSystemView />}
       </main>
       <Footer />
       <BottomNav />

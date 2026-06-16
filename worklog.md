@@ -853,3 +853,31 @@ Stage Summary:
 - Données fictives réalistes Abidjan : Paracétamol Cocody, garde Yopougon, Wave 500 FCFA, ordonnance estimée
 - État vide professionnel avec bouton "Retour à l'accueil"
 - Couleurs pleines uniquement (pas de dégradé)
+
+---
+Task ID: 27
+Agent: main (orchestrator)
+Task: Remplacement du logo SVG par l'image originale
+
+Work Log:
+- Copie de l'image originale "WhatsApp Image 2026-06-16 at 17.52.27.jpeg" vers public/images/logo-sablin-pharma.png (1080x400px, logo horizontal avec croix+feuille+texte SABLIN PHARMA)
+- Recréation complète du composant Logo (src/components/logo.tsx) :
+  * Suppression du SVG croix+feuille recréé
+  * Suppression du texte "SABLIN PHARMA" (déjà inclus dans l'image)
+  * LogoMark et Logo utilisent désormais <img src="/images/logo-sablin-pharma.png"> directement
+  * variant="light" : ajout d'un fond blanc arrondi (bg-white/95 p-1 rounded-lg) pour visibilité sur fonds verts
+  * size contrôle la hauteur, largeur auto (ratio 2.7:1)
+- Création favicon (48x48px) à partir du logo → public/favicon.png
+- Mise à jour layout.tsx : icons.icon = "/favicon.png" (au lieu de /logo.svg)
+- Vérification Agent Browser + VLM :
+  * Header desktop : "Logo affiche l'image originale de SABLIN PHARMA avec croix verte, feuille et texte, sans être un SVG/croix recréé"
+  * Footer : "Logo dans le footer est l'image originale de SABLIN PHARMA, identique à celui du header"
+  * Auth page (panneau vert) : "Logo SABLIN PHARMA (croix+feuille+texte) visible sur le panneau vert à gauche"
+  * Mobile 390px : "Logo SABLIN PHARMA visible dans le header sur mobile"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Logo SVG recréé (croix+feuille) entièrement remplacé par l'image originale
+- Image utilisée directement comme logo partout (header, footer, auth, mobile)
+- Favicon mis à jour avec l'image originale
+- Plus aucun SVG ou texte "SABLIN PHARMA" ajouté artificiellement

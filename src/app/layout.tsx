@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "SABLIN PHARMA" }],
   icons: {
-    icon: "/logo.svg",
+    icon: "/favicon.png",
   },
   openGraph: {
     title: "SABLIN PHARMA — Santé & Pharmacie en Côte d'Ivoire",

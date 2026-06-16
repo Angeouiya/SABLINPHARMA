@@ -38,19 +38,29 @@ export function MedicationCard({ med }: { med: Medication }) {
       className="group gap-0 cursor-pointer overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg"
     >
       {/* Header visual */}
-      <div className="relative flex h-28 items-center justify-center overflow-hidden bg-brand-light">
-        <div className="absolute inset-0 opacity-[0.07] bg-dotted" />
-        <div className="relative flex size-16 items-center justify-center rounded-2xl bg-background shadow-premium">
-          {med.category ? (
-            <CategoryIcon
-              name={med.category.iconName}
-              size={30}
-              color={med.category.color}
-            />
-          ) : (
-            <Pill className="size-7 text-brand" />
-          )}
-        </div>
+      <div className="relative flex h-32 items-center justify-center overflow-hidden bg-brand-light">
+        {med.imageUrl ? (
+          <img
+            src={med.imageUrl}
+            alt={med.name}
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : (
+          <>
+            <div className="absolute inset-0 opacity-[0.07] bg-dotted" />
+            <div className="relative flex size-16 items-center justify-center rounded-2xl bg-background shadow-premium">
+              {med.category ? (
+                <CategoryIcon
+                  name={med.category.iconName}
+                  size={30}
+                  color={med.category.color}
+                />
+              ) : (
+                <Pill className="size-7 text-brand" />
+              )}
+            </div>
+          </>
+        )}
         {med.requiresRx && (
           <span className="absolute right-2 top-2">
             <Badge className="border-0 bg-amber-500/90 text-[10px] font-semibold text-white">

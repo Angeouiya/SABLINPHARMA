@@ -197,9 +197,15 @@ export function PharmacyDetailView() {
 
       {/* ============ FICHE PHARMACIE (header) ============ */}
       <Card className="overflow-hidden border-border/70 py-0 shadow-premium">
-        <div className="relative bg-brand-gradient">
-          <div className="absolute inset-0 bg-dotted-white opacity-15" />
-          <div className="absolute -right-12 -top-12 size-44 rounded-full bg-white/10 blur-3xl" />
+        <div className="relative bg-brand">
+          {pharmacy.imageUrl && (
+            <img
+              src={pharmacy.imageUrl}
+              alt={pharmacy.name}
+              className="absolute inset-0 size-full object-cover"
+            />
+          )}
+          <div className="absolute inset-0 bg-black/40" />
           <div className="relative p-5 sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-start gap-4">

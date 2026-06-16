@@ -12,6 +12,7 @@ type MedSeed = {
   avgPrice: number;
   requiresRx: boolean;
   categorySlug: string;
+  imageUrl?: string;
 };
 
 type CategorySeed = {
@@ -36,6 +37,7 @@ type PharmacySeed = {
   latitude: number;
   longitude: number;
   rating: number;
+  imageUrl?: string;
 };
 
 const categories: CategorySeed[] = [
@@ -133,6 +135,28 @@ function slugify(s: string) {
 async function main() {
   console.log("Seeding SABLIN PHARMA database...");
 
+  // Mapping: category slug → medication image URL
+  const medImageByCategory: Record<string, string> = {
+    "douleur-fievre": "/images/medications/med-douleur.png",
+    "antibiotiques": "/images/medications/med-antibiotiques.png",
+    "vitamines": "/images/medications/med-vitamines.png",
+    "cardiovasculaire": "/images/medications/med-cardiovasculaire.png",
+    "digestif": "/images/medications/med-digestif.png",
+    "respiratoire": "/images/medications/med-respiratoire.png",
+    "dermatologie": "/images/medications/med-dermatologie.png",
+    "mere-enfant": "/images/medications/med-mere-enfant.png",
+    "hygiene": "/images/medications/med-hygiene.png",
+    "antipaludeens": "/images/medications/med-antipaludeens.png",
+  };
+
+  // Pharmacy images (cycled)
+  const pharmacyImages = [
+    "/images/pharmacies/pharmacy-1.png",
+    "/images/pharmacies/pharmacy-2.png",
+    "/images/pharmacies/pharmacy-3.png",
+    "/images/pharmacies/pharmacy-4.png",
+  ];
+
   // Clean
   await db.pharmacyMedication.deleteMany();
   await db.medication.deleteMany();
@@ -165,6 +189,7 @@ async function main() {
         description: m.description,
         requiresRx: m.requiresRx,
         avgPrice: m.avgPrice,
+        imageUrl: m.imageUrl ?? medImageByCategory[m.categorySlug] ?? null,
       },
     });
     medMap[m.name] = created.id;
@@ -173,8 +198,11 @@ async function main() {
 
   // Pharmacies
   const pharmaMap: Record<string, string> = {};
-  for (const p of pharmacies) {
-    const created = await db.pharmacy.create({ data: { ...p } });
+  for (let i = 0; i < pharmacies.length; i++) {
+    const p = pharmacies[i];
+    const created = await db.pharmacy.create({
+      data: { ...p, imageUrl: p.imageUrl ?? pharmacyImages[i % pharmacyImages.length] },
+    });
     pharmaMap[p.slug] = created.id;
   }
   console.log(`✓ ${pharmacies.length} pharmacies`);

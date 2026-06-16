@@ -284,24 +284,31 @@ export function MedicationDetailView() {
       <Card className="overflow-hidden border-border/70 py-0 shadow-premium">
         <div className="grid gap-0 md:grid-cols-[220px_1fr]">
           {/* Visual */}
-          <div
-            className="relative flex items-center justify-center p-8"
-            style={
-              med.category
-                ? { backgroundColor: `${med.category.color}14` }
-                : { backgroundColor: "var(--brand-light)" }
-            }
-          >
-            <div
-              className="absolute inset-0 opacity-[0.06] bg-dotted"
-            />
-            <div className="relative flex size-24 items-center justify-center rounded-3xl bg-background shadow-premium">
-              {med.category ? (
-                <CategoryIcon name={med.category.iconName} size={44} color={med.category.color} />
-              ) : (
-                <Pill className="size-10 text-brand" />
-              )}
-            </div>
+          <div className="relative flex items-center justify-center overflow-hidden bg-brand-light">
+            {med.imageUrl ? (
+              <img
+                src={med.imageUrl}
+                alt={med.name}
+                className="aspect-square w-full object-cover"
+              />
+            ) : (
+              <div
+                className="flex items-center justify-center p-8"
+                style={
+                  med.category
+                    ? { backgroundColor: `${med.category.color}14` }
+                    : { backgroundColor: "var(--brand-light)" }
+                }
+              >
+                <div className="relative flex size-24 items-center justify-center rounded-3xl bg-background shadow-premium">
+                  {med.category ? (
+                    <CategoryIcon name={med.category.iconName} size={44} color={med.category.color} />
+                  ) : (
+                    <Pill className="size-10 text-brand" />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Info */}

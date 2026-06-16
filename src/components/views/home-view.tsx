@@ -546,8 +546,15 @@ function DutyPharmacyCard({ pharma }: { pharma: Pharmacy }) {
   return (
     <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg">
       {/* Header banner */}
-      <div className="relative flex items-center justify-between bg-brand-gradient px-4 py-3">
-        <div className="absolute inset-0 bg-dotted-white opacity-15" />
+      <div className="relative flex items-center justify-between bg-brand px-4 py-3">
+        {pharma.imageUrl && (
+          <img
+            src={pharma.imageUrl}
+            alt={pharma.name}
+            className="absolute inset-0 size-full object-cover"
+          />
+        )}
+        <div className="absolute inset-0 bg-black/40" />
         <div className="relative flex items-center gap-2.5">
           <span className="flex size-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
             <Plus className="size-5 text-white" strokeWidth={3} />

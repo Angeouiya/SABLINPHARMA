@@ -761,3 +761,35 @@ Stage Summary:
 - Placeholder gris (text-muted-foreground) lisible
 - Bouton Rechercher : vert plein (bg-brand) texte blanc
 - Correction validée desktop et mobile
+
+---
+Task ID: 24
+Agent: main (orchestrator)
+Task: Ajout de photos pour chaque pharmacie et chaque médicament
+
+Work Log:
+- Génération de 14 images via z-ai image (séquentiellement pour éviter rate limit 429) :
+  * 4 photos pharmacies : pharmacy-1 (storefront Abidjan), pharmacy-2 (intérieur moderne), pharmacy-3 (comptoir pharmacien), pharmacy-4 (pharmacie nuit croix verte)
+  * 10 photos médicaments par catégorie : med-douleur (blister comprimés), med-antibiotiques (gélules), med-vitamines (bouteille vitamine C), med-cardiovasculaire (pilules tension), med-digestif (boîte antiacide), med-respiratoire (sirop toux), med-dermatologie (tube crème), med-mere-enfant (sirop bébé), med-hygiene (flacon antiseptique), med-antipaludeens (blister antipaludéen)
+- Mise à jour prisma/seed.ts : ajout imageUrl optionnel aux types MedSeed et PharmacySeed, mapping medImageByCategory (10 catégories → images), pharmacyImages (4 images cyclées), attribution imageUrl lors de la création en base
+- Re-seed : 33 médicaments + 12 pharmacies avec imageUrl
+- Mise à jour MedicationCard : header h-32 avec img object-cover si imageUrl disponible, fallback icône catégorie
+- Mise à jour PharmacyCard : header h-32 avec img object-cover + overlay bg-black/30, fallback bg-brand-dark
+- Mise à jour medication-detail-view : section visuelle affiche img aspect-square w-full object-cover si imageUrl, fallback icône catégorie colorée
+- Mise à jour pharmacy-detail-view : header bg-brand avec img object-cover + overlay bg-black/40, texte blanc par-dessus
+- Mise à jour home-view DutyPharmacyCard : header bg-brand avec img + overlay
+- Mise à jour pharmacies-view PharmacyResultCard : header bg-brand avec img + overlay
+- Vérification Agent Browser + VLM :
+  * Médicaments (desktop) : "Photos de médicaments visibles sur les cartes (comprimés, flacons, tubes, blisters)"
+  * Pharmacies accueil : "Cartes pharmacies affichent des photos réelles d'une pharmacie en arrière-plan"
+  * Détail pharmacie : "Photo de la pharmacie en arrière-plan du header"
+  * Détail médicament : "Photo du médicament (blister d'aspirine) dans la section visuelle à gauche"
+  * Mobile 390px : "Photos de médicaments visibles sur les cartes"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Photos ajoutées pour CHAQUE pharmacie (4 images cyclées) et CHAQUE médicament (10 images par catégorie)
+- Images visibles dans : cartes médicaments (Médicaments + Accueil), cartes pharmacies (Pharmacies + Accueil + Résultat ordonnance), détail médicament, détail pharmacie
+- 14 images générées (1024x1024) stockées dans public/images/pharmacies/ et public/images/medications/
+- Fallback gracieux : si pas d'image, icône catégorie colorée (médicaments) ou fond vert foncé (pharmacies)
+- Overlay sombre sur les photos de pharmacies pour garantir la lisibilité du texte blanc

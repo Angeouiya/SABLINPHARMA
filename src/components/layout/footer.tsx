@@ -69,26 +69,6 @@ export function Footer() {
               </li>
             </ul>
           </div>
-
-          <div>
-            <h4 className="mb-3 text-sm font-bold text-foreground">Application</h4>
-            <div className="flex flex-col gap-2.5">
-              <button className="flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-brand/40">
-                <span className="text-xl"></span>
-                <span className="flex flex-col leading-tight">
-                  <span className="text-[10px] text-muted-foreground">Télécharger sur</span>
-                  <span className="text-sm font-bold">Google Play</span>
-                </span>
-              </button>
-              <button className="flex items-center gap-2.5 rounded-xl border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-brand/40">
-                <span className="text-xl"></span>
-                <span className="flex flex-col leading-tight">
-                  <span className="text-[10px] text-muted-foreground">Disponible sur</span>
-                  <span className="text-sm font-bold">App Store</span>
-                </span>
-              </button>
-            </div>
-          </div>
         </div>
 
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row">

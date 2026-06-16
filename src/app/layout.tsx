@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "SABLIN PHARMA — Santé & Pharmacie en Côte d'Ivoire",
     description:
-      "Trouvez vos médicaments et pharmacies à Abidjan. Plateforme d'information santé moderne et fiable.",
+      "Trouvez vos médicaments et pharmacies à Abidjan.",
     siteName: "SABLIN PHARMA",
     type: "website",
     locale: "fr_FR",

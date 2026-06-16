@@ -741,3 +741,23 @@ Stage Summary:
 - Champs recherche/formulaires : bg-background text-foreground placeholder-muted (fond blanc, texte foncé, placeholder gris)
 - Contrastes vérifiés : texte toujours visible sur son fond
 - Responsive mobile/tablette/desktop vérifié
+
+---
+Task ID: 23
+Agent: main (orchestrator)
+Task: Correction contraste barre recherche accueil (texte blanc sur fond blanc)
+
+Work Log:
+- Problème : l'input de la SearchBar utilisait bg-transparent sans couleur de texte explicite, héritant du text-white du hero vert → texte tapé invisible (blanc sur blanc)
+- Correction search-bar.tsx : ajout de text-foreground sur l'input (texte foncé explicite #222)
+- Correction bouton Rechercher : bg-brand-gradient → bg-brand text-white hover:bg-brand-dark (vert plein cohérent)
+- Vérification Agent Browser + VLM :
+  * Desktop : "Le texte tapé 'Paracétamol 500mg' est visible (foncé sur fond blanc). Le placeholder est gris sur fond blanc."
+  * Mobile : "Le texte tapé est foncé et visible sur le fond blanc de la barre de recherche mobile."
+- 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Barre de recherche de l'accueil corrigée : texte tapé maintenant foncé (text-foreground) sur fond blanc (bg-background)
+- Placeholder gris (text-muted-foreground) lisible
+- Bouton Rechercher : vert plein (bg-brand) texte blanc
+- Correction validée desktop et mobile

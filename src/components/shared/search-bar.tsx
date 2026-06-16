@@ -90,7 +90,7 @@ export function SearchBar({ variant = "compact", initialQuery = "", placeholder 
             if (e.key === "Escape") setOpen(false);
           }}
           placeholder={placeholder ?? "Rechercher un médicament (ex : Paracétamol)..."}
-          className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
+          className="min-w-0 flex-1 bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground"
           aria-label="Rechercher un médicament"
         />
         {query && (
@@ -108,7 +108,7 @@ export function SearchBar({ variant = "compact", initialQuery = "", placeholder 
         <Button
           size={variant === "hero" ? "lg" : "default"}
           className={cn(
-            "shrink-0 bg-brand-gradient text-white hover:opacity-90",
+            "shrink-0 bg-brand text-white hover:bg-brand-dark",
             variant === "hero" && "h-12 px-5"
           )}
           onClick={() => submit()}

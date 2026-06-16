@@ -115,7 +115,7 @@ export function HomeView() {
               <Logo size={44} variant="light" />
             </div>
 
-            <h1 className="mt-4 text-3xl font-extrabold leading-[1.08] tracking-tight sm:text-4xl lg:text-5xl">
+            <h1 className="mt-4 text-3xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-4xl lg:text-5xl">
               Trouvez vos médicaments{" "}
               <span className="text-amber-300">plus rapidement</span>{" "}
               en Côte d&apos;Ivoire
@@ -502,7 +502,7 @@ export function HomeView() {
               <Headphones className="size-8" />
             </span>
             <div className="flex-1">
-              <h3 className="text-xl font-extrabold sm:text-2xl">
+              <h3 className="text-xl font-extrabold text-foreground sm:text-2xl">
                 Besoin d&apos;aide ?
               </h3>
               <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-white/85 sm:text-base">

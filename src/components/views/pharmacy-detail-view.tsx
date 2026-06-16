@@ -214,7 +214,7 @@ export function PharmacyDetailView() {
                   <Plus className="size-9 text-white" strokeWidth={3} />
                 </span>
                 <div className="text-white">
-                  <h1 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
+                  <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl">
                     {pharmacy.name}
                   </h1>
                   <p className="mt-1.5 max-w-md text-sm leading-relaxed text-white/85">

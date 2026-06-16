@@ -344,3 +344,28 @@ Stage Summary:
 - Composants réutilisables : Button (9 variantes), StatusBadge (8 statuts), StatBlock (6 tons), AlertMessage (4 variantes), EmptyState, Loader, SearchBar, SectionHeader, FavoriteButton, PaymentSummary, MedicationCard/Row, PharmacyCard/Row, Heading/Eyebrow/Text/Muted/Price/PriceRange
 - Showcase démontre : palette organisée, hiérarchie typographique, tous les boutons (Rechercher/Voir détails/S'abonner/Estimer ordonnance/Appeler/Itinéraire), badges statuts, cartes premium, stats, alertes, états vides/loaders, bloc abonnement, tableau, formulaire
 - Design cohérent, premium, professionnel, rassurant — prêt pour MVP public ivoirien
+
+---
+Task ID: 11
+Agent: main (orchestrator)
+Task: Page d'accueil complète SABLIN PHARMA — refonte selon spécifications détaillées
+
+Work Log:
+- Hero refondu : logo SABLIN PHARMA prominent (variant light), titre exact "Trouvez vos médicaments plus rapidement en Côte d'Ivoire", sous-texte rassurant, grande SearchBar + bouton secondaire "Estimer mon ordonnance" + bouton "Pharmacies de garde", recherches populaires, image hero avec carte pharmacie overlay + badge flottant "12 pharmacies de garde ce soir"
+- Section confiance : 4 StatBlocks (12 pharmacies partenaires, 33+ médicaments référencés, 15 000+ recherches effectuées, 12 communes couvertes) avec tons variés (brand/success/info/warning)
+- Section catégories : 7 catégories exactes demandées (Douleur & Fièvre, Antibiotiques, Toux & Rhume, Vitamines, Digestion, Peau & Soins, Bébé & Maman) mappées depuis les slugs DB avec noms affichés conviviaux, cartes élégantes avec icônes colorées et hover premium
+- Section pharmacies de garde proches : nouvelle DutyPharmacyCard custom avec bandeau bg-brand-gradient, badge "De garde" + "Ouvert", nom + commune + quartier (extrait de l'adresse), distance km, téléphone (lien tel:), boutons "Voir détails" + "Itinéraire" (lien Google Maps). 4 pharmacies : Deux Plateaux, Riviera, Angré, Marcory Zone 4
+- Section estimation ordonnance : Card brand-light avec Eyebrow "Estimation gratuite", illustration ClipboardList, liste fonctionnalités, bouton "Commencer l'estimation"
+- Section Premium : Card amber avec Crown, prix 500 FCFA/mois, 7 avantages demandés (Recherche illimitée, Estimation d'ordonnance, Pharmacies ouvertes, Pharmacies de garde, Historique complet, Favoris illimités, Alertes de disponibilité) en grille 2 colonnes, bouton "S'abonner maintenant"
+- Section médicaments récemment recherchés : tableau enrichi avec 6 colonnes (Médicament, Dosage, Forme, Prix indicatif, Pharmacies, Statut), statuts variés déterministes (Disponible/Stock faible/Rupture) via MedicationStatusBadge, lignes cliquables vers le détail
+- Section support : Card bg-brand-gradient avec Headphones, message "Besoin d'aide ? Notre équipe vous accompagne pour trouver vos médicaments plus facilement", boutons "Appeler" (tel:) + "Contacter le support"
+- Design system utilisé : Heading, Eyebrow, Price, StatBlock, MedicationStatusBadge, SectionHeader, Logo, SearchBar, Button (variantes brand-gradient/outline/ghost)
+- Vérification Agent Browser : desktop 1440px (toutes sections + VLM confirme hero efficace, sections organisées, identité premium, boutons visibles, confiance), tablette 768px, mobile 390px (VLM confirme empilement propre, boutons cliquables, lisibilité bonne)
+- 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page d'accueil complète, premium, responsive conforme aux spécifications détaillées
+- 8 sections : Hero (logo + titre + recherche + 2 boutons), Confiance (4 stats), Catégories (7 cartes), Pharmacies de garde (cartes enrichies avec distance/téléphone/Voir détails/Itinéraire), Estimation ordonnance, Premium (500 FCFA + 7 avantages), Tableau médicaments (6 colonnes + statuts variés), Support
+- Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Bingerville
+- Responsive parfait desktop/tablette/mobile vérifié par VLM
+- Aucune icône interdite (étoile/feuille/bâtiment)

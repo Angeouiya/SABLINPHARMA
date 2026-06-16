@@ -369,3 +369,40 @@ Stage Summary:
 - Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Bingerville
 - Responsive parfait desktop/tablette/mobile vérifié par VLM
 - Aucune icône interdite (étoile/feuille/bâtiment)
+
+---
+Task ID: 12
+Agent: main (orchestrator)
+Task: Page Médicaments complète — refonte avec filtres, catégories, badges statut, 3 vues
+
+Work Log:
+- MedicationCard enrichi : badges de statut variés (Disponible/Stock faible/Rupture/À confirmer) via getMedStatus déterministe, bouton "Voir détails", badge Ordonnance, Price avec "À partir de", icône catégorie colorée, hover premium -translate-y-1
+- MedicationTable créé : tableau responsive 8 colonnes (Médicament, DCI, Forme, Dosage, Prix indicatif, Pharmacies, Statut, Action) avec MedicationStatusBadge, lignes cliquables
+- Page Médicaments recréée (medications-view.tsx) :
+  * Zone de recherche dédiée : Input large + bouton "Rechercher" brand-gradient + texte d'aide "Exemple : Paracétamol 500 mg, Amoxicilline, Vitamine C..."
+  * Section 7 catégories cliquables (Douleur & Fièvre, Antibiotiques, Toux & Rhume, Vitamines, Digestion, Peau & Soins, Bébé & Maman) avec icônes colorées, état actif brand-light
+  * Filtres latéraux desktop (sticky) / repliables mobile : catégorie (Select), forme (Select dynamique), disponibilité (boutons radio : Tous/Disponible/Stock faible/Rupture), commune (Select 12 communes Abidjan), prix indicatif max (Select ≤500/1000/2000/5000 FCFA), pharmacie proche (toggle)
+  * Chips de filtres actifs avec bouton "Tout effacer"
+  * 3 modes d'affichage : Grille / Liste / Tableau (toggle avec icônes LayoutGrid/List/Table2)
+  * Filtrage client-side (useMemo) : query + catégorie + forme + disponibilité + prix
+  * EmptyState quand 0 résultat + bouton réinitialiser
+  * Compteur de résultats dynamique
+- Responsive : desktop filtres latéraux sticky 260px, mobile bouton "Filtres" avec badge compteur + panneau collapsible, cartes s'empilent en grid-cols-2
+- Vérification Agent Browser : 
+  * desktop 1440px : zone recherche + 7 catégories + filtres latéraux + cartes avec badges (Disponible/Stock faible/Ordonnance) + boutons Voir détails — VLM confirme "Zone de recherche claire, filtres organisés, cartes modernes, identité premium"
+  * recherche "Paracétamol" filtre correctement
+  * filtre catégorie Antibiotiques affiche Amoxicilline/Augmentin
+  * clic "Voir détails" navigue vers détail médicament
+  * mobile 390px : bouton Filtres repliable, panneau s'ouvre avec tous les filtres
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Médicaments premium, responsive, complète avec tous les éléments demandés
+- Zone recherche + bouton Rechercher + texte aide
+- 7 catégories cliquables avec icônes premium
+- 6 filtres (catégorie, forme, disponibilité, commune, prix, pharmacie proche) + chips actifs
+- 3 vues : grille / liste / tableau (8 colonnes)
+- Badges statut : Disponible (vert), Stock faible (ambre), Rupture (rouge), À confirmer (gris)
+- Cartes : nom commercial, DCI, dosage, forme, prix FCFA "À partir de", nb pharmacies, bouton Voir détails
+- Données réalistes Abidjan : Paracétamol, Amoxicilline, Augmentin, Smecta, Vitamine C, etc.
+- Responsive desktop filtres latéraux / mobile repliable, boutons faciles à cliquer

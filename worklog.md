@@ -793,3 +793,30 @@ Stage Summary:
 - 14 images générées (1024x1024) stockées dans public/images/pharmacies/ et public/images/medications/
 - Fallback gracieux : si pas d'image, icône catégorie colorée (médicaments) ou fond vert foncé (pharmacies)
 - Overlay sombre sur les photos de pharmacies pour garantir la lisibilité du texte blanc
+
+---
+Task ID: 25
+Agent: main (orchestrator)
+Task: Intégration de 4 cartes Google Maps visibles (iframe embed)
+
+Work Log:
+- Création composant réutilisable GoogleMap (@/components/shared/google-map.tsx) : iframe embed Google Maps sans clé API (format maps.google.com/maps?q=LAT,LNG&z=ZOOM&output=embed), props lat/lng/zoom/label/title/showButton/className, bouton "Ouvrir dans Google Maps"
+- Intégration 4 cartes Google Maps :
+  1. **Accueil** (home-view) : carte après les cartes "Pharmacies de garde proches" (lat 5.375, lng -3.995, zoom 13, titre "Carte des pharmacies de garde", h-64/h-72)
+  2. **Pharmacies** (pharmacies-view) : remplace le placeholder "Carte des pharmacies proches" par une vraie carte d'Abidjan (lat 5.34, lng -4.008, zoom 12, titre "Carte des pharmacies à Abidjan", h-72/h-80)
+  3. **Détail pharmacie** (pharmacy-detail-view) : remplace le placeholder "Localisation de la pharmacie" par une vraie carte centrée sur la pharmacie (lat/lng de la pharmacie, zoom 16, label nom pharmacie, titre "Localisation de la pharmacie", h-56)
+  4. **Détail médicament** (medication-detail-view) : carte après la liste des pharmacies ayant le médicament (lat/lng de la 1ère pharmacie, zoom 13, titre "Pharmacies ayant ce médicament", h-64)
+- Correction URL embed : format initial "label@lat,lng" ne fonctionnait pas → format "lat,lng" simple (maps.google.com/maps?q=LAT,LNG&z=ZOOM&output=embed)
+- Vérification Agent Browser + VLM :
+  * Accueil : "Carte Google Maps visible en bas de page, avec routes et géographie d'Abidjan, interactive"
+  * Pharmacies : "Carte Google Maps visible en bas de page, affichant les pharmacies d'Abidjan"
+  * Détail pharmacie : "Carte Google Maps visible, affichant la localisation de la pharmacie avec un marqueur rouge"
+  * Détail médicament : "Carte Google Maps visible en bas de page, montrant des pharmacies et des lieux"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- 4 cartes Google Maps intégrées et visibles sur la plateforme SABLIN PHARMA
+- Composant GoogleMap réutilisable (iframe embed sans clé API)
+- Cartes interactives avec routes, marqueurs, zoom Google Maps réel
+- Bouton "Ouvrir dans Google Maps" sur chaque carte (lien externe)
+- Emplacements : Accueil (pharmacies de garde), Pharmacies (Abidjan), Détail pharmacie (localisation précise), Détail médicament (pharmacies ayant le médicament)

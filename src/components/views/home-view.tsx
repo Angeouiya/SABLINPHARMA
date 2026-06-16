@@ -23,6 +23,7 @@ import { SearchBar } from "@/components/shared/search-bar";
 import { SectionHeader } from "@/components/shared/section-header";
 import { StatBlock } from "@/components/shared/stat-block";
 import { MedicationStatusBadge } from "@/components/shared/status-badge";
+import { GoogleMap } from "@/components/shared/google-map";
 import { CategoryIcon } from "@/components/category-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -311,6 +312,20 @@ export function HomeView() {
                 </Card>
               )}
           </div>
+
+          {/* Carte Google Maps des pharmacies de garde */}
+          {onDuty.length > 0 && (
+            <Card className="mt-6 overflow-hidden border-brand/20 py-0">
+              <GoogleMap
+                lat={onDuty[0].latitude}
+                lng={onDuty[0].longitude}
+                zoom={13}
+                label="Pharmacies de garde Abidjan"
+                title="Carte des pharmacies de garde"
+                className="h-64 sm:h-72"
+              />
+            </Card>
+          )}
         </div>
       </section>
 

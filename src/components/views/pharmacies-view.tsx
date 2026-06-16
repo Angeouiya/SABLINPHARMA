@@ -34,6 +34,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/empty-state";
+import { GoogleMap } from "@/components/shared/google-map";
 import { Heading, Eyebrow, Muted } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { distanceKm } from "@/lib/format";
@@ -342,30 +343,17 @@ export function PharmaciesView() {
         </section>
       )}
 
-      {/* ============ MAP PLACEHOLDER ============ */}
+      {/* ============ GOOGLE MAP ============ */}
       <section className="mt-6">
-        <Card className="relative overflow-hidden border-brand/20 py-0">
-          <div className="relative flex h-44 items-center justify-center bg-brand-soft sm:h-52">
-            {/* Decorative grid pattern resembling a map */}
-            <div className="absolute inset-0 opacity-30 bg-brand-light" />
-            <div className="absolute left-1/4 top-1/3 size-3 rounded-full bg-brand ring-4 ring-brand/20" />
-            <div className="absolute right-1/3 top-1/2 size-3 rounded-full bg-amber-500 ring-4 ring-amber-500/20" />
-            <div className="absolute left-1/2 top-2/3 size-3 rounded-full bg-brand ring-4 ring-brand/20" />
-            <div className="absolute right-1/4 top-1/4 size-3 rounded-full bg-brand ring-4 ring-brand/20" />
-            <div className="relative flex flex-col items-center gap-2 rounded-2xl bg-background/90 px-5 py-3 text-center shadow-premium backdrop-blur-sm">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-brand-light text-brand">
-                <MapPinned className="size-5" />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-foreground">
-                  Carte des pharmacies proches
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Visualisation cartographique bientôt disponible
-                </p>
-              </div>
-            </div>
-          </div>
+        <Card className="overflow-hidden border-brand/20 py-0">
+          <GoogleMap
+            lat={5.34}
+            lng={-4.008}
+            zoom={12}
+            label="Pharmacies Abidjan"
+            title="Carte des pharmacies à Abidjan"
+            className="h-72 sm:h-80"
+          />
         </Card>
       </section>
 

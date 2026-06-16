@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { CategoryIcon } from "@/components/category-icons";
 import { FavoriteButton } from "@/components/shared/favorite-button";
 import { AlertMessage } from "@/components/shared/alert-message";
+import { GoogleMap } from "@/components/shared/google-map";
 import {
   MedicationStatusBadge,
 } from "@/components/shared/status-badge";
@@ -457,6 +458,20 @@ export function MedicationDetailView() {
             />
           ))}
         </div>
+
+        {/* Carte des pharmacies ayant ce médicament */}
+        {sortedPharmacies.length > 0 && (
+          <Card className="mt-4 overflow-hidden border-brand/20 py-0">
+            <GoogleMap
+              lat={sortedPharmacies[0].latitude}
+              lng={sortedPharmacies[0].longitude}
+              zoom={13}
+              label={sortedPharmacies[0].name}
+              title="Pharmacies ayant ce médicament"
+              className="h-64"
+            />
+          </Card>
+        )}
       </section>
 
       {/* ============ ALTERNATIVES / ÉQUIVALENTS ============ */}

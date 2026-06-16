@@ -36,6 +36,7 @@ import { CategoryIcon } from "@/components/category-icons";
 import { FavoriteButton } from "@/components/shared/favorite-button";
 import { AlertMessage } from "@/components/shared/alert-message";
 import { EmptyState } from "@/components/shared/empty-state";
+import { GoogleMap } from "@/components/shared/google-map";
 import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { distanceKm } from "@/lib/format";
@@ -437,36 +438,16 @@ export function PharmacyDetailView() {
             </Button>
           </Card>
 
-          {/* Map placeholder */}
+          {/* Google Map */}
           <Card className="overflow-hidden border-brand/20 py-0">
-            <div className="relative flex h-48 items-center justify-center bg-brand-soft">
-              <div className="absolute inset-0 opacity-30 bg-brand-light" />
-              <span className="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand ring-4 ring-brand/30" />
-              <div className="relative flex flex-col items-center gap-2 rounded-xl bg-background/90 px-4 py-2.5 text-center shadow-premium backdrop-blur-sm">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
-                  <MapPinned className="size-5" />
-                </span>
-                <div>
-                  <p className="text-xs font-bold text-foreground">
-                    Localisation de la pharmacie
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {pharmacy.latitude.toFixed(4)}, {pharmacy.longitude.toFixed(4)}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="p-3">
-              <Button
-                size="sm"
-                className="w-full bg-brand-gradient text-white hover:opacity-90"
-                asChild
-              >
-                <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-                  <Navigation className="size-4" /> Ouvrir dans Google Maps
-                </a>
-              </Button>
-            </div>
+            <GoogleMap
+              lat={pharmacy.latitude}
+              lng={pharmacy.longitude}
+              zoom={16}
+              label={pharmacy.name}
+              title="Localisation de la pharmacie"
+              className="h-56"
+            />
           </Card>
         </div>
       </div>

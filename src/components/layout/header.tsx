@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
+import { NotificationDropdown } from "@/components/shared/notification-dropdown";
 import { useNotifications } from "@/store/notifications";
 import { cn } from "@/lib/utils";
 import type { View } from "@/lib/types";
@@ -108,19 +109,8 @@ export function Header() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-          {/* Notifications bell */}
-          <button
-            onClick={() => go("notifications")}
-            className="relative flex size-10 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
-            aria-label={`Notifications${unread > 0 ? ` (${unread} non lues)` : ""}`}
-          >
-            <Bell className="size-5" />
-            {unread > 0 && (
-              <span className="absolute right-1.5 top-1.5 flex min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-background">
-                {unread > 9 ? "9+" : unread}
-              </span>
-            )}
-          </button>
+          {/* Notifications dropdown */}
+          <NotificationDropdown />
 
           {/* Subscription button */}
           {premium ? (

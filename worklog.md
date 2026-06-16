@@ -820,3 +820,36 @@ Stage Summary:
 - Cartes interactives avec routes, marqueurs, zoom Google Maps réel
 - Bouton "Ouvrir dans Google Maps" sur chaque carte (lien externe)
 - Emplacements : Accueil (pharmacies de garde), Pharmacies (Abidjan), Détail pharmacie (localisation précise), Détail médicament (pharmacies ayant le médicament)
+
+---
+Task ID: 26
+Agent: main (orchestrator)
+Task: Page Notifications + composant NotificationDropdown — refonte complète
+
+Work Log:
+- Création composant NotificationDropdown (@/components/shared/notification-dropdown.tsx) : cloche Bell avec badge rouge (nombre non lues), menu déroulant w-80/w-96 avec header (titre + compteur + bouton "Tout lire"), liste 5 dernières notifications (icône tonalisée, titre, message, point non lu), footer "Voir toutes les notifications" → navigate notifications. Fermeture au clic extérieur.
+- Intégration dans header.tsx : remplacement du bouton cloche simple par <NotificationDropdown />, imports ajoutés (Bell conservé pour menu mobile/compte)
+- Recréation page Notifications (notifications-view.tsx) :
+  * Header : Eyebrow "Alertes et informations" + titre "Notifications" + badge non lues + Muted sous-texte
+  * Barre actions : "Tout marquer comme lu" + "Effacer tout" (confirm)
+  * 8 filtres chips horizontaux avec compteurs : Toutes, Non lues, Médicaments, Pharmacies, Ordonnances, Abonnement, Paiement, Support (scroll horizontal mobile)
+  * Cartes notifications : icône tonalisée (success/warning/alert/info/promotion), titre + point non lu + badge type (Succès/Alerte/Urgent/Info/Promo), message, date, actions contextuelles (Voir le médicament / Voir la pharmacie / Consulter l'ordonnance / Renouveler l'abonnement / Voir le paiement / Contacter le support) + "Marquer comme lu" + "Supprimer"
+  * Catégorisation automatique des notifications par mots-clés (médicament, pharmacie, ordonnance, abonnement, paiement, support)
+  * État vide : EmptyState Inbox + message rassurant + bouton "Retour à l'accueil"
+  * État non connecté : EmptyState Bell + bouton Se connecter
+- Enrichissement seed notifications API (12 types) : Médicament disponible (Paracétamol Cocody), Stock faible (Amoxicilline Marcory), Rupture (Coartem Abobo), Pharmacie de garde (Yopougon), Abonnement expiré, Abonnement activé, Paiement réussi (Wave 500 FCFA), Paiement échoué (MTN Money), Ordonnance estimée (3 médicaments 2150-3200 FCFA), Ordonnance enregistrée (Traitement paludisme), Pharmacie favorite mise à jour (Riviera horaires), Message support. Dates échelonnées (1h à 72h).
+- Couleurs pleines uniquement (pas de dégradé) : bg-brand-light text-brand (success), bg-amber-100 text-amber-600 (warning), bg-red-100 text-red-600 (alert), bg-sky-100 text-sky-600 (info)
+- Layout responsive : desktop large (filtres horizontaux + cartes), mobile (filtres scroll horizontal + cartes empilées)
+- Vérification Agent Browser + VLM :
+  * Page notifications (desktop) : 12 notifications, 8 filtres avec compteurs (Toutes 12, Non lues 12, Médicaments 4, Pharmacies 2, Ordonnances 1, Abonnement 3, Paiement 1, Support 1), cartes avec icônes/badges/actions — VLM confirme "titre, 8 filtres, cartes, actions, couleurs pleines, identité premium"
+  * Dropdown header : ouverture menu avec 5 dernières notifications + "Voir toutes les notifications"
+  * Mobile 390px : filtres lisibles, cartes empilées, boutons faciles à cliquer — VLM confirme "filtres lisibles, empilement, boutons adaptés"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Notifications premium, responsive, complète avec 12 types de notifications et 8 filtres
+- Composant NotificationDropdown dans le header (cloche + badge + menu déroulant + lien "Voir toutes")
+- Cartes enrichies : icône, titre, badge type, message, date, statut lu/non lu, actions contextuelles (Voir médicament/pharmacie/ordonnance, Renouveler, Contacter support)
+- Données fictives réalistes Abidjan : Paracétamol Cocody, garde Yopougon, Wave 500 FCFA, ordonnance estimée
+- État vide professionnel avec bouton "Retour à l'accueil"
+- Couleurs pleines uniquement (pas de dégradé)

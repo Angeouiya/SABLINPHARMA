@@ -630,3 +630,34 @@ Stage Summary:
 - Notifications personnalisées : rappel abonnement, disponibilité médicament, pharmacie de garde, mise à jour
 - Menu Paramètres : modifier infos, mot de passe, notifications, abonnement, confidentialité, aide, conditions, déconnexion
 - Layout : desktop menu latéral + contenu, mobile empilé
+
+---
+Task ID: 20
+Agent: main (orchestrator)
+Task: Page Abonnement complète — refonte avec statut, avantages, comparatif, pourquoi, FAQ
+
+Work Log:
+- Section attractive : header gradient amber→background→brand-light avec badge Crown "Offre Premium", titre "Abonnement Premium", sous-texte "Accédez à toutes les fonctionnalités pour trouver vos médicaments plus rapidement", prix 500 FCFA/mois dans encadré ambre bien visible (text-5xl)
+- Carte Premium centrale (sticky right) : Crown gradient amber, badge "Recommandé", "Plan Premium", prix 500 FCFA/mois (text-5xl), 8 avantages avec coches ambre, boutons "S'abonner à 500 FCFA/mois" (gradient amber) + "Voir les avantages" (outline brand), note "Sans engagement · Paiement sécurisé", badge ShieldCheck "Paiement chiffré 100% sécurisé"
+- 8 avantages Premium (cards avec icônes gradient amber) : Recherche illimitée, Estimation d'ordonnance, Accès pharmacies ouvertes, Accès pharmacies de garde, Historique recherches, Pharmacies favorites, Alertes disponibilité, Support utilisateur prioritaire
+- Bloc Statut de l'abonnement : si premium → Crown + "Premium actif" + badge "Actif" + grille 6 infos (Type, Statut, Date début, Date expiration, Moyen paiement, Montant) + bouton "Renouveler". Si gratuit → Clock + "Compte gratuit" + badge "Inactif" + grille 6 infos (—) + bouton "S'abonner maintenant"
+- Comparatif Gratuit vs Premium : tableau 9 lignes (Recherches, Estimation, Pharmacies ouvertes, Pharmacies de garde, Historique, Favoris, Alertes, Support, Sans pub) avec X pour gratuit et ✓ ambre pour premium, badge "Recommandé" sur colonne Premium, pied "Prix mensuel : 0 FCFA vs 500 FCFA"
+- Section "Pourquoi passer à Premium ?" : 5 cartes (Gagner du temps/Zap, Éviter déplacements inutiles/Navigation, Préparer budget ordonnance/Wallet, Trouver pharmacies de garde/Timer, Recevoir alertes importantes/Bell) avec descriptions concrètes
+- FAQ : 4 questions exactes (Comment payer l'abonnement ?, Puis-je annuler ?, Que se passe-t-il si mon abonnement expire ?, Les prix des médicaments sont-ils garantis ?) avec réponses rassurantes via Accordion
+- CTA final : Card gradient amber "Prêt à passer Premium ?" + bouton "S'abonner à 500 FCFA/mois" (si non premium)
+- Design system : Heading, Eyebrow, Muted, Button (brand-gradient/outline/gradient amber), Card, Badge, Accordion, Separator
+- Layout responsive : desktop grid [1fr_400px] (avantages+statut left, carte Premium sticky right), mobile empilé
+- Vérification Agent Browser :
+  * desktop 1440px : titre + prix 500 FCFA + 8 avantages + statut (compte gratuit/inactif) + carte Premium (S'abonner + Voir avantages) + comparatif (badge Recommandé) + 5 cartes Pourquoi + FAQ 4 questions — VLM confirme "titre, prix visible, carte Premium 8 avantages + boutons, comparatif badge Recommandé, statut abonnement, pourquoi 5 cartes, FAQ 4 questions, identité premium ambre"
+  * mobile 390px : prix 500 FCFA bien visible, cartes empilées, design adapté — VLM confirme "prix bien visible, empilement propre, interface claire"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Abonnement premium, responsive, complète conforme aux spécifications
+- Section attractive : titre "Abonnement Premium" + sous-texte + prix 500 FCFA/mois bien visible
+- Carte Premium : 8 avantages (recherche illimitée, estimation, pharmacies ouvertes/garde, historique, favoris, alertes, support) + boutons "S'abonner à 500 FCFA/mois" + "Voir les avantages"
+- Comparatif Gratuit vs Premium : 9 fonctionnalités + badge "Recommandé" sur Premium
+- Statut abonnement : type, statut actif/inactif, dates début/expiration, moyen paiement, bouton Renouveler/S'abonner
+- Pourquoi passer à Premium : 5 cartes (gagner temps, éviter déplacements, budget, garde, alertes)
+- FAQ : 4 questions (paiement, annulation, expiration, prix garantis)
+- Layout : desktop carte Premium sticky + contenu, mobile empilé

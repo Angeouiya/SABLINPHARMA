@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,15 +11,23 @@ import {
   ShieldCheck,
   Zap,
   Clock,
+  Search,
+  ClipboardList,
+  Timer,
+  Heart,
+  Bell,
+  Headphones,
+  CreditCard,
+  Smartphone,
+  RotateCcw,
+  AlertCircle,
+  Info,
+  TrendingDown,
+  Navigation,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -27,17 +36,23 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
+import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
-import { formatFCFA } from "@/lib/format";
+import { formatFCFA, formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import type { Subscription } from "@/lib/types";
 
+// Les 8 avantages Premium demandés
 const AVANTAGES = [
-  "Recherches illimitées et sans publicité",
-  "Estimations d'ordonnance illimitées",
-  "Alertes pharmacies de garde en temps réel",
-  "Comparateur de prix avancé",
-  "Priorité sur l'assistance WhatsApp 24/7",
-  "Historique des recherches sauvegardé",
+  { icon: Search, label: "Recherche illimitée de médicaments" },
+  { icon: ClipboardList, label: "Estimation d'ordonnance" },
+  { icon: Clock, label: "Accès aux pharmacies ouvertes" },
+  { icon: Timer, label: "Accès aux pharmacies de garde" },
+  { icon: Clock, label: "Historique des recherches" },
+  { icon: Heart, label: "Pharmacies favorites" },
+  { icon: Bell, label: "Alertes de disponibilité" },
+  { icon: Headphones, label: "Support utilisateur prioritaire" },
 ];
 
 const COMPARATIF: {
@@ -46,68 +61,96 @@ const COMPARATIF: {
   premium: string;
   premiumOnly?: boolean;
 }[] = [
+  { label: "Recherches de médicaments", gratuit: "10 / jour", premium: "Illimité" },
+  { label: "Estimation d'ordonnance", gratuit: "3 / mois", premium: "Illimité" },
+  { label: "Pharmacies ouvertes", gratuit: "Accès partiel", premium: "Accès complet" },
+  { label: "Pharmacies de garde", gratuit: "—", premium: "Accès complet", premiumOnly: true },
+  { label: "Historique des recherches", gratuit: "—", premium: "Illimité", premiumOnly: true },
+  { label: "Pharmacies favorites", gratuit: "3 maximum", premium: "Illimité" },
+  { label: "Alertes de disponibilité", gratuit: "—", premium: "Incluses", premiumOnly: true },
+  { label: "Support utilisateur", gratuit: "Standard", premium: "Prioritaire" },
+  { label: "Sans publicité", gratuit: "—", premium: "Inclus", premiumOnly: true },
+];
+
+// Pourquoi passer à Premium
+const POURQUOI = [
   {
-    label: "Recherches de médicaments",
-    gratuit: "10 / jour",
-    premium: "Illimité",
+    icon: Zap,
+    title: "Gagner du temps",
+    desc: "Trouvez vos médicaments et pharmacies en quelques secondes, sans déplacement inutile.",
   },
   {
-    label: "Estimation ordonnance",
-    gratuit: "3 / mois",
-    premium: "Illimité",
+    icon: Navigation,
+    title: "Éviter les déplacements inutiles",
+    desc: "Vérifiez la disponibilité avant de sortir et allez directement à la bonne pharmacie.",
   },
   {
-    label: "Alertes pharmacies de garde",
-    gratuit: "—",
-    premium: "Illimité",
-    premiumOnly: true,
+    icon: Wallet,
+    title: "Préparer son budget ordonnance",
+    desc: "Estimez le coût total de vos médicaments et comparez les prix par pharmacie.",
   },
   {
-    label: "Assistance prioritaire",
-    gratuit: "—",
-    premium: "Incluse",
-    premiumOnly: true,
+    icon: Timer,
+    title: "Trouver les pharmacies de garde",
+    desc: "Accédez en temps réel aux pharmacies de garde près de chez vous, jour et nuit.",
   },
   {
-    label: "Sans publicité",
-    gratuit: "—",
-    premium: "Incluse",
-    premiumOnly: true,
+    icon: Bell,
+    title: "Recevoir des alertes importantes",
+    desc: "Soyez informé des disponibilités, des gardes et des mises à jour importantes.",
   },
 ];
 
 const FAQ = [
   {
-    q: "Comment fonctionne l'abonnement ?",
-    a: "L'abonnement Premium est mensuel : vous payez 500 FCFA une fois, et toutes les fonctionnalités avancées sont débloquées pendant 30 jours. À la fin de la période, vous pouvez renouveler manuellement. Aucun prélèvement automatique n'est effectué.",
+    q: "Comment payer l'abonnement ?",
+    a: "Vous pouvez régler votre abonnement via Mobile Money (Orange Money, MTN MoMo, Moov Money) ou par carte bancaire (Visa, Mastercard). Le paiement est sécurisé et chiffré. Aucun prélèvement automatique : vous payez 500 FCFA pour 30 jours d'accès Premium.",
   },
   {
-    q: "Puis-je résilier à tout moment ?",
-    a: "Oui. L'abonnement n'est pas reconduit automatiquement. Vous conservez l'accès Premium jusqu'à la fin de la période payée, puis le compte repasse en mode gratuit sans aucune action de votre part.",
+    q: "Puis-je annuler ?",
+    a: "Oui, l'abonnement est sans engagement. Il n'est pas reconduit automatiquement. Vous conservez l'accès Premium jusqu'à la fin de la période payée, puis le compte repasse en mode gratuit sans aucune action de votre part.",
   },
   {
-    q: "Quels moyens de paiement ?",
-    a: "Vous pouvez régler votre abonnement via Mobile Money (Orange Money, MTN MoMo, Moov Money) ou par carte bancaire (Visa, Mastercard). Le paiement est sécurisé et chiffré.",
+    q: "Que se passe-t-il si mon abonnement expire ?",
+    a: "Votre compte repasse automatiquement en mode gratuit. Vous conservez accès aux fonctionnalités de base (recherche limitée, pharmacies). Vos favoris et historique sont conservés. Vous pouvez renouveler à tout moment pour retrouver toutes les fonctionnalités Premium.",
   },
   {
-    q: "Est-ce que je peux acheter des médicaments ?",
-    a: "Non. SABLIN PHARMA est une plateforme d'information uniquement. Nous ne vendons aucun médicament. Nous vous aidons à localiser les médicaments dans les pharmacies partenaires et à estimer le coût de votre ordonnance.",
+    q: "Les prix des médicaments sont-ils garantis ?",
+    a: "Les prix affichés sont indicatifs et basés sur les informations fournies par les pharmacies partenaires. Ils peuvent varier selon le point de vente. Nous vous recommandons toujours de confirmer auprès de la pharmacie avant tout déplacement. SABLIN PHARMA est une plateforme d'information, aucune vente en ligne.",
   },
 ];
 
 export function SubscriptionView() {
   const { navigate } = useNav();
-  const { premium } = useAuth();
+  const { user, premium } = useAuth();
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setSubscription(data.subscription ?? null);
+        }
+      } catch {
+        /* noop */
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="flex flex-col">
-      {/* HEADER */}
+      {/* ============ HEADER ATTRACTIF ============ */}
       <section className="relative overflow-hidden bg-gradient-to-br from-amber-50 via-background to-brand-light/40">
         <div className="absolute -right-16 -top-16 size-72 rounded-full bg-amber-300/20 blur-3xl" />
         <div className="absolute -bottom-24 -left-16 size-80 rounded-full bg-brand/10 blur-3xl" />
 
         <div className="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
-          {/* Back link */}
           <button
             onClick={() => navigate("home")}
             className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
@@ -119,98 +162,74 @@ export function SubscriptionView() {
           <div className="mx-auto mt-6 max-w-2xl text-center">
             <Badge className="mx-auto inline-flex items-center gap-1.5 border-0 bg-gradient-to-br from-amber-400 to-amber-500 px-3 py-1 text-xs font-bold text-white shadow-premium">
               <Crown className="size-3.5" />
-              Premium
+              Offre Premium
             </Badge>
             <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-              Abonnement Premium{" "}
-              <span className="text-brand-dark">SABLIN PHARMA</span>
+              Abonnement Premium
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
-              Débloquez toutes les fonctionnalités avancées et profitez d&apos;une
-              expérience sans limite pour gérer votre santé au quotidien.
+              Accédez à toutes les fonctionnalités pour trouver vos médicaments plus
+              rapidement, estimer vos ordonnances et localiser les pharmacies de garde.
             </p>
+
+            {/* Prix bien visible */}
+            <div className="mt-5 inline-flex items-baseline gap-2 rounded-2xl border border-amber-500/30 bg-background px-6 py-3 shadow-premium">
+              <span className="text-4xl font-extrabold tracking-tight text-brand-dark sm:text-5xl">
+                500
+              </span>
+              <span className="text-sm font-semibold text-muted-foreground">FCFA / mois</span>
+            </div>
           </div>
         </div>
       </section>
 
       <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-        {/* MAIN GRID */}
+        {/* ============ CARTE PREMIUM CENTRALE + AVANTAGES ============ */}
         <div className="grid gap-8 lg:grid-cols-[1fr_400px] lg:gap-10">
-          {/* LEFT — Avantages + image */}
+          {/* LEFT — Avantages détaillés */}
           <div className="flex flex-col gap-6">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
                   <Zap className="size-5" />
                 </span>
-                <h2 className="text-xl font-extrabold text-foreground sm:text-2xl">
-                  Ce que vous obtenez
-                </h2>
+                <div>
+                  <Eyebrow>Vos avantages</Eyebrow>
+                  <Heading level="h2">Ce que vous obtenez avec Premium</Heading>
+                </div>
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <Muted className="mt-2 max-w-lg">
                 Des outils exclusifs pour gagner du temps et prendre de meilleures
-                décisions santé.
-              </p>
+                décisions santé au quotidien.
+              </Muted>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               {AVANTAGES.map((a, i) => (
                 <Card
-                  key={a}
-                  className="group flex items-start gap-3 border-border/70 p-4 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium"
+                  key={i}
+                  className="group flex items-center gap-3 border-border/70 p-4 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium"
                 >
-                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand transition-transform group-hover:scale-110">
-                    <CheckCircle2 className="size-4" />
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white transition-transform group-hover:scale-110">
+                    <a.icon className="size-5" />
                   </span>
-                  <div className="flex-1">
-                    <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                      Avantage {i + 1}
-                    </span>
-                    <p className="text-sm font-semibold leading-snug text-foreground">
-                      {a}
-                    </p>
-                  </div>
+                  <p className="text-sm font-semibold leading-snug text-foreground">
+                    {a.label}
+                  </p>
                 </Card>
               ))}
             </div>
 
-            {/* Illustration */}
-            <Card className="relative overflow-hidden border-border/70 p-0">
-              <div className="grid items-center gap-0 sm:grid-cols-[1.2fr_1fr]">
-                <div className="p-6 sm:p-8">
-                  <Badge className="border-0 bg-brand-light text-xs font-semibold text-brand-dark">
-                    <Clock className="size-3" /> Disponibilité 24/7
-                  </Badge>
-                  <h3 className="mt-3 text-lg font-extrabold text-foreground sm:text-xl">
-                    Soyez informé en temps réel
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Recevez des alertes instantanées lorsque les pharmacies de
-                    garde ouvrent près de chez vous. Ne ratez plus jamais une
-                    pharmacie ouverte la nuit ou le week-end.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-4 border-brand/30 text-brand hover:bg-brand-light hover:text-brand-dark"
-                    onClick={() => navigate("pharmacies", { filter: "on-duty" })}
-                  >
-                    Voir les pharmacies de garde
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-                <div className="relative h-44 overflow-hidden sm:h-full">
-                  <img
-                    src="/images/pharmacist.png"
-                    alt="Pharmacien SABLIN PHARMA"
-                    className="size-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-transparent sm:from-card" />
-                </div>
-              </div>
-            </Card>
+            {/* Statut de l'abonnement */}
+            <SubscriptionStatus
+              premium={premium}
+              subscription={subscription}
+              onRenew={() => navigate("payment")}
+              onSubscribe={() => navigate("payment")}
+            />
           </div>
 
-          {/* RIGHT — Pricing card (sticky) */}
+          {/* RIGHT — Carte Premium pricing (sticky) */}
           <div className="lg:sticky lg:top-24 lg:self-start">
             <Card className="relative overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-50 via-card to-card p-0 shadow-premium-lg">
               <div className="absolute -right-10 -top-10 size-44 rounded-full bg-amber-300/30 blur-3xl" />
@@ -222,7 +241,7 @@ export function SubscriptionView() {
                     <Crown className="size-6" />
                   </span>
                   <Badge className="border-0 bg-amber-500 text-[11px] font-bold text-white">
-                    Offre mensuelle
+                    Recommandé
                   </Badge>
                 </div>
 
@@ -244,65 +263,51 @@ export function SubscriptionView() {
 
                 <Separator className="my-5" />
 
+                <ul className="flex-1 space-y-2 text-sm">
+                  {AVANTAGES.map((a, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                      <span className="text-foreground/80">{a.label}</span>
+                    </li>
+                  ))}
+                </ul>
+
                 {premium ? (
-                  <div className="flex flex-1 flex-col gap-4">
-                    <div className="flex items-center gap-3 rounded-xl bg-brand-light/60 p-4">
-                      <CheckCircle2 className="size-6 shrink-0 text-brand" />
-                      <div>
-                        <p className="text-sm font-bold text-foreground">
-                          Vous êtes Premium
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Votre abonnement est actif. Profitez pleinement de
-                          toutes les fonctionnalités.
-                        </p>
-                      </div>
-                    </div>
-                    <ul className="space-y-2 text-sm">
-                      {AVANTAGES.slice(0, 4).map((a) => (
-                        <li key={a} className="flex items-start gap-2">
-                          <Check className="mt-0.5 size-4 shrink-0 text-brand" />
-                          <span className="text-foreground/80">{a}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button
-                      className="mt-auto w-full bg-brand-gradient text-white hover:opacity-90"
-                      size="lg"
-                      onClick={() => navigate("home")}
-                    >
-                      Retour à l&apos;accueil
-                      <ChevronRight className="size-4" />
-                    </Button>
-                  </div>
+                  <Button
+                    className="mt-5 w-full bg-brand-gradient text-white hover:opacity-90"
+                    size="lg"
+                    onClick={() => navigate("payment")}
+                  >
+                    <RotateCcw className="size-4" /> Renouveler mon abonnement
+                  </Button>
                 ) : (
-                  <div className="flex flex-1 flex-col gap-4">
-                    <ul className="space-y-2 text-sm">
-                      {AVANTAGES.map((a) => (
-                        <li key={a} className="flex items-start gap-2">
-                          <Check className="mt-0.5 size-4 shrink-0 text-amber-600" />
-                          <span className="text-foreground/80">{a}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Button
-                      className="mt-auto w-full bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
-                      size="lg"
-                      onClick={() => navigate("payment")}
-                    >
-                      <Crown className="size-4" />
-                      S&apos;abonner maintenant
-                    </Button>
-                    <p className="text-center text-[11px] text-muted-foreground">
-                      Sans engagement · Paiement sécurisé · Résiliable à tout
-                      moment
-                    </p>
-                  </div>
+                  <Button
+                    className="mt-5 w-full bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
+                    size="lg"
+                    onClick={() => navigate("payment")}
+                  >
+                    <Crown className="size-4" /> S&apos;abonner à 500 FCFA/mois
+                  </Button>
                 )}
+                <Button
+                  variant="outline"
+                  className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+                  size="lg"
+                  onClick={() => {
+                    document
+                      .getElementById("avantages")
+                      ?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
+                  Voir les avantages <ChevronRight className="size-4" />
+                </Button>
+
+                <p className="mt-3 text-center text-[11px] text-muted-foreground">
+                  Sans engagement · Paiement sécurisé · Résiliable à tout moment
+                </p>
               </div>
             </Card>
 
-            {/* Trust badge */}
             <div className="mt-4 flex items-center justify-center gap-2 rounded-xl border border-border/70 bg-card/60 p-3 text-xs text-muted-foreground">
               <ShieldCheck className="size-4 text-brand" />
               Paiement chiffré et 100% sécurisé
@@ -310,20 +315,19 @@ export function SubscriptionView() {
           </div>
         </div>
 
-        {/* COMPARATIF */}
-        <section className="mt-14">
+        {/* ============ COMPARATIF ============ */}
+        <section id="avantages" className="mt-14 scroll-mt-20">
           <div className="text-center">
-            <h2 className="text-2xl font-extrabold text-foreground sm:text-3xl">
-              Gratuit vs{" "}
-              <span className="text-amber-600">Premium</span>
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Comparez les fonctionnalités et choisissez l&apos;offre qui vous
-              convient.
-            </p>
+            <Eyebrow className="justify-center">Comparez les offres</Eyebrow>
+            <Heading level="h2" className="text-center">
+              Gratuit vs <span className="text-amber-600">Premium</span>
+            </Heading>
+            <Muted className="mt-2 text-center">
+              Comparez les fonctionnalités et choisissez l&apos;offre qui vous convient.
+            </Muted>
           </div>
 
-          <Card className="mt-6 overflow-hidden border-border/70 p-0">
+          <Card className="mt-6 overflow-hidden border-border/70 p-0 shadow-premium">
             <div className="overflow-x-auto scroll-thin">
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="border-b border-border/60 bg-muted/40">
@@ -338,6 +342,9 @@ export function SubscriptionView() {
                       <span className="inline-flex items-center gap-1">
                         <Crown className="size-3.5" /> Premium
                       </span>
+                      <span className="ml-1.5 inline-flex rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] text-white">
+                        Recommandé
+                      </span>
                     </th>
                   </tr>
                 </thead>
@@ -349,14 +356,9 @@ export function SubscriptionView() {
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         {row.premiumOnly ? (
-                          <span className="inline-flex items-center justify-center">
-                            <X className="size-4 text-muted-foreground/60" />
-                            <span className="sr-only">Non inclus</span>
-                          </span>
+                          <X className="mx-auto size-4 text-muted-foreground/60" />
                         ) : (
-                          <span className="text-muted-foreground">
-                            {row.gratuit}
-                          </span>
+                          <span className="text-muted-foreground">{row.gratuit}</span>
                         )}
                       </td>
                       <td className="px-5 py-3.5 text-center">
@@ -370,9 +372,7 @@ export function SubscriptionView() {
                 </tbody>
                 <tfoot className="bg-amber-50/60">
                   <tr>
-                    <td className="px-5 py-4 font-bold text-foreground">
-                      Prix mensuel
-                    </td>
+                    <td className="px-5 py-4 font-bold text-foreground">Prix mensuel</td>
                     <td className="px-5 py-4 text-center font-bold text-muted-foreground">
                       0 FCFA
                     </td>
@@ -386,21 +386,52 @@ export function SubscriptionView() {
           </Card>
         </section>
 
-        {/* FAQ */}
+        {/* ============ POURQUOI PASSER À PREMIUM ============ */}
         <section className="mt-14">
           <div className="text-center">
-            <h2 className="text-2xl font-extrabold text-foreground sm:text-3xl">
+            <Eyebrow className="justify-center">Bénéfices concrets</Eyebrow>
+            <Heading level="h2" className="text-center">
+              Pourquoi passer à Premium ?
+            </Heading>
+            <Muted className="mt-2 text-center">
+              500 FCFA/mois pour gagner du temps et mieux gérer votre santé.
+            </Muted>
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {POURQUOI.map((p, i) => (
+              <Card
+                key={i}
+                className="group border-border/70 p-5 transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg"
+              >
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-brand-light text-brand transition-transform group-hover:scale-110">
+                  <p.icon className="size-6" />
+                </span>
+                <h3 className="mt-4 text-base font-bold text-foreground">{p.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {p.desc}
+                </p>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* ============ FAQ ============ */}
+        <section className="mt-14">
+          <div className="text-center">
+            <Eyebrow className="justify-center">Besoin d&apos;informations ?</Eyebrow>
+            <Heading level="h2" className="text-center">
               Questions fréquentes
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            </Heading>
+            <Muted className="mt-2 text-center">
               Tout ce que vous devez savoir avant de vous abonner.
-            </p>
+            </Muted>
           </div>
 
           <Card className="mx-auto mt-6 max-w-3xl border-border/70 p-6 sm:p-8">
             <Accordion type="single" collapsible className="w-full">
               {FAQ.map((item, i) => (
-                <AccordionItem key={item.q} value={`item-${i}`}>
+                <AccordionItem key={i} value={`item-${i}`}>
                   <AccordionTrigger className="text-left text-sm font-semibold text-foreground sm:text-base">
                     {item.q}
                   </AccordionTrigger>
@@ -413,7 +444,7 @@ export function SubscriptionView() {
           </Card>
         </section>
 
-        {/* CTA FINAL */}
+        {/* ============ CTA FINAL ============ */}
         {!premium && (
           <section className="mt-14">
             <Card className="relative overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-50 via-card to-brand-light/40 p-8 text-center shadow-premium sm:p-10">
@@ -437,13 +468,120 @@ export function SubscriptionView() {
                   onClick={() => navigate("payment")}
                 >
                   <Crown className="size-4" />
-                  S&apos;abonner maintenant
+                  S&apos;abonner à 500 FCFA/mois
                 </Button>
               </div>
             </Card>
           </section>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   SubscriptionStatus — bloc statut de l'abonnement
+   ============================================================ */
+function SubscriptionStatus({
+  premium,
+  subscription,
+  onRenew,
+  onSubscribe,
+}: {
+  premium: boolean;
+  subscription: Subscription | null;
+  onRenew: () => void;
+  onSubscribe: () => void;
+}) {
+  return (
+    <Card className="overflow-hidden border-border/70 py-0 shadow-premium">
+      <div className="flex items-center gap-2 border-b border-border/50 bg-muted/30 px-5 py-3">
+        <CreditCard className="size-4 text-brand" />
+        <h3 className="text-sm font-bold text-foreground">Statut de votre abonnement</h3>
+      </div>
+      <div className="p-5">
+        {premium && subscription ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white">
+                <Crown className="size-5" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-foreground">Premium actif</p>
+                <Badge className="mt-0.5 border-0 bg-success text-white">
+                  <CheckCircle2 className="size-3" /> Actif
+                </Badge>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <StatusInfo label="Type d'abonnement" value="Premium mensuel" />
+              <StatusInfo label="Statut" value="Actif" success />
+              <StatusInfo label="Date de début" value={formatDate(subscription.startDate)} />
+              <StatusInfo
+                label="Date d'expiration"
+                value={subscription.endDate ? formatDate(subscription.endDate) : "—"}
+              />
+              <StatusInfo label="Moyen de paiement" value="Mobile Money" />
+              <StatusInfo label="Montant" value="500 FCFA" />
+            </div>
+            <Button
+              className="w-full bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
+              onClick={onRenew}
+            >
+              <RotateCcw className="size-4" /> Renouveler
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-brand-light text-brand">
+                <Clock className="size-5" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-foreground">Compte gratuit</p>
+                <Badge className="mt-0.5 border-0 bg-neutral-light text-neutral-foreground">
+                  <AlertCircle className="size-3" /> Inactif
+                </Badge>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <StatusInfo label="Type d'abonnement" value="Gratuit" />
+              <StatusInfo label="Statut" value="Inactif" />
+              <StatusInfo label="Date de début" value="—" />
+              <StatusInfo label="Date d'expiration" value="—" />
+              <StatusInfo label="Moyen de paiement" value="—" />
+              <StatusInfo label="Montant" value="0 FCFA" />
+            </div>
+            <Button
+              className="w-full bg-brand-gradient text-white hover:opacity-90"
+              onClick={onSubscribe}
+            >
+              <Crown className="size-4" /> S&apos;abonner maintenant
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function StatusInfo({
+  label,
+  value,
+  success = false,
+}: {
+  label: string;
+  value: string;
+  success?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border/50 bg-background px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className={cn("mt-0.5 text-sm font-semibold", success ? "text-success" : "text-foreground")}>
+        {value}
+      </p>
     </div>
   );
 }

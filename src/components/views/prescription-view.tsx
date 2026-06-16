@@ -442,7 +442,7 @@ export function PrescriptionView() {
                 <h1 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
                   Estimez votre ordonnance
                 </h1>
-                <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-white/85">
+                <p className="mt-1.5 max-w-lg text-sm leading-relaxed break-words text-white/85">
                   Ajoutez les médicaments prescrits, précisez les dosages et quantités, puis
                   obtenez une estimation claire du coût total avant de vous rendre en pharmacie.
                 </p>

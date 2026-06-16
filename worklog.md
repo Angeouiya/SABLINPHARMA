@@ -1403,3 +1403,20 @@ Stage Summary:
 - Règle CSS globale anti-débordement sur tous les éléments texte
 - StatBlock corrigé (labels complets visibles)
 - 0 overflow horizontal sur mobile
+
+---
+Task ID: 34
+Agent: main (orchestrator)
+Task: Fix textes débordant de leur cadre UI
+
+Work Log:
+- Audit mobile 390px complet (Accueil, Médicaments, Pharmacies, Ordonnance, Portefeuille) avec VLM
+- Overflow horizontal réel : 0px sur toutes les pages
+- Ajout de `break-words` sur tous les paragraphes `leading-relaxed` dans toutes les vues (home, medication-detail, pharmacy-detail, prescription, subscription, wallet, profile, notifications) pour garantir qu'aucun mot long ne déborde de son cadre
+- Vérification finale : "Aucun texte ne dépasse son cadre. Les éléments sont bien ajustés."
+- 0 overflow horizontal, lint 0 erreur, 0 erreur console
+
+Stage Summary:
+- Tous les textes de la plateforme restent dans leur cadre UI, même sur mobile
+- break-words ajouté globalement sur les paragraphes longs
+- 0 débordement horizontal confirmé

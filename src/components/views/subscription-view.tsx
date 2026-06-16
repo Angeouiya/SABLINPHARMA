@@ -167,7 +167,7 @@ export function SubscriptionView() {
             <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl lg:text-5xl">
               Abonnement Premium
             </h1>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:text-base">
+            <p className="mt-3 text-sm leading-relaxed break-words text-muted-foreground sm:text-base">
               Accédez à toutes les fonctionnalités pour trouver vos médicaments plus
               rapidement, estimer vos ordonnances et localiser les pharmacies de garde.
             </p>
@@ -408,7 +408,7 @@ export function SubscriptionView() {
                   <p.icon className="size-6" />
                 </span>
                 <h3 className="mt-4 text-base font-bold text-foreground">{p.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                <p className="mt-1.5 text-sm leading-relaxed break-words text-muted-foreground">
                   {p.desc}
                 </p>
               </Card>
@@ -435,7 +435,7 @@ export function SubscriptionView() {
                   <AccordionTrigger className="text-left text-sm font-semibold text-foreground sm:text-base">
                     {item.q}
                   </AccordionTrigger>
-                  <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
+                  <AccordionContent className="text-sm leading-relaxed break-words text-muted-foreground">
                     {item.a}
                   </AccordionContent>
                 </AccordionItem>

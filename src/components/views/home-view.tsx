@@ -123,7 +123,7 @@ export function HomeView() {
               en Côte d&apos;Ivoire
             </h1>
 
-            <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/85 sm:text-base">
+            <p className="mt-4 max-w-lg text-sm leading-relaxed break-words text-white/85 sm:text-base">
               Recherchez un médicament, trouvez une pharmacie disponible près de chez vous,
               consultez les pharmacies ouvertes ou de garde, et estimez le coût de votre
               ordonnance. Simple, rapide et fiable.
@@ -269,7 +269,7 @@ export function HomeView() {
               <h3 className="mt-4 text-base font-extrabold text-foreground">
                 1. Recherchez gratuitement
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
                 Recherchez un médicament ou une pharmacie. C&rsquo;est gratuit et
                 illimité.
               </p>
@@ -283,7 +283,7 @@ export function HomeView() {
               <h3 className="mt-4 text-base font-extrabold text-foreground">
                 2. Utilisez vos crédits
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
                 Les services avancés utilisent vos crédits. Vous payez seulement
                 ce que vous utilisez.
               </p>
@@ -297,7 +297,7 @@ export function HomeView() {
               <h3 className="mt-4 text-base font-extrabold text-foreground">
                 3. Gagnez du temps
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
                 Vérifiez la disponibilité avant de vous déplacer en pharmacie.
               </p>
             </Card>
@@ -409,7 +409,7 @@ export function HomeView() {
               </div>
               <div>
                 <Heading level="h3">Estimez votre ordonnance</Heading>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                <p className="mt-1.5 text-sm leading-relaxed break-words text-muted-foreground">
                   Ajoutez plusieurs médicaments et obtenez instantanément un coût total
                   estimatif, avec la liste des pharmacies où les trouver au meilleur prix.
                 </p>
@@ -573,7 +573,7 @@ export function HomeView() {
               <h3 className="text-xl font-extrabold text-foreground sm:text-2xl">
                 Besoin d&apos;aide ?
               </h3>
-              <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-white/85 sm:text-base">
+              <p className="mt-1.5 max-w-xl text-sm leading-relaxed break-words text-white/85 sm:text-base">
                 Notre équipe vous accompagne pour trouver vos médicaments plus facilement.
                 Disponible 24h/24 pour vous orienter vers la pharmacie la plus proche.
               </p>

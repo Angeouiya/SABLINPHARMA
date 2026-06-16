@@ -375,7 +375,7 @@ export function NotificationsView() {
                           {styles.label}
                         </Badge>
                       </div>
-                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      <p className="mt-1 text-sm leading-relaxed break-words text-muted-foreground">
                         {n.message}
                       </p>
                       <p className="mt-1.5 text-xs text-muted-foreground/70">

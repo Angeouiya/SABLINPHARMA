@@ -231,7 +231,7 @@ export function PharmacyDetailView() {
                   <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl">
                     {pharmacy.name}
                   </h1>
-                  <p className="mt-1.5 max-w-md text-sm leading-relaxed text-white/85">
+                  <p className="mt-1.5 max-w-md text-sm leading-relaxed break-words text-white/85">
                     Pharmacie partenaire SABLIN PHARMA à {pharmacy.commune}. Vos médicaments
                     et produits de santé, avec un accompagnement professionnel.
                   </p>

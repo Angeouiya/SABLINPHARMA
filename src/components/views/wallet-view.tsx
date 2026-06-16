@@ -69,7 +69,7 @@ export function WalletView() {
           <h1 className="text-xl font-bold tracking-tight text-foreground">
             Connectez-vous pour accéder à votre portefeuille
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
             Connectez-vous pour recharger vos crédits, acheter le Pass Ordonnance
             et suivre votre historique de transactions SABLIN PHARMA.
           </p>
@@ -639,7 +639,7 @@ function InfoNote({
       </span>
       <div>
         <p className="text-sm font-bold text-foreground">{title}</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-0.5 text-xs leading-relaxed break-words text-muted-foreground">
           {desc}
         </p>
       </div>

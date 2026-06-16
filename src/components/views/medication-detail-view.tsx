@@ -402,7 +402,7 @@ export function MedicationDetailView() {
             </div>
 
             {/* Description */}
-            <p className="mt-4 text-sm leading-relaxed text-foreground/80">
+            <p className="mt-4 text-sm leading-relaxed break-words text-foreground/80">
               {med.description}
             </p>
 
@@ -489,7 +489,7 @@ export function MedicationDetailView() {
             <h3 className="mt-4 text-lg font-extrabold text-foreground">
               Voir les pharmacies disponibles
             </h3>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed break-words text-muted-foreground">
               Cette action coûte 1 crédit. Elle vous permet de voir les pharmacies
               où ce médicament est disponible.
             </p>

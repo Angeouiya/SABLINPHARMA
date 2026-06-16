@@ -137,7 +137,7 @@ export function ProfileView() {
           <h1 className="text-xl font-bold tracking-tight text-brand-dark">
             Connectez-vous pour accéder à votre profil
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
             Connectez-vous ou créez un compte gratuit pour suivre vos médicaments
             consultés, vos ordonnances estimées et vos pharmacies favorites à Abidjan.
           </p>

@@ -658,7 +658,7 @@ function OnDutyMiniCard({ pharma }: { pharma: Pharmacy & { distance?: number } }
         <span className="absolute -right-1 -top-1 flex size-3.5 items-center justify-center rounded-full bg-amber-400 ring-2 ring-background" />
       </span>
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-bold text-foreground group-hover:text-brand">
+        <h3 className="truncate text-sm font-bold text-foreground">
           {pharma.name}
         </h3>
         <p className="truncate text-xs text-muted-foreground">

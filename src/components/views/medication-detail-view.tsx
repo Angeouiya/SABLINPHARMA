@@ -335,7 +335,7 @@ export function MedicationDetailView() {
               )}
             </div>
 
-            <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-brand-dark sm:text-3xl">
+            <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
               {med.name}
             </h1>
 
@@ -510,7 +510,7 @@ export function MedicationDetailView() {
                       />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-sm font-bold text-foreground group-hover:text-brand">
+                      <h3 className="truncate text-sm font-bold text-foreground">
                         {alt.name}
                       </h3>
                       <p className="truncate text-xs text-muted-foreground">

@@ -59,7 +59,7 @@ export function PharmacyCard({ pharma, showPrice }: { pharma: Pharmacy; showPric
         </div>
         <div className="space-y-2 p-4">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-sm font-bold leading-tight text-foreground transition-colors group-hover:text-brand">
+            <h3 className="text-sm font-bold leading-tight text-foreground">
               {pharma.name}
             </h3>
             <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
@@ -107,7 +107,7 @@ export function PharmacyRow({ pharma }: { pharma: Pharmacy }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
-          <span className="truncate text-sm font-bold text-foreground group-hover:text-brand">
+          <span className="truncate text-sm font-bold text-foreground">
             {pharma.name}
           </span>
           <RatingPill rating={pharma.rating} />

@@ -270,7 +270,7 @@ export function HomeView() {
                   >
                     <CategoryIcon name={cat.iconName} size={28} color={cat.color} />
                   </span>
-                  <span className="text-sm font-bold leading-tight text-foreground transition-colors group-hover:text-brand">
+                  <span className="text-sm font-bold leading-tight text-foreground">
                     {cat.name}
                   </span>
                 </button>

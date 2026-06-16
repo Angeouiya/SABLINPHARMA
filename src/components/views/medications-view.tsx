@@ -741,7 +741,7 @@ function MedicationRowSimple({ med }: { med: Medication }) {
         <CategoryIcon name={med.category?.iconName ?? "Pill"} size={22} color="#fff" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="truncate text-sm font-bold text-foreground group-hover:text-brand">
+        <span className="truncate text-sm font-bold text-foreground">
           {med.name}
         </span>
         <span className="block truncate text-xs text-muted-foreground">

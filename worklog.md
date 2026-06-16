@@ -1124,3 +1124,31 @@ Stage Summary:
 - Section "Comment ça marche" sur l'accueil (3 étapes)
 - Messages pédagogiques partout ("Gratuit", "Cette action utilise des crédits", "Aucun abonnement obligatoire")
 - Couleurs pleines uniquement, pas de dégradé, contrastes vérifiés
+
+---
+Task ID: 31
+Agent: main (orchestrator)
+Task: Plateforme super responsive — audit et corrections
+
+Work Log:
+- Audit responsive complet avec Agent Browser sur mobile (390px), tablette (768px), desktop (1440px)
+- Vérification overflow horizontal sur toutes les pages clés (Accueil, Médicaments, Pharmacies, Ordonnance, Abonnement) : 0px sur tous les viewports
+- Corrections CSS globales (globals.css) :
+  * box-sizing: border-box sur tous les éléments
+  * overflow-x: hidden sur html et body (prévention débordement)
+  * -webkit-text-size-adjust: 100% (iOS)
+  * max-width: 100% sur img, video, svg, table (pas de débordement média)
+  * word-wrap + overflow-wrap: break-word sur les titres (pas de texte coupé)
+  * Font sizes responsive avec clamp() : h1 (1.5rem→2.5rem), h2 (1.25rem→2rem), h3 (1.1rem→1.5rem) selon viewport
+- Vérification VLM :
+  * Mobile 390px : "Responsivité bonne : textes lisibles, boutons cliquables, pas de débordement. Tout s'adapte bien à l'écran mobile."
+  * Tablette 768px : overflow 0px
+  * Desktop 1440px : overflow 0px
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Plateforme SABLIN PHARMA super responsive sur mobile, tablette et desktop
+- Font sizes fluides (clamp) qui s'adaptent au viewport
+- Prévention débordement horizontal (overflow-x hidden, max-width 100% médias)
+- Titres avec word-wrap pour éviter les coupures
+- 0 overflow sur tous les viewports et toutes les pages

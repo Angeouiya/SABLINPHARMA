@@ -58,6 +58,10 @@ export function Footer() {
               <li><button onClick={() => go("auth")} className="hover:text-brand">Connexion</button></li>
               <li><button onClick={() => go("auth")} className="hover:text-brand">Inscription</button></li>
               <li><button onClick={() => go("profile")} className="hover:text-brand">Mon profil</button></li>
+              <li><button onClick={() => go("favorites")} className="hover:text-brand">Mes favoris</button></li>
+              <li><button onClick={() => go("history")} className="hover:text-brand">Historique</button></li>
+              <li><button onClick={() => go("notifications")} className="hover:text-brand">Notifications</button></li>
+              <li><button onClick={() => go("settings")} className="hover:text-brand">Paramètres</button></li>
               <li>
                 <button onClick={() => go("subscription")} className="inline-flex items-center gap-1 hover:text-brand">
                   <Crown className="size-3.5 text-amber-500" /> Premium

@@ -16,6 +16,8 @@ import {
   ClipboardList,
   CheckCircle2,
   Bell,
+  Heart,
+  Clock,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,6 +31,8 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
+import { useNotifications } from "@/store/notifications";
+import { useFavorites } from "@/store/favorites";
 import { formatDate } from "@/lib/format";
 import type { Subscription } from "@/lib/types";
 
@@ -62,6 +66,8 @@ function getInitials(name: string): string {
 export function ProfileView() {
   const { navigate } = useNav();
   const { user, premium, logout } = useAuth();
+  const unreadCount = useNotifications((s) => s.unread);
+  const favCount = useFavorites((s) => s.favorites.length);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -343,6 +349,35 @@ export function ProfileView() {
           )}
         </CardContent>
       </Card>
+
+      {/* ---------- Quick access ---------- */}
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          { label: "Notifications", icon: Bell, view: "notifications" as const, badge: unreadCount },
+          { label: "Mes favoris", icon: Heart, view: "favorites" as const, badge: favCount },
+          { label: "Historique", icon: Clock, view: "history" as const },
+          { label: "Paramètres", icon: Settings, view: "settings" as const },
+        ].map((item) => (
+          <button
+            key={item.view}
+            onClick={() => navigate(item.view)}
+            className="group flex flex-col items-start gap-3 rounded-2xl border border-border/70 bg-background p-4 text-left shadow-premium transition-all hover:-translate-y-0.5 hover:border-brand/30"
+          >
+            <span className="flex size-10 items-center justify-center rounded-xl bg-brand-light text-brand transition-transform group-hover:scale-110">
+              <item.icon className="size-5" />
+            </span>
+            <span className="flex items-center gap-2 text-sm font-bold text-foreground group-hover:text-brand">
+              {item.label}
+              {item.badge ? (
+                <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                  {item.badge}
+                </span>
+              ) : null}
+              <ChevronRight className="size-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
+            </span>
+          </button>
+        ))}
+      </div>
 
       {/* ---------- Preferences ---------- */}
       <Card className="mt-6 border-border/70 shadow-premium">

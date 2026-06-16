@@ -199,6 +199,10 @@ export function PrescriptionView() {
       const data: EstimateResult = await res.json();
       setEstimate(data);
       toast.success("Estimation calculée avec succès.");
+      // Navigate to the dedicated result view with the items + result
+      navigate("prescription-result", {
+        estimateItems: items.map((it) => ({ slug: it.slug, quantity: it.quantity })),
+      });
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : "Erreur lors de l'estimation."

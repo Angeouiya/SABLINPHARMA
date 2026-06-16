@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryIcon } from "@/components/category-icons";
+import { FavoriteButton } from "@/components/shared/favorite-button";
 import { useNav } from "@/store/nav";
 import { formatFCFA, distanceKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -197,6 +198,12 @@ export function MedicationDetailView() {
               <Button variant="outline" onClick={() => navigator.share?.({ title: med.name }).catch(() => {})}>
                 <Share2 className="size-4" /> Partager
               </Button>
+              <FavoriteButton
+                kind="medication"
+                slug={med.slug}
+                label={`${med.name} · ${med.form} ${med.dosage}`}
+                variant="button"
+              />
             </div>
           </div>
         </div>

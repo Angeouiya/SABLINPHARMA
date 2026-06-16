@@ -1,0 +1,736 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useRef, useState, useCallback } from "react";
+     4→import {
+     5→  ChevronLeft,
+     6→  ChevronRight,
+     7→  ClipboardList,
+     8→  Plus,
+     9→  Minus,
+    10→  Search,
+    11→  Trash2,
+    12→  CheckCircle2,
+    13→  Crown,
+    14→  ShieldAlert,
+    15→  Pill,
+    16→  MapPin,
+    17→  X,
+    18→  Loader2,
+    19→  Calculator,
+    20→  TrendingDown,
+    21→} from "lucide-react";
+    22→import { toast } from "sonner";
+    23→import { Button } from "@/components/ui/button";
+    24→import { Card } from "@/components/ui/card";
+    25→import { Badge } from "@/components/ui/badge";
+    26→import { Input } from "@/components/ui/input";
+    27→import { Skeleton } from "@/components/ui/skeleton";
+    28→import { Separator } from "@/components/ui/separator";
+    29→import { CategoryIcon } from "@/components/category-icons";
+    30→import { useNav } from "@/store/nav";
+    31→import { useAuth } from "@/store/auth";
+    32→import { formatFCFA } from "@/lib/format";
+    33→import { cn } from "@/lib/utils";
+    34→import type { Medication } from "@/lib/types";
+    35→
+    36→interface EstimateLine {
+    37→  medication: {
+    38→    id: string;
+    39→    name: string;
+    40→    slug: string;
+    41→    form: string;
+    42→    dosage: string;
+    43→    packSize: string;
+    44→    requiresRx: boolean;
+    45→  };
+    46→  quantity: number;
+    47→  unitMin: number;
+    48→  unitMax: number;
+    49→  lineMin: number;
+    50→  lineMax: number;
+    51→  pharmacyCount: number;
+    52→}
+    53→
+    54→interface EstimateResult {
+    55→  lines: EstimateLine[];
+    56→  totalMin: number;
+    57→  totalMax: number;
+    58→  availablePharmacies: number;
+    59→}
+    60→
+    61→interface CartItem {
+    62→  slug: string;
+    63→  name: string;
+    64→  form: string;
+    65→  dosage: string;
+    66→  packSize: string;
+    67→  requiresRx: boolean;
+    68→  avgPrice: number;
+    69→  pharmacyCount: number;
+    70→  category?: { iconName: string; color: string } | null;
+    71→  quantity: number;
+    72→}
+    73→
+    74→export function PrescriptionView() {
+    75→  const { navigate } = useNav();
+    76→  const { premium } = useAuth();
+    77→
+    78→  const [query, setQuery] = useState("");
+    79→  const [suggestions, setSuggestions] = useState<Medication[]>([]);
+    80→  const [showSuggestions, setShowSuggestions] = useState(false);
+    81→  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    82→
+    83→  const [items, setItems] = useState<CartItem[]>([]);
+    84→  const [estimating, setEstimating] = useState(false);
+    85→  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+    86→
+    87→  const searchBoxRef = useRef<HTMLDivElement>(null);
+    88→
+    89→  // Debounced search for suggestions
+    90→  useEffect(() => {
+    91→    if (!query.trim()) {
+    92→      setSuggestions([]);
+    93→      setShowSuggestions(false);
+    94→      setLoadingSuggestions(false);
+    95→      return;
+    96→    }
+    97→    setLoadingSuggestions(true);
+    98→    const t = setTimeout(async () => {
+    99→      try {
+   100→        const url = `/api/medications?q=${encodeURIComponent(query.trim())}&limit=8`;
+   101→        const res = await fetch(url);
+   102→        if (!res.ok) throw new Error();
+   103→        const data: Medication[] = await res.json();
+   104→        setSuggestions(data);
+   105→        setShowSuggestions(true);
+   106→      } catch {
+   107→        toast.error("Impossible de charger les suggestions.");
+   108→        setSuggestions([]);
+   109→      } finally {
+   110→        setLoadingSuggestions(false);
+   111→      }
+   112→    }, 250);
+   113→    return () => clearTimeout(t);
+   114→  }, [query]);
+   115→
+   116→  // Close suggestion dropdown on outside click
+   117→  useEffect(() => {
+   118→    function handleClick(e: MouseEvent) {
+   119→      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+   120→        setShowSuggestions(false);
+   121→      }
+   122→    }
+   123→    document.addEventListener("mousedown", handleClick);
+   124→    return () => document.removeEventListener("mousedown", handleClick);
+   125→  }, []);
+   126→
+   127→  const addMedication = useCallback(
+   128→    (med: Medication) => {
+   129→      setItems((prev) => {
+   130→        if (prev.some((it) => it.slug === med.slug)) {
+   131→          toast.info(`${med.name} est déjà dans votre liste.`);
+   132→          return prev;
+   133→        }
+   134→        return [
+   135→          ...prev,
+   136→          {
+   137→            slug: med.slug,
+   138→            name: med.name,
+   139→            form: med.form,
+   140→            dosage: med.dosage,
+   141→            packSize: med.packSize,
+   142→            requiresRx: med.requiresRx,
+   143→            avgPrice: med.avgPrice,
+   144→            pharmacyCount: med.pharmacyCount ?? 0,
+   145→            category: med.category
+   146→              ? { iconName: med.category.iconName, color: med.category.color }
+   147→              : null,
+   148→            quantity: 1,
+   149→          },
+   150→        ];
+   151→      });
+   152→      setQuery("");
+   153→      setSuggestions([]);
+   154→      setShowSuggestions(false);
+   155→      setEstimate(null);
+   156→      toast.success(`${med.name} ajouté à l'ordonnance.`);
+   157→    },
+   158→    []
+   159→  );
+   160→
+   161→  const removeItem = (slug: string) => {
+   162→    setItems((prev) => prev.filter((it) => it.slug !== slug));
+   163→    setEstimate(null);
+   164→  };
+   165→
+   166→  const updateQuantity = (slug: string, delta: number) => {
+   167→    setItems((prev) =>
+   168→      prev.map((it) =>
+   169→        it.slug === slug
+   170→          ? { ...it, quantity: Math.max(1, it.quantity + delta) }
+   171→          : it
+   172→      )
+   173→    );
+   174→    setEstimate(null);
+   175→  };
+   176→
+   177→  const totalItems = items.reduce((s, it) => s + it.quantity, 0);
+   178→  const totalAvg = items.reduce((s, it) => s + it.avgPrice * it.quantity, 0);
+   179→
+   180→  const handleEstimate = async () => {
+   181→    if (items.length === 0) {
+   182→      toast.error("Ajoutez au moins un médicament à votre ordonnance.");
+   183→      return;
+   184→    }
+   185→    setEstimating(true);
+   186→    setEstimate(null);
+   187→    try {
+   188→      const res = await fetch("/api/prescription/estimate", {
+   189→        method: "POST",
+   190→        headers: { "Content-Type": "application/json" },
+   191→        body: JSON.stringify({
+   192→          items: items.map((it) => ({ slug: it.slug, quantity: it.quantity })),
+   193→        }),
+   194→      });
+   195→      if (!res.ok) {
+   196→        const err = await res.json().catch(() => null);
+   197→        throw new Error(err?.error ?? "Échec de l'estimation.");
+   198→      }
+   199→      const data: EstimateResult = await res.json();
+   200→      setEstimate(data);
+   201→      toast.success("Estimation calculée avec succès.");
+   202→      // Navigate to the dedicated result view with the items + result
+   203→      navigate("prescription-result", {
+   204→        estimateItems: items.map((it) => ({ slug: it.slug, quantity: it.quantity })),
+   205→      });
+   206→    } catch (e) {
+   207→      toast.error(
+   208→        e instanceof Error ? e.message : "Erreur lors de l'estimation."
+   209→      );
+   210→    } finally {
+   211→      setEstimating(false);
+   212→    }
+   213→  };
+   214→
+   215→  return (
+   216→    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+   217→      {/* Back link */}
+   218→      <button
+   219→        onClick={() => navigate("home")}
+   220→        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
+   221→      >
+   222→        <ChevronLeft className="size-4" /> Accueil
+   223→      </button>
+   224→
+   225→      {/* Header */}
+   226→      <div className="flex flex-col gap-2">
+   227→        <div className="flex items-center gap-3">
+   228→          <span className="flex size-11 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-premium">
+   229→            <ClipboardList className="size-6" />
+   230→          </span>
+   231→          <div>
+   232→            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+   233→              Estimer mon ordonnance
+   234→            </h1>
+   235→            <p className="text-sm text-muted-foreground">
+   236→              Calculez le coût de vos médicaments et trouvez les meilleurs prix.
+   237→            </p>
+   238→          </div>
+   239→        </div>
+   240→      </div>
+   241→
+   242→      {/* Two-column layout */}
+   243→      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_380px]">
+   244→        {/* LEFT — Add medications */}
+   245→        <div className="flex flex-col gap-5">
+   246→          {/* Search box with autocomplete */}
+   247→          <div ref={searchBoxRef} className="relative">
+   248→            <div className="relative">
+   249→              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+   250→              <Input
+   251→                value={query}
+   252→                onChange={(e) => setQuery(e.target.value)}
+   253→                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+   254→                placeholder="Rechercher un médicament (ex : Paracétamol)..."
+   255→                className="h-12 rounded-xl border-border/70 pl-11 pr-10 text-base shadow-sm"
+   256→                aria-label="Recherche de médicament"
+   257→              />
+   258→              {query && (
+   259→                <button
+   260→                  onClick={() => {
+   261→                    setQuery("");
+   262→                    setSuggestions([]);
+   263→                    setShowSuggestions(false);
+   264→                  }}
+   265→                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+   266→                  aria-label="Effacer la recherche"
+   267→                >
+   268→                  <X className="size-4" />
+   269→                </button>
+   270→              )}
+   271→            </div>
+   272→
+   273→            {/* Suggestions dropdown */}
+   274→            {showSuggestions && (query.trim().length > 0) && (
+   275→              <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-xl border border-border/70 bg-popover shadow-premium-lg">
+   276→                {loadingSuggestions ? (
+   277→                  <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+   278→                    <Loader2 className="size-4 animate-spin text-brand" />
+   279→                    Recherche en cours...
+   280→                  </div>
+   281→                ) : suggestions.length === 0 ? (
+   282→                  <div className="flex flex-col items-center gap-2 p-6 text-center">
+   283→                    <span className="flex size-10 items-center justify-center rounded-xl bg-brand-light text-brand">
+   284→                      <Search className="size-5" />
+   285→                    </span>
+   286→                    <p className="text-sm font-medium text-foreground">
+   287→                      Aucun résultat
+   288→                    </p>
+   289→                    <p className="text-xs text-muted-foreground">
+   290→                      Essayez un autre nom ou principe actif.
+   291→                    </p>
+   292→                  </div>
+   293→                ) : (
+   294→                  <ul className="max-h-80 overflow-y-auto scroll-thin py-1">
+   295→                    {suggestions.map((m) => (
+   296→                      <li key={m.id}>
+   297→                        <button
+   298→                          onClick={() => addMedication(m)}
+   299→                          className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent/60"
+   300→                        >
+   301→                          <span
+   302→                            className="flex size-10 shrink-0 items-center justify-center rounded-lg"
+   303→                            style={{
+   304→                              backgroundColor: m.category
+   305→                                ? `${m.category.color}14`
+   306→                                : undefined,
+   307→                            }}
+   308→                          >
+   309→                            {m.category ? (
+   310→                              <CategoryIcon
+   311→                                name={m.category.iconName}
+   312→                                size={20}
+   313→                                color={m.category.color}
+   314→                              />
+   315→                            ) : (
+   316→                              <Pill className="size-5 text-brand" />
+   317→                            )}
+   318→                          </span>
+   319→                          <span className="min-w-0 flex-1">
+   320→                            <span className="flex items-center gap-1.5">
+   321→                              <span className="truncate text-sm font-semibold text-foreground">
+   322→                                {m.name}
+   323→                              </span>
+   324→                              {m.requiresRx && (
+   325→                                <Badge
+   326→                                  variant="outline"
+   327→                                  className="shrink-0 border-amber-500/40 bg-amber-50 px-1.5 py-0 text-[9px] font-semibold text-amber-700"
+   328→                                >
+   329→                                  Rx
+   330→                                </Badge>
+   331→                              )}
+   332→                            </span>
+   333→                            <span className="block truncate text-xs text-muted-foreground">
+   334→                              {m.form} · {m.dosage} · {m.packSize}
+   335→                            </span>
+   336→                          </span>
+   337→                          <span className="flex shrink-0 flex-col items-end">
+   338→                            <span className="text-sm font-bold text-brand-dark">
+   339→                              {formatFCFA(m.avgPrice)}
+   340→                            </span>
+   341→                            <span className="text-[10px] text-muted-foreground">
+   342→                              {m.pharmacyCount ?? 0} pharmacies
+   343→                            </span>
+   344→                          </span>
+   345→                          <span className="ml-1 flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-light text-brand">
+   346→                            <Plus className="size-4" />
+   347→                          </span>
+   348→                        </button>
+   349→                      </li>
+   350→                    ))}
+   351→                  </ul>
+   352→                )}
+   353→              </div>
+   354→            )}
+   355→          </div>
+   356→
+   357→          {/* Added medications list */}
+   358→          <div className="flex items-center justify-between">
+   359→            <h2 className="text-lg font-bold text-foreground">
+   360→              Ma liste{" "}
+   361→              {items.length > 0 && (
+   362→                <span className="ml-1 text-sm font-medium text-muted-foreground">
+   363→                  ({items.length} médicament{items.length > 1 ? "s" : ""})
+   364→                </span>
+   365→              )}
+   366→            </h2>
+   367→            {items.length > 0 && (
+   368→              <button
+   369→                onClick={() => {
+   370→                  setItems([]);
+   371→                  setEstimate(null);
+   372→                  toast.success("Liste vidée.");
+   373→                }}
+   374→                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-destructive"
+   375→              >
+   376→                <Trash2 className="size-3.5" /> Tout supprimer
+   377→              </button>
+   378→            )}
+   379→          </div>
+   380→
+   381→          {items.length === 0 ? (
+   382→            <Card className="flex flex-col items-center gap-4 border-dashed border-border/70 bg-background p-10 text-center">
+   383→              <span className="flex size-20 items-center justify-center rounded-full bg-brand-light text-brand">
+   384→                <ClipboardList className="size-10" />
+   385→              </span>
+   386→              <div>
+   387→                <h3 className="text-base font-bold text-foreground">
+   388→                  Ajoutez vos médicaments pour commencer
+   389→                </h3>
+   390→                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+   391→                  Utilisez la barre de recherche ci-dessus pour trouver vos
+   392→                  médicaments, puis ajoutez-les à votre ordonnance.
+   393→                </p>
+   394→              </div>
+   395→            </Card>
+   396→          ) : (
+   397→            <ul className="flex flex-col gap-3">
+   398→              {items.map((it) => (
+   399→                <li key={it.slug}>
+   400→                  <Card className="gap-0 border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium">
+   401→                    <div className="flex items-start gap-3 p-4">
+   402→                      {/* Category icon */}
+   403→                      <span
+   404→                        className="flex size-12 shrink-0 items-center justify-center rounded-xl"
+   405→                        style={{
+   406→                          backgroundColor: it.category
+   407→                            ? `${it.category.color}14`
+   408→                            : undefined,
+   409→                        }}
+   410→                      >
+   411→                        {it.category ? (
+   412→                          <CategoryIcon
+   413→                            name={it.category.iconName}
+   414→                            size={24}
+   415→                            color={it.category.color}
+   416→                          />
+   417→                        ) : (
+   418→                          <Pill className="size-6 text-brand" />
+   419→                        )}
+   420→                      </span>
+   421→
+   422→                      {/* Main info */}
+   423→                      <div className="min-w-0 flex-1">
+   424→                        <div className="flex flex-wrap items-center gap-1.5">
+   425→                          <h3 className="text-sm font-bold text-foreground">
+   426→                            {it.name}
+   427→                          </h3>
+   428→                          {it.requiresRx && (
+   429→                            <Badge
+   430→                              variant="outline"
+   431→                              className="border-amber-500/40 bg-amber-50 px-1.5 py-0 text-[9px] font-semibold text-amber-700"
+   432→                            >
+   433→                              <ShieldAlert className="size-3" /> Ordonnance
+   434→                            </Badge>
+   435→                          )}
+   436→                        </div>
+   437→                        <p className="mt-0.5 text-xs text-muted-foreground">
+   438→                          {it.form} · {it.dosage} · {it.packSize}
+   439→                        </p>
+   440→                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+   441→                          <span>
+   442→                            Prix moyen :{" "}
+   443→                            <span className="font-semibold text-brand-dark">
+   444→                              {formatFCFA(it.avgPrice)}
+   445→                            </span>
+   446→                          </span>
+   447→                          <span className="inline-flex items-center gap-1">
+   448→                            <MapPin className="size-3" />
+   449→                            {it.pharmacyCount} pharmacies
+   450→                          </span>
+   451→                        </div>
+   452→                      </div>
+   453→
+   454→                      {/* Quantity stepper */}
+   455→                      <div className="flex shrink-0 flex-col items-center gap-2">
+   456→                        <div className="flex items-center rounded-lg border border-border bg-background">
+   457→                          <button
+   458→                            onClick={() => updateQuantity(it.slug, -1)}
+   459→                            disabled={it.quantity <= 1}
+   460→                            className="flex size-9 items-center justify-center rounded-l-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent"
+   461→                            aria-label="Diminuer la quantité"
+   462→                          >
+   463→                            <Minus className="size-4" />
+   464→                          </button>
+   465→                          <span className="w-9 text-center text-sm font-bold text-foreground">
+   466→                            {it.quantity}
+   467→                          </span>
+   468→                          <button
+   469→                            onClick={() => updateQuantity(it.slug, 1)}
+   470→                            className="flex size-9 items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+   471→                            aria-label="Augmenter la quantité"
+   472→                          >
+   473→                            <Plus className="size-4" />
+   474→                          </button>
+   475→                        </div>
+   476→                        <button
+   477→                          onClick={() => removeItem(it.slug)}
+   478→                          className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-destructive"
+   479→                          aria-label={`Supprimer ${it.name}`}
+   480→                        >
+   481→                          <Trash2 className="size-3.5" /> Retirer
+   482→                        </button>
+   483→                      </div>
+   484→                    </div>
+   485→                  </Card>
+   486→                </li>
+   487→              ))}
+   488→            </ul>
+   489→          )}
+   490→        </div>
+   491→
+   492→        {/* RIGHT — Summary & estimation (sticky) */}
+   493→        <div className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
+   494→          <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-premium">
+   495→            <div className="border-b border-border/60 bg-brand-light/40 px-5 py-4">
+   496→              <div className="flex items-center gap-2">
+   497→                <Calculator className="size-5 text-brand" />
+   498→                <h3 className="text-base font-bold text-foreground">
+   499→                  Résumé de l&apos;ordonnance
+   500→                </h3>
+   501→              </div>
+   502→            </div>
+   503→
+   504→            <div className="space-y-4 p-5">
+   505→              {/* Quick stats */}
+   506→              <div className="grid grid-cols-2 gap-3">
+   507→                <div className="rounded-xl border border-border/60 bg-background p-3">
+   508→                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+   509→                    Médicaments
+   510→                  </p>
+   511→                  <p className="mt-0.5 text-2xl font-extrabold text-foreground">
+   512→                    {items.length}
+   513→                  </p>
+   514→                </div>
+   515→                <div className="rounded-xl border border-border/60 bg-background p-3">
+   516→                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+   517→                    Total unités
+   518→                  </p>
+   519→                  <p className="mt-0.5 text-2xl font-extrabold text-foreground">
+   520→                    {totalItems}
+   521→                  </p>
+   522→                </div>
+   523→              </div>
+   524→
+   525→              {/* Pre-estimate approximation */}
+   526→              {items.length > 0 && (
+   527→                <div className="flex items-center justify-between rounded-xl bg-muted/40 px-4 py-3">
+   528→                  <span className="text-xs font-medium text-muted-foreground">
+   529→                    Coût moyen estimé
+   530→                  </span>
+   531→                  <span className="text-sm font-bold text-brand-dark">
+   532→                    {formatFCFA(totalAvg)}
+   533→                  </span>
+   534→                </div>
+   535→              )}
+   536→
+   537→              {/* Estimate button */}
+   538→              <Button
+   539→                onClick={handleEstimate}
+   540→                disabled={items.length === 0 || estimating}
+   541→                className="w-full bg-brand-gradient text-white hover:opacity-90"
+   542→                size="lg"
+   543→              >
+   544→                {estimating ? (
+   545→                  <>
+   546→                    <Loader2 className="size-4 animate-spin" /> Calcul en cours...
+   547→                  </>
+   548→                ) : (
+   549→                  <>
+   550→                    <Calculator className="size-4" /> Estimer le coût
+   551→                  </>
+   552→                )}
+   553→              </Button>
+   554→
+   555→              {/* Estimate result */}
+   556→              {estimating && (
+   557→                <div className="space-y-2">
+   558→                  <Skeleton className="h-16 w-full rounded-xl" />
+   559→                  <Skeleton className="h-24 w-full rounded-xl" />
+   560→                </div>
+   561→              )}
+   562→
+   563→              {!estimating && estimate && (
+   564→                <div className="space-y-4">
+   565→                  <Separator />
+   566→
+   567→                  {/* Total range */}
+   568→                  <div className="rounded-xl border border-brand/20 bg-gradient-to-br from-brand-light/60 to-background p-4">
+   569→                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+   570→                      Total estimé
+   571→                    </p>
+   572→                    <p className="mt-1 text-2xl font-extrabold text-brand-dark">
+   573→                      {formatFCFA(estimate.totalMin)} —{" "}
+   574→                      {formatFCFA(estimate.totalMax)}
+   575→                    </p>
+   576→                    <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+   577→                      <TrendingDown className="size-3.5 text-brand" />
+   578→                      Fourchette basée sur {estimate.lines.length} médicament
+   579→                      {estimate.lines.length > 1 ? "s" : ""}
+   580→                    </div>
+   581→                  </div>
+   582→
+   583→                  {/* Available pharmacies */}
+   584→                  <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-4 py-3">
+   585→                    <span className="flex size-9 items-center justify-center rounded-lg bg-brand-light text-brand">
+   586→                      <MapPin className="size-5" />
+   587→                    </span>
+   588→                    <div className="flex-1">
+   589→                      <p className="text-sm font-bold text-foreground">
+   590→                        {estimate.availablePharmacies} pharmacie
+   591→                        {estimate.availablePharmacies > 1 ? "s" : ""}
+   592→                      </p>
+   593→                      <p className="text-[11px] text-muted-foreground">
+   594→                        ont tous les médicaments en stock
+   595→                      </p>
+   596→                    </div>
+   597→                  </div>
+   598→
+   599→                  {/* Lines breakdown */}
+   600→                  <div className="space-y-2">
+   601→                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+   602→                      Détail par médicament
+   603→                    </p>
+   604→                    <ul className="space-y-2">
+   605→                      {estimate.lines.map((line) => (
+   606→                        <li
+   607→                          key={line.medication.id}
+   608→                          className="rounded-xl border border-border/60 bg-background p-3"
+   609→                        >
+   610→                          <div className="flex items-start justify-between gap-2">
+   611→                            <div className="min-w-0 flex-1">
+   612→                              <p className="truncate text-sm font-semibold text-foreground">
+   613→                                {line.medication.name}
+   614→                              </p>
+   615→                              <p className="text-[11px] text-muted-foreground">
+   616→                                {line.medication.form} ·{" "}
+   617→                                {line.medication.dosage}
+   618→                              </p>
+   619→                            </div>
+   620→                            <Badge
+   621→                              variant="outline"
+   622→                              className="shrink-0 border-brand/30 bg-brand-light/60 px-2 py-0 text-[10px] font-semibold text-brand-dark"
+   623→                            >
+   624→                              x{line.quantity}
+   625→                            </Badge>
+   626→                          </div>
+   627→                          <div className="mt-2 flex items-center justify-between text-xs">
+   628→                            <span className="text-muted-foreground">
+   629→                              Unit. :{" "}
+   630→                              <span className="font-medium text-foreground">
+   631→                                {formatFCFA(line.unitMin)}
+   632→                                {line.unitMax !== line.unitMin
+   633→                                  ? ` — ${formatFCFA(line.unitMax)}`
+   634→                                  : ""}
+   635→                              </span>
+   636→                            </span>
+   637→                            <span className="font-bold text-brand-dark">
+   638→                              {formatFCFA(line.lineMin)}
+   639→                              {line.lineMax !== line.lineMin
+   640→                                ? ` — ${formatFCFA(line.lineMax)}`
+   641→                                : ""}
+   642→                            </span>
+   643→                          </div>
+   644→                          <div className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+   645→                            <CheckCircle2 className="size-3 text-brand" />
+   646→                            {line.pharmacyCount} pharmacie
+   647→                            {line.pharmacyCount > 1 ? "s" : ""} en stock
+   648→                          </div>
+   649→                        </li>
+   650→                      ))}
+   651→                    </ul>
+   652→                  </div>
+   653→
+   654→                  {/* CTA to find pharmacies */}
+   655→                  <Button
+   656→                    variant="outline"
+   657→                    className="w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   658→                    onClick={() => navigate("pharmacies")}
+   659→                  >
+   660→                    <MapPin className="size-4" /> Voir les pharmacies
+   661→                    <ChevronRight className="size-4" />
+   662→                  </Button>
+   663→                </div>
+   664→              )}
+   665→
+   666→              {!estimating && !estimate && items.length > 0 && (
+   667→                <p className="text-center text-xs text-muted-foreground">
+   668→                  Cliquez sur « Estimer le coût » pour obtenir une fourchette de
+   669→                  prix détaillée.
+   670→                </p>
+   671→              )}
+   672→            </div>
+   673→          </Card>
+   674→
+   675→          {/* Premium upsell */}
+   676→          {!premium && (
+   677→            <Card className="relative overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-50 to-background py-0 shadow-premium">
+   678→              <div className="absolute -right-10 -top-10 size-40 rounded-full bg-amber-300/20 blur-3xl" />
+   679→              <div className="relative flex flex-col gap-3 p-5">
+   680→                <div className="flex items-center gap-3">
+   681→                  <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-premium">
+   682→                    <Crown className="size-5" />
+   683→                  </span>
+   684→                  <div>
+   685→                    <h3 className="text-base font-extrabold text-foreground">
+   686→                      Passez Premium
+   687→                    </h3>
+   688→                    <p className="text-[11px] text-muted-foreground">
+   689→                      Débloquez l&apos;estimation sans limites
+   690→                    </p>
+   691→                  </div>
+   692→                </div>
+   693→                <ul className="space-y-1.5 text-sm text-foreground/80">
+   694→                  {[
+   695→                    "Estimations d'ordonnance illimitées",
+   696→                    "Alertes de prix en temps réel",
+   697→                    "Comparaison détaillée des pharmacies",
+   698→                    "Priorité sur l'assistance WhatsApp",
+   699→                  ].map((f) => (
+   700→                    <li key={f} className="flex items-start gap-2">
+   701→                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-amber-500" />
+   702→                      {f}
+   703→                    </li>
+   704→                  ))}
+   705→                </ul>
+   706→                <Button
+   707→                  className="w-full bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
+   708→                  onClick={() => navigate("subscription")}
+   709→                >
+   710→                  <Crown className="size-4" /> Découvrir Premium
+   711→                </Button>
+   712→              </div>
+   713→            </Card>
+   714→          )}
+   715→        </div>
+   716→      </div>
+   717→
+   718→      {/* Information footer */}
+   719→      <div className="mt-10">
+   720→        <Card className="flex items-start gap-3 border-border/60 bg-muted/30 p-4">
+   721→          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
+   722→            <ShieldAlert className="size-5" />
+   723→          </span>
+   724→          <p className="text-xs leading-relaxed text-muted-foreground">
+   725→            <span className="font-semibold text-foreground">
+   726→              SABLIN PHARMA
+   727→            </span>{" "}
+   728→            est une plateforme d&apos;information. Les prix sont indicatifs et
+   729→            peuvent varier selon les pharmacies. Aucune vente en ligne.
+   730→          </p>
+   731→        </Card>
+   732→      </div>
+   733→    </div>
+   734→  );
+   735→}
+   736→

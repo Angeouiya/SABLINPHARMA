@@ -20,6 +20,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { CategoryIcon } from "@/components/category-icons";
+import { FavoriteButton } from "@/components/shared/favorite-button";
 import { useNav } from "@/store/nav";
 import { formatFCFA } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -207,6 +208,16 @@ export function PharmacyDetailView() {
                 />
                 {pharmacy.openNow ? "Ouvert maintenant" : "Fermé actuellement"}
               </span>
+              <div className="mt-1">
+                <FavoriteButton
+                  kind="pharmacy"
+                  slug={pharmacy.slug}
+                  label={pharmacy.name}
+                  meta={pharmacy.commune}
+                  variant="button"
+                  size="sm"
+                />
+              </div>
             </div>
           </div>
         </div>

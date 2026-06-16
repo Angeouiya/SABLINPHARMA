@@ -151,3 +151,127 @@ Stage Summary:
 - Logo officiel SABLIN PHARMA collé comme l'image de référence : croix médicale vert foncé + feuille vert clair (pointe, tige, nervures) dans le bras inférieur inclinée à droite + texte SABLIN/PHARMA vert foncé
 - L'utilisateur a explicitement demandé ce logo exact ; la contrainte "pas de feuille" est levée pour le logo de marque (demande explicite utilisateur)
 - Favicon mis à jour, rendu validé par VLM (correspondance globale confirmée), lint propre
+
+---
+Task ID: 23-a
+Agent: Agent 23-a (Views Notifications/Historique/Favoris)
+Task: Construire 3 vues FRANÇAIS pour SABLIN PHARMA : Notifications, Historique, Favoris
+
+Work Log:
+- Lecture du worklog partagé (design system vert brand, contraintes d'icônes, stores, composants partagés), des vues existantes (medications-view, notifications stub), des stores useNav/useAuth/useNotifications/useHistory/useFavorites, des types (@/lib/types), de format.ts et des composants shared (EmptyState, Loader, AlertMessage, SectionHeader).
+- notifications-view.tsx (export nommé `NotificationsView`, 'use client') :
+  * Lien retour Accueil (ChevronLeft) → navigate('home')
+  * En-tête : titre « Notifications » + Badge brand « X non lue(s) » si unread>0 + sous-titre
+  * Barre d'actions : bouton outline « Tout marquer comme lu » (CheckCheck, désactivé si unread===0, toast succès), bouton outline « Effacer tout » (Trash2) avec window.confirm puis boucle await remove(id) sur chaque notification + Loader2 spinner pendant la suppression (désactivé si vide ou en cours)
+  * Fetch au mount via useEffect si user (useNotifications.fetch())
+  * État non connecté : EmptyState Bell « Connectez-vous pour voir vos notifications » + bouton « Se connecter » → navigate('auth',{authMode:'login'})
+  * Tabs (shadcn) : « Toutes (N) » / « Non lues (N) » avec filtre local useMemo sur !read
+  * Liste Cards : icône lucide dans cercle coloré selon type (info=sky-100/sky-600, success=brand-light/brand, warning=amber-100/amber-600, alert=red-100/red-600, promotion=amber-100/amber-600) ; mappe les noms d'icônes stockés (Bell, CheckCircle2, Timer, Crown, Pill, AlertTriangle, Info, Heart) avec fallback Bell ; titre bold + message line-clamp-2 muted + date formatDate ; point coloré si !read ; fond bg-brand-light/20 si non lue ; bouton Trash2 ghost (stop propagation) → remove(id) + toast ; clic card → markRead(id) + navigate vers view résolue depuis `link` (validée contre liste home/medications/pharmacies/prescription/subscription/profile)
+  * Loading : 4 skeletons h-24
+  * EmptyState (Inbox) si liste filtrée vide : message différent selon tab (non lues = "Vous avez lu toutes vos notifications" ; toutes = "Vous n'avez pas encore de notification") + bouton « Explorer les médicaments » → navigate('medications')
+- history-view.tsx (export nommé `HistoryView`, 'use client') :
+  * Lien retour Accueil
+  * En-tête : titre « Historique » + Badge secondary « X élément(s) » + sous-titre
+  * Bouton outline « Effacer l'historique » (Trash2) avec window.confirm → clear() + toast (affiché seulement si history non vide)
+  * Fetch au mount si user (useHistory.fetch())
+  * État non connecté : EmptyState Clock + bouton connexion
+  * Liste groupée par jour via helper getGroupLabel(createdAt) → « Aujourd'hui » / « Hier » / « Cette semaine » / « Plus ancien » (comparaison startOfToday/startOfYesterday/startOfWeek). Sections avec séparateur + compteur par groupe
+  * Chaque item = Card cliquable : icône kind dans cercle brand-light (medication=Pill, pharmacy=Plus, prescription=ClipboardList) + label bold + ligne secondaire (kind français + date formatDate + query entre guillemets si présent) + bouton X ghost (stop propagation) → setHistory filter local (store n'expose pas remove) + toast
+  * Clic → handleItemClick : medication+slug → medication-detail ; pharmacy+slug → pharmacy-detail ; prescription → prescription ; query → medications{query} ; fallback medications
+  * Loading : 5 skeletons h-16
+  * EmptyState (Clock) si vide : « Aucun historique » + bouton « Rechercher un médicament » → navigate('medications')
+- favorites-view.tsx (export nommé `FavoritesView`, 'use client') :
+  * Lien retour Accueil
+  * En-tête : titre « Mes favoris » + Badge brand « X favori(s) » + sous-titre
+  * Tabs (shadcn) : « Tous (N) » / « Médicaments (N) » / « Pharmacies (N) » avec filtre local sur kind + compteurs useMemo
+  * Fetch au mount si user (useFavorites.fetch())
+  * État non connecté : EmptyState Heart + bouton connexion
+  * Grille responsive Cards (grid-cols-1 sm:grid-cols-2 lg:grid-cols-3) : icône kind dans cercle bg-brand-gradient text-white shadow-premium (medication=Pill, pharmacy=Plus) + label bold line-clamp-2 + Badge brand-light/brand-dark « Médicament »/« Pharmacie » + meta si présent (line-clamp-1 muted) + footer avec séparateur : bouton outline flex-1 « Voir » (ChevronRight) → navigate(medication-detail ou pharmacy-detail {slug}) + bouton icon ghost Trash2 → remove(id) + toast
+  * Loading : 6 skeletons h-40
+  * EmptyState (Heart) si vide : « Aucun favori » + description « Ajoutez des médicaments ou pharmacies à vos favoris en cliquant sur le cœur » + bouton « Explorer » → navigate('medications')
+- Icônes strictement autorisées uniquement : Bell, CheckCircle2, CheckCheck, Clock, Heart, Pill, Plus, Timer, Crown, Trash2, ChevronRight, ChevronLeft, X, Inbox, Loader2, AlertTriangle, Info, ClipboardList. AUCUNE étoile/feuille/bâtiment.
+- TypeScript strict, exports nommés exacts (NotificationsView, HistoryView, FavoritesView), 'use client' partout, toasts via sonner, formatDate utilisé, stores useNav/useAuth/useNotifications/useHistory/useFavorites consommés correctement (fetch au mount, méthodes optimistes), pas de z-ai-web-dev-sdk côté client, pas de tests.
+- Design system respecté : vert brand dominant, cards border-border/70 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg, boutons premium bg-brand-gradient, badges bg-brand/bg-brand-light/text-brand-dark, mobile-first responsive (max-w-3xl pour notifications/history, max-w-5xl pour favorites avec grille).
+- `bun run lint` : 0 erreur / 0 warning sur les 3 fichiers. Dev server compile sans erreur (✓ Compiled), routes API /api/notifications, /api/history, /api/favorites répondent 200.
+
+Stage Summary:
+- 3 vues livrées et lint-clean, prêtes pour intégration : notifications-view.tsx (liste filtrable avec tabs Toutes/Non lues, mark all read, effacer tout, icônes colorées par type, navigation vers view liée), history-view.tsx (regroupement par jour Aujourd'hui/Hier/Cette semaine/Plus ancien, suppression individuelle locale + clear all, navigation contextuelle selon kind), favorites-view.tsx (grille de cards avec tabs Tous/Médicaments/Pharmacies, suppression + view détail, compteur dans l'en-tête).
+- Stores Zustand consommés : useNotifications (fetch, markAllRead, markRead, remove), useHistory (fetch, clear, setHistory pour suppression locale), useFavorites (fetch, remove). Toutes les méthodes font déjà de l'optimistic update + call API.
+- États non connectés gérés sur les 3 vues avec EmptyState dédié + bouton « Se connecter » → navigate('auth',{authMode:'login'}).
+- États vides gérés avec EmptyState + bouton d'action contextuel (Explorer les médicaments / Rechercher un médicament / Explorer).
+- Contraintes d'icônes intégralement respectées (aucune étoile/feuille/bâtiment, aucune icône en dehors de la liste autorisée).
+- Plateforme 100% informationnelle, navigation SPA cohérente (ChevronLeft retour Accueil, navigation vers détails medicament/pharmacy, tabs/filtres locaux sans rechargement).
+
+---
+Task ID: 23-b
+Agent: Agent 23-b (views settings + prescription-result)
+Task: Construire 2 vues FRANÇAIS pour SABLIN PHARMA — SettingsView (paramètres utilisateur) et PrescriptionResultView (résultat d'estimation d'ordonnance).
+
+Work Log:
+- Lecture du worklog partagé (Tasks 1, 7-a, 7-c, 7-d, 7-e, 8), des vues existantes (prescription-view, payment-view, profile-view), des stores (useNav, useAuth, useFavorites), des composants partagés (EmptyState, Loader, AlertMessage, PaymentSummary, SectionHeader), des composants shadcn/ui (Switch, Select, Card, Badge, Separator, Label, Button), des routes API /api/settings (GET/PATCH) et /api/prescription/estimate (POST), et de la config ESLint.
+- Écriture de src/components/views/settings-view.tsx (export nommé SettingsView, 'use client') :
+  * Back link "Accueil" (ChevronLeft) → navigate('home').
+  * Header brand-gradient (Settings size-6 dans span size-11 rounded-2xl) + titre "Paramètres" + sous-titre "Gérez vos préférences et votre compte".
+  * Si non connecté → Card avec EmptyState({ icon: Settings, ... }) + bouton "Se connecter" → navigate('auth', {authMode:'login'}) + bouton "Retour à l'accueil".
+  * Fetch au mount (useEffect + setTimeout(0)) → GET /api/settings → setSettings. State settings: UserSettings|null, saving: string|null.
+  * Loader simple pendant que settings === null.
+  * 4 Cards séparées (chacune avec CardHeader icône + CardTitle) :
+    1. Notifications (Bell) : 5 Switches (pushAlerts, dutyAlerts, priceAlerts avec badge "Premium" Crown + Switch désactivée si !premium, promoAlerts, emailRecap). PATCH optimiste (update locale → PATCH → toast succès, ou revert + toast erreur). Loader2 spinner à côté du switch pendant le save. Encart amber si premium (rappel alertes prix activées).
+    2. Préférences (Globe) : Select langue (Français / "English (Bientôt)" disabled), Select thème (Clair/Sombre/Automatique), Select commune par défaut ("Aucune" + 12 communes d'Abidjan). Chaque onValueChange → patch(key, value). Notes explicatives sous chaque select.
+    3. Confidentialité & sécurité (Lock) : 3 boutons — "Modifier mon mot de passe" (toast "Bientôt disponible"), "Télécharger mes données" (toast "Bientôt disponible"), "Supprimer mon compte" (red, window.confirm + toast info décoratif). Encart brand-light ShieldCheck rassurance.
+    4. Abonnement (Crown, span bg-gradient amber) : si premium → encart "Premium actif" + bouton "Gérer l'abonnement" → navigate('subscription') ; sinon → encart amber "Passez à Premium" + bouton "Découvrir Premium" → navigate('subscription').
+  * Bouton "Se déconnecter" (outline red) → logout() + toast + navigate('home').
+  * Footer note : "SABLIN PHARMA v1.0 — Plateforme d'information. Aucune vente en ligne."
+- Écriture de src/components/views/prescription-result-view.tsx (export nommé PrescriptionResultView, 'use client') :
+  * Récupère params.estimateItems via useNav. Si vide → navigate('prescription').
+  * Au mount : POST /api/prescription/estimate avec { items } → setEstimate(result). Effet avec setTimeout(0) + flag cancelled pour cleanup. FullLoader pendant le calcul + back link "Ordonnance".
+  * Header succès : CheckCircle2 verte size-8 dans span size-14 rounded-full bg-brand-light ring-8 ring-brand-light/30, titre "Estimation calculée" + sous-titre.
+  * Layout 2 colonnes lg:grid-cols-[1fr_380px] :
+    - Colonne gauche : "Détail par médicament" + Badge count. Pour chaque line : Card p-5 shadow-premium hover -translate-y-0.5 hover:border-brand/30. Header (Pill brand-light + nom bold + badge "Ordonnance" amber si requiresRx + Badge "x{quantity}"). Sous-titre form · dosage · packSize. Separator. Grid 2 cols (Prix unitaire min—max / Total ligne lineMin—lineMax en brand-dark extrabold). Footer MapPin + "{pharmacyCount} pharmacies en stock".
+    - Colonne droite (sticky top-24) : Card récap "Récapitulatif de l'ordonnance" : 3 rows (Médicaments / Unités totales / Pharmacies avec tout en stock), Separator, "Fourchette totale estimée" en text-3xl font-extrabold text-brand-dark avec tiret séparateur, note "Fourchette basée sur les prix réels en pharmacie". 3 boutons : "Voir les pharmacies dispos" (bg-brand-gradient, MapPin + ChevronRight) → navigate('pharmacies'), "Nouvelle estimation" (outline, ChevronLeft) → navigate('prescription'), "Partager le résultat" (outline, Share2) → navigator.share ou fallback clipboard + toast.
+    - Encart premium si !premium : Card amber gradient Crown "Estimations illimitées avec Premium" + bouton "Découvrir Premium" → navigate('subscription').
+  * Footer disclaimer : encart muted AlertTriangle "SABLIN PHARMA est une plateforme d'information. Les prix sont indicatifs et peuvent varier. Aucune vente en ligne."
+  * Gestion erreur : AlertMessage variant="error" + boutons "Retour à l'ordonnance" (brand-gradient) et "Retour à l'accueil" (outline).
+- Icônes strictement autorisées uniquement : Settings, Bell, Crown, Globe, Lock, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Download, Trash2, CheckCircle2 (settings-view) ; ChevronLeft, ChevronRight, CheckCircle2, Crown, Share2, MapPin, Pill, AlertTriangle (prescription-result-view). AUCUNE étoile/feuille/bâtiment. Notes en badges numériques sans étoiles.
+- TypeScript strict, exports nommés exacts, 'use client' partout, toast via sonner, formatFCFA utilisé, pas de z-ai-web-dev-sdk côté client, pas de tests.
+- Vérification bun run lint : exit code 0, 0 erreur, 0 warning sur tout le projet. Dev server log propre.
+
+Stage Summary:
+- 2 vues livrées et lint-clean : SettingsView (4 sections Cartes : Notifications 5 switches avec lock Premium, Préférences 3 selects, Confidentialité 3 boutons, Abonnement statut/upsell Premium + déconnexion + note version) et PrescriptionResultView (header succès CheckCircle2, layout 2 colonnes avec détail par médicament + récap sticky, 3 actions partager/nouvelle estimation/pharmacies, upsell Premium, gestion loading/erreur complète).
+- API consommées correctement : GET /api/settings, PATCH /api/settings (patch optimiste + revert sur erreur), POST /api/prescription/estimate.
+- Stores utilisés : useNav (navigate, params.estimateItems), useAuth (user, premium, logout).
+- Composants shadcn/ui réutilisés : Button, Card (+Header/Title/Content), Badge, Label, Switch, Separator, Select (+Trigger/Value/Content/Item). Composants partagés : EmptyState, Loader/FullLoader, AlertMessage.
+- Design system respecté : vert brand dominant (bg-brand-gradient, text-brand, text-brand-dark, bg-brand-light, shadow-premium, shadow-premium-lg), accent amber pour Premium, cartes border-border/70, sticky card sur desktop, responsive mobile-first, back links + headers cohérents avec les autres vues.
+- Contraintes critiques d'icônes intégralement respectées (aucune étoile/feuille/bâtiment ; notes en badges numériques sans étoiles). Plateforme 100% informationnelle (footer disclaimer, aucune vente).
+- Work record détaillé également écrit dans /agent-ctx/23-b-settings-and-prescription-result.md.
+
+---
+Task ID: 9
+Agent: main (orchestrator)
+Task: Extension structure complète — 5 nouvelles pages + composants réutilisables + header enrichi
+
+Work Log:
+- Schéma Prisma étendu : Notification, SearchHistory, Favorite, UserSettings (+ avatarColor sur User) ; db:push + generate
+- Types étendus : View += prescription-result, notifications, history, favorites, settings ; nouveaux types AppNotification, HistoryItem, FavoriteItem, UserSettings, EstimateLine/Result, MedicationStatus, PharmacyStatus
+- 5 routes API : /api/notifications (GET seed démo + POST + PATCH all-read), /api/notifications/[id] (PATCH read + DELETE), /api/history (GET/POST/DELETE), /api/favorites (GET/POST/DELETE), /api/favorites/[id] (DELETE), /api/settings (GET/PATCH)
+- Guard requireUserId (@/lib/auth/guard)
+- 3 stores Zustand : useNotifications (fetch, markAllRead, markRead, remove), useFavorites (fetch, toggle, isFavorite, remove), useHistory (fetch, add, clear)
+- 6 composants réutilisables : StatusBadge (MedicationStatusBadge: Disponible/Stock faible/Rupture/À confirmer + PharmacyStatusBadge: Ouvert/Fermé/De garde + Open247Badge), Loader (Loader/FullLoader/ButtonLoader), EmptyState (icône + titre + description + action), AlertMessage (info/success/warning/error + onClose), FavoriteButton (icon/button, toggle), PaymentSummary (rows + total + secureNote)
+- Header enrichi : cloche notifications avec badge non-lus, menu compte déroulant (avatar initiales + nom + liens Profil/Favoris/Historique/Notifications/Abonnement/Paramètres/Déconnexion), ajout "Profil" à la nav desktop, bouton Premium ; Sheet mobile avec tous les liens
+- page.tsx : routeur mis à jour avec 16 vues ; fetch auto des stores user-scoped (notifications/favorites/history) au login
+- 5 nouvelles vues (déléguées aux sous-agents 23-a et 23-b) : NotificationsView, HistoryView, FavoritesView, SettingsView, PrescriptionResultView
+- PrescriptionView modifiée : après estimation → navigate('prescription-result', { estimateItems })
+- ProfileView enrichie : section "Accès rapide" (Notifications/Favoris/Historique/Paramètres avec badges compteurs)
+- FavoriteButton ajouté aux détails médicament + pharmacie (variant button)
+- Footer enrichi : liens Favoris/Historique/Notifications/Paramètres
+- Seed notifications démo : Bienvenue, Pharmacie de garde, Premium, Nouveau médicament référencé (créées à la volée si l'utilisateur n'en a aucune)
+- Vérification Agent Browser : header (cloche + menu compte + Profil nav), notifications seedées affichées (4), historique empty state, favoris (ajout Aspirine → affiché "Mes favoris 1"), paramètres (5 switches + 4 sections), résultat ordonnance (fourchette 100-150 FCFA + récap + boutons)
+- Lint 0 erreur / 0 warning ; serveur stable ; responsive mobile vérifié
+
+Stage Summary:
+- Plateforme SABLIN PHARMA maintenant complète avec 16 pages/vues : Accueil, Médicaments, Détail médicament, Pharmacies, Détail pharmacie, Ordonnance, Résultat ordonnance, Profil, Connexion, Inscription, Abonnement, Paiement, Succès, Notifications, Historique, Favoris, Paramètres
+- Header professionnel : logo + nav (Accueil/Médicaments/Pharmacies/Ordonnance/Profil) + cloche notifications (badge) + bouton Premium + menu compte déroulant
+- Composants réutilisables créés et utilisés : StatusBadge (8 statuts visuels), Loader, EmptyState, AlertMessage, FavoriteButton, PaymentSummary, SearchBar, SectionHeader, cartes médicament/pharmacie
+- Navigation complète : header desktop + bottom-nav mobile + footer + menu compte + accès rapide profil
+- Données persistantes : notifications, historique, favoris, paramètres (Prisma SQLite)
+- Aucune icône interdite (étoile/feuille/bâtiment) ; notes en badges numériques

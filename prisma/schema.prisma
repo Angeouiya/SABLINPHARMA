@@ -11,15 +11,20 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
+  id           String           @id @default(cuid())
   name         String
-  email        String   @unique
+  email        String           @unique
   phone        String?
   password     String
   commune      String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  avatarColor  String           @default("#0c7a50")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
   subscription Subscription?
+  notifications Notification[]
+  history      SearchHistory[]
+  favorites    Favorite[]
+  settings     UserSettings?
 }
 
 model Category {
@@ -101,4 +106,57 @@ model Payment {
   reference    String   @unique
   status       String   @default("success") // success, pending, failed
   createdAt    DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // info, success, warning, alert, promotion
+  title     String
+  message   String
+  icon      String   @default("Bell")
+  read      Boolean  @default(false)
+  link      String?  // optional view slug to navigate to
+  createdAt DateTime @default(now())
+}
+
+model SearchHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind         String   // medication, pharmacy, prescription
+  query        String?
+  slug         String?
+  label        String   // human-readable label
+  meta         String?  // optional JSON string for extra info
+  createdAt    DateTime @default(now())
+}
+
+model Favorite {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind         String   // medication, pharmacy
+  slug         String
+  label        String
+  meta         String?  // optional JSON string
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, kind, slug])
+}
+
+model UserSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushAlerts      Boolean  @default(true)
+  dutyAlerts      Boolean  @default(true)
+  priceAlerts     Boolean  @default(false)
+  promoAlerts     Boolean  @default(true)
+  emailRecap      Boolean  @default(false)
+  language        String   @default("fr")
+  theme           String   @default("light")
+  defaultCommune  String?
+  updatedAt       DateTime @updatedAt
 }

@@ -7,19 +7,26 @@ export type View =
   | "pharmacies"
   | "pharmacy-detail"
   | "prescription"
+  | "prescription-result"
   | "profile"
   | "auth"
   | "subscription"
   | "payment"
-  | "success";
+  | "success"
+  | "notifications"
+  | "history"
+  | "favorites"
+  | "settings";
 
 export interface NavParams {
   slug?: string;
   query?: string;
   category?: string;
-  filter?: string; // "open" | "on-duty" | "all"
+  filter?: string; // "open" | "on-duty" | "all" | "247"
   authMode?: "login" | "register";
   fromEstimate?: boolean;
+  // Prescription estimate payload (passed from prescription view to result view)
+  estimateItems?: { slug: string; quantity: number }[];
 }
 
 export interface Category {
@@ -85,6 +92,7 @@ export interface User {
   email: string;
   phone: string | null;
   commune: string | null;
+  avatarColor?: string;
 }
 
 export interface Subscription {
@@ -95,3 +103,80 @@ export interface Subscription {
   startDate: string;
   endDate: string | null;
 }
+
+export type NotificationType = "info" | "success" | "warning" | "alert" | "promotion";
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  icon: string;
+  read: boolean;
+  link: string | null;
+  createdAt: string;
+}
+
+export type HistoryKind = "medication" | "pharmacy" | "prescription";
+
+export interface HistoryItem {
+  id: string;
+  kind: HistoryKind;
+  query: string | null;
+  slug: string | null;
+  label: string;
+  meta: string | null;
+  createdAt: string;
+}
+
+export type FavoriteKind = "medication" | "pharmacy";
+
+export interface FavoriteItem {
+  id: string;
+  kind: FavoriteKind;
+  slug: string;
+  label: string;
+  meta: string | null;
+  createdAt: string;
+}
+
+export interface UserSettings {
+  pushAlerts: boolean;
+  dutyAlerts: boolean;
+  priceAlerts: boolean;
+  promoAlerts: boolean;
+  emailRecap: boolean;
+  language: string;
+  theme: string;
+  defaultCommune: string | null;
+}
+
+// Prescription estimation result
+export interface EstimateLine {
+  medication: {
+    id: string;
+    name: string;
+    slug: string;
+    form: string;
+    dosage: string;
+    packSize: string;
+    requiresRx: boolean;
+  };
+  quantity: number;
+  unitMin: number;
+  unitMax: number;
+  lineMin: number;
+  lineMax: number;
+  pharmacyCount: number;
+}
+
+export interface EstimateResult {
+  lines: EstimateLine[];
+  totalMin: number;
+  totalMax: number;
+  availablePharmacies: number;
+}
+
+// Visual status badges
+export type MedicationStatus = "available" | "low-stock" | "out-of-stock" | "to-confirm";
+export type PharmacyStatus = "open" | "closed" | "on-duty";

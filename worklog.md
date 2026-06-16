@@ -905,3 +905,22 @@ Stage Summary:
 - Taille ajustée (32px header, 34px footer) pour harmonie
 - Variant light (fond vert) : conteneur blanc plein avec ombre premium
 - Logo bien proportionné et harmonisé sur desktop et mobile
+
+---
+Task ID: 29
+Agent: main (orchestrator)
+Task: Correction des contours du logo (suppression des bords disgracieux)
+
+Work Log:
+- Problème : le logo avait un conteneur avec bg-background + ring-1 ring-border/60 qui créait un cadre disgracieux sur le fond blanc du header
+- Correction logo.tsx : suppression totale des contours (ring, bg, border) sur variant default → le logo s'affiche directement sans aucun cadre, proprement
+- variant light (fond vert) conservé : rounded-xl bg-white px-2.5 py-1.5 shadow-premium (conteneur blanc arrondi élégant)
+- Vérification VLM :
+  * Desktop : "Contours propres et élégants. Aucun cadre ou bordure disgracieux."
+  * Mobile : "Contours propres."
+  * Auth (panneau vert) : "Contours propres et élégants."
+- 0 erreur, lint 0 erreur
+
+Stage Summary:
+- Logo SABLIN PHARMA affiché sans aucun contour disgracieux sur fond blanc (header, footer, mobile)
+- Conteneur blanc élégant uniquement sur fond vert (page connexion) pour la lisibilité

@@ -11,6 +11,7 @@ interface LogoProps {
  * SABLIN PHARMA — Logo officiel
  * Utilise l'image du logo directement (croix + feuille + texte SABLIN PHARMA).
  * Sur fond vert (variant light), un conteneur blanc arrondi est ajouté pour la lisibilité.
+ * Sur fond blanc (variant default), le logo s'affiche sans contour, proprement.
  */
 export function LogoMark({
   size = 40,
@@ -29,7 +30,7 @@ export function LogoMark({
       height={size}
       className={cn(
         "object-contain",
-        variant === "light" && "rounded-lg bg-white px-1.5 py-1 shadow-sm",
+        variant === "light" && "rounded-lg bg-white px-2 py-1.5 shadow-sm",
         className
       )}
       style={{ height: `${size}px`, width: "auto" }}
@@ -39,19 +40,15 @@ export function LogoMark({
 
 export function Logo({ className, showText = true, size = 40, variant = "default" }: LogoProps) {
   return (
-    <div
-      className={cn(
-        "flex items-center",
-        variant === "light"
-          ? "rounded-xl bg-white px-2 py-1.5 shadow-premium"
-          : "rounded-lg bg-background px-1.5 py-1 ring-1 ring-border/60",
-        className
-      )}
-    >
+    <div className={cn("flex items-center", className)}>
       <img
         src="/images/logo-sablin-pharma.png"
         alt="SABLIN PHARMA"
-        className="object-contain"
+        className={cn(
+          "object-contain",
+          variant === "light" && "rounded-xl bg-white px-2.5 py-1.5 shadow-premium",
+          className
+        )}
         style={{ height: `${size}px`, width: "auto" }}
       />
     </div>

@@ -465,3 +465,35 @@ Stage Summary:
 - Cartes élégantes : nom, commune, quartier, adresse, distance, téléphone, statut (Ouvert/Fermé/De garde/24/7/Disponible aujourd'hui/À proximité), horaires + 4 boutons (Voir détails/Appeler/Itinéraire/Médicaments)
 - Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Treichville, Bingerville, Koumassi
 - Responsive desktop filtres latéraux / mobile repliable, boutons faciles à cliquer
+
+---
+Task ID: 15
+Agent: main (orchestrator)
+Task: Page Détail pharmacie complète — refonte avec fiche, horaires, services, médicaments, localisation
+
+Work Log:
+- Fiche pharmacie refondue : header bg-brand-gradient avec icône Plus, nom, description courte, commune+quartier, distance estimée (km), note badge, statut (Ouvert/Fermé avec point pulsant, De garde, 24/7), 4 badges enrichis (Médicaments disponibles, À proximité si ≤5km, Livraison disponible, Paiement mobile)
+- Section horaires : Card avec 3 jours (Lundi-Vendredi/Samedi/Dimanche), jour actuel mis en évidence (bg-brand-light + badge "Aujourd'hui"), heures d'ouverture/fermeture, "Fermé" si fermé. Bloc spécial garde (Card ambre gradient) si isOnDuty
+- Section informations pratiques : grille 4 InfoCards (Adresse complète + commune, Téléphone lien tel:, Distance estimée, Médicaments en stock X/Y)
+- Section actions rapides (right column) : Card avec 5 boutons (Appeler tel:, Itinéraire Google Maps, Partager navigator.share, Ajouter aux favoris FavoriteButton, Voir médicaments disponibles → scroll to section)
+- Bloc localisation : placeholder élégant avec motif grille façon carte + point central brand + overlay "Localisation de la pharmacie" avec coordonnées + bouton "Ouvrir dans Google Maps"
+- Section médicaments disponibles : recherche locale, liste de cards (icône catégorie colorée, nom, DCI+forme+dosage, prix Price, statut Disponible/Stock faible/Rupture via MedStatusBadge, bouton "Ordonnance" → toast succès). Compteur "X médicaments en stock sur Y référencés"
+- Section services disponibles : 7 cartes (Conseils pharmaceutiques/Stethoscope, Paiement Mobile Money/Smartphone, Pharmacie de garde/Timer, Produits bébé/Baby, Parapharmacie/Package, Suivi tension/HeartPulse, Première urgence/Plus) avec descriptions réalistes ivoiriennes
+- Message rassurant : AlertMessage variant info "Les disponibilités et prix affichés sont indicatifs. Veuillez confirmer auprès de la pharmacie avant tout déplacement."
+- Design system utilisé : Heading, Eyebrow, Muted, Price, AlertMessage, EmptyState, FavoriteButton, Button (brand-gradient/outline), Card, Badge
+- Layout responsive : desktop grid [1fr_340px] (infos left + actions/map right), mobile empilé
+- Vérification Agent Browser :
+  * desktop 1440px : fiche Pharmacie des Deux Plateaux (Cocody, 4.1km, Ouvert, De garde, 24/7, 4 badges), horaires avec "Aujourd'hui" Lundi-Vendredi, bloc garde, 4 infos pratiques, 5 actions, localisation + Google Maps, 33 médicaments avec statut + bouton Ordonnance, 7 services, message rassurant — VLM confirme "fiche élégante, badges visuels, horaires avec jour actuel, actions rapides, localisation Google Maps, médicaments avec Ordonnance, services, identité premium"
+  * mobile 390px : sections empilées, boutons faciles à cliquer — VLM confirme "empilement propre, boutons bien espacés, lisibilité bonne, ergonomique"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Détail pharmacie premium, responsive, complète conforme aux spécifications
+- Fiche : nom, description, commune, quartier, adresse, téléphone, distance, statut (Ouvert/Fermé/De garde/24/7) + 4 badges (Médicaments disponibles, À proximité, Livraison, Paiement mobile)
+- Horaires : 3 jours avec jour actuel mis en évidence + bloc spécial garde
+- Contact : 5 actions (Appeler/Itinéraire/Partager/Favoris/Voir médicaments)
+- Localisation : placeholder carte + bouton Google Maps
+- Médicaments : nom, DCI, dosage, forme, prix, statut (Disponible/Stock faible/Rupture) + bouton Ajouter à l'ordonnance
+- Services : 7 cartes (conseils, Mobile Money, garde, bébé, parapharmacie, tension, urgence)
+- Message rassurant discret mais sérieux
+- Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Bingerville

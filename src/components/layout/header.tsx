@@ -85,7 +85,7 @@ export function Header() {
           className="flex items-center transition-opacity hover:opacity-95"
           aria-label="Accueil SABLIN PHARMA"
         >
-          <Logo size={32} />
+          <Logo size={44} />
         </button>
 
         <nav className="ml-4 hidden items-center gap-1 lg:flex">
@@ -233,7 +233,7 @@ export function Header() {
         <SheetContent side="right" className="w-[300px] sm:w-[360px]">
           <SheetHeader>
             <SheetTitle className="text-left">
-              <Logo size={36} />
+              <Logo size={42} />
             </SheetTitle>
           </SheetHeader>
           <div className="mt-6 flex flex-col gap-1">

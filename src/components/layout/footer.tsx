@@ -15,7 +15,7 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
           <div className="col-span-2 lg:col-span-2">
-            <Logo size={34} />
+            <Logo size={46} />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
               La plateforme d&apos;information santé n°1 en Côte d&apos;Ivoire.
               Trouvez vos médicaments et les pharmacies près de chez vous, à toute heure.

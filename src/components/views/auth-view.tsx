@@ -242,7 +242,7 @@ export function AuthView() {
         <div className="absolute -bottom-32 -left-20 size-80 rounded-full bg-emerald-300/10 blur-3xl" />
 
         <div className="relative">
-          <Logo variant="light" size={44} />
+          <Logo variant="light" size={56} />
         </div>
 
         <div className="relative max-w-md text-white">
@@ -276,7 +276,7 @@ export function AuthView() {
       {/* ---------- Right form panel ---------- */}
       <section className="flex flex-col bg-background">
         <div className="border-b border-border/70 px-4 py-3 sm:px-6 lg:hidden">
-          <Logo size={36} />
+          <Logo size={50} />
         </div>
 
         <button

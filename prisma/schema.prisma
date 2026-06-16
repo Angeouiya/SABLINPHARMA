@@ -1,0 +1,104 @@
+// SABLIN PHARMA — Prisma schema
+// Plateforme d'information santé (Côte d'Ivoire)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  password     String
+  commune      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  subscription Subscription?
+}
+
+model Category {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  description String?
+  iconName    String
+  color       String
+  medications Medication[]
+}
+
+model Medication {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  genericName String
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  form        String // comprimé, sirop, gélule, pommade, suppositoire, injectable
+  dosage      String // ex: 500 mg, 250 mg/5 mL
+  packSize    String // ex: Boîte de 20, Flacon 100 mL
+  description String
+  imageUrl    String?
+  requiresRx  Boolean  @default(false)
+  avgPrice    Int // FCFA
+  createdAt   DateTime @default(now())
+  pharmacies  PharmacyMedication[]
+}
+
+model Pharmacy {
+  id              String               @id @default(cuid())
+  name            String
+  slug            String               @unique
+  address         String
+  commune         String
+  phone           String
+  hoursWeekday    String
+  hoursSaturday   String
+  hoursSunday     String
+  isOpen247       Boolean              @default(false)
+  isOnDuty        Boolean              @default(false) // pharmacie de garde
+  latitude        Float
+  longitude       Float
+  rating          Float                @default(4.5)
+  imageUrl        String?
+  createdAt       DateTime             @default(now())
+  medications     PharmacyMedication[]
+}
+
+model PharmacyMedication {
+  id           String     @id @default(cuid())
+  pharmacyId   String
+  medicationId String
+  price        Int // FCFA
+  inStock      Boolean    @default(true)
+  pharmacy     Pharmacy   @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medication   Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      String   @default("premium")
+  status    String   @default("active") // active, pending, expired
+  amount    Int      @default(500)
+  startDate DateTime @default(now())
+  endDate   DateTime?
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id           String   @id @default(cuid())
+  userId       String?
+  amount       Int
+  method       String // mobile_money, card
+  provider     String // orange, mtn, moov, visa, mastercard
+  reference    String   @unique
+  status       String   @default("success") // success, pending, failed
+  createdAt    DateTime @default(now())
+}

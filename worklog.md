@@ -566,3 +566,35 @@ Stage Summary:
 - Boutons : Enregistrer/Modifier/Nouvelle/Partager/Voir ordonnances
 - Message de prudence discret mais visible
 - Montre la valeur SABLIN PHARMA : gagner du temps, comparer, préparer son budget
+
+---
+Task ID: 18
+Agent: main (orchestrator)
+Task: Pages Connexion et Inscription complètes — refonte avec validation inline, connexion rapide, bénéfices
+
+Work Log:
+- Page Connexion refondue : titre "Connexion à votre compte", sous-texte rassurant, champ "Téléphone ou e-mail" (avec icône Mail, détection email/téléphone), mot de passe (toggle œil), bouton "Se connecter" brand-gradient avec flèche, lien "Mot de passe oublié ?", lien "Créer un compte"
+- Page Inscription refondue : titre "Créer votre compte", champs nom complet, téléphone, e-mail (grille 2 colonnes), commune (Select 12 communes), mot de passe (toggle + indicateur longueur), confirmation (toggle + indicateur correspondance), checkbox conditions d'utilisation (Card cliquable), bouton "Créer mon compte"
+- Validation inline propre : FieldError component avec icône AlertCircle, messages "Ce champ est obligatoire", "Format d'e-mail invalide", "Numéro invalide. Ex : 07 00 00 00 00", "Le mot de passe doit contenir au moins 6 caractères", "Les mots de passe ne correspondent pas", "Vous devez accepter les conditions", "Un compte existe déjà avec cet e-mail", "Veuillez sélectionner votre commune". Erreurs effacées au typing
+- Connexion rapide : séparateur "ou continuer avec", 2 boutons outline Google (icône SVG colorée 4 couleurs) + Téléphone (Smartphone icône brand), toast info "bientôt disponible"
+- Bloc confiance (panneau gauche desktop) : Logo variant light, titre "Votre santé, simplifiée", 4 bénéfices avec icônes (Search "Trouvez vos médicaments plus rapidement", ClipboardList "Estimez vos ordonnances en quelques clics", Timer "Consultez les pharmacies de garde 24/7", Heart "Gardez vos recherches et pharmacies en favoris"), badge ShieldCheck "Plateforme 100% information, aucune vente en ligne"
+- Badges confiance sous le formulaire : "Données chiffrées", "100% gratuit", "Côte d'Ivoire"
+- Indicateurs positifs : mdp correspondant (CheckCircle2 vert), longueur mdp insuffisante (info muted)
+- Composants réutilisables créés : Field (icône + label + input + erreur), PasswordInput (toggle œil), FieldError (AlertCircle + msg), GoogleIcon (SVG 4 couleurs)
+- Layout responsive : desktop grid 2 colonnes (panneau brand left + formulaire right), mobile formulaire centré avec logo en haut
+- Vérification Agent Browser :
+  * desktop 1440px : panneau gauche vert avec 4 bénéfices + formulaire onglets Connexion/Inscription — VLM confirme "panneau gauche vert avec logo + 4 bénéfices, formulaire élégant avec onglets, champs avec icônes et validation inline, boutons Google/Téléphone, checkbox conditions, identité premium"
+  * validation inline : formulaire vide → "Ce champ est obligatoire" / inscription vide → toutes les erreurs affichées
+  * inscription réelle (Mariam Traoré, 07 01 23 45 67, mariam.traore@test.ci, Yopougon, monpass123, conditions acceptées) → succès → redirection accueil + menu compte visible
+  * mobile 390px : formulaire centré, logo visible, champs/boutons faciles à cliquer — VLM confirme "centré, lisible, bonne ergonomie"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Pages Connexion et Inscription premium, responsive, complètes conformes aux spécifications
+- Connexion : logo, titre "Connexion à votre compte", téléphone/email, mot de passe (œil), bouton Se connecter, mot de passe oublié, créer compte
+- Inscription : nom, téléphone, email, mot de passe (œil), confirmation (œil), commune, checkbox conditions, bouton Créer mon compte
+- Connexion rapide : Google (icône colorée) + Téléphone
+- Validation inline : champ obligatoire, email invalide, téléphone invalide, mdp court, mdp non correspondant, conditions non acceptées, compte existant
+- Bloc confiance : 4 bénéfices (médicaments, ordonnances, garde, favoris) + badge sécurité
+- Messages succès : "Connexion réussie", "Compte créé avec succès"
+- Layout : desktop panneau brand + formulaire, mobile centré

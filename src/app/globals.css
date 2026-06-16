@@ -195,9 +195,8 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  /* Headings default to brand-dark for premium pharmacy feel */
+  /* Headings use foreground (dark) for maximum readability on all backgrounds */
   h1, h2, h3, h4, h5, h6 {
-    color: var(--brand-dark);
     letter-spacing: -0.01em;
   }
 }

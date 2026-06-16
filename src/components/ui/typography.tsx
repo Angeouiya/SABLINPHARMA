@@ -27,7 +27,7 @@ export function Heading({
 }) {
   const Tag = level;
   return (
-    <Tag className={cn(headingSizes[level], "text-brand-dark", className)}>
+    <Tag className={cn(headingSizes[level], "text-foreground", className)}>
       {children}
     </Tag>
   );

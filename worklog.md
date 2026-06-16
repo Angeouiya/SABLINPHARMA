@@ -694,3 +694,50 @@ Stage Summary:
 - Modale confirmation : paiement confirmé, abonnement activé, montant, dates, référence, bouton Accéder à mon compte
 - Historique : date, formule, montant, moyen, statut, référence (4 lignes fictives)
 - Layout : desktop formulaire + récap sticky, mobile empilé
+
+---
+Task ID: 22
+Agent: main (orchestrator)
+Task: Suppression totale des dégradés — identité visuelle en couleurs pleines uniquement
+
+Work Log:
+- globals.css : .bg-brand-gradient → background-color: var(--brand) (vert plein), .bg-brand-soft → background-color: var(--brand-light), .text-brand-gradient → color: var(--brand-dark), .bg-dotted/.bg-dotted-white → background-color: transparent (radial-gradient retirés)
+- button.tsx : variante "brand-gradient" → bg-brand text-white hover:bg-brand-dark (vert plein, plus de gradient)
+- Remplacements en masse (sed) sur 36 fichiers (views + shared + layout) :
+  * bg-gradient-to-br from-amber-400 to-amber-600 → bg-amber-500
+  * bg-gradient-to-br from-amber-400 to-amber-500 → bg-amber-500
+  * bg-gradient-to-br from-amber-50 to-background → bg-amber-50
+  * bg-gradient-to-br from-amber-50 via-background to-brand-light/40 → bg-amber-50
+  * bg-gradient-to-br from-amber-50 via-card to-card → bg-amber-50
+  * bg-gradient-to-br from-amber-50 via-card to-brand-light/40 → bg-amber-50
+  * bg-gradient-to-br from-amber-50 to-amber-100/40 → bg-amber-50
+  * bg-gradient-to-br from-amber-50 to-amber-100/50 → bg-amber-50
+  * bg-gradient-to-r from-amber-50 to-background → bg-amber-50
+  * bg-gradient-to-br from-brand-light/60 to-background → bg-brand-light
+  * bg-gradient-to-br from-brand-light/70 to-brand-light/30 → bg-brand-light
+  * bg-gradient-to-br from-brand-light/50 to-card → bg-brand-light
+  * bg-gradient-to-br from-brand-light/40 to-card → bg-brand-light
+  * bg-gradient-to-br from-brand-dark to-brand → bg-brand-dark
+  * bg-gradient-to-br from-slate-700 to-slate-900 → bg-slate-800
+  * bg-gradient-to-b from-background to-brand-light/30 → bg-background
+  * bg-gradient-to-t from-black/60 to-transparent → bg-black/60
+  * hover:opacity-90 sur boutons ambre → hover:bg-amber-600
+- Suppression des styles inline radial-gradient et linear-gradient (motifs pointillés, halos, grilles carte)
+- Corrections de parsing sur 5 fichiers (lignes vides cassées par sed) : medication-detail-view, pharmacies-view, pharmacy-detail-view, success-view, medication-card
+- Vérification finale : 0 gradient restant dans tout src/ (grep confirmé)
+- Vérification Agent Browser + VLM :
+  * Accueil : "Aucun dégradé visible. Hero fond vert uni, boutons fond plein, cartes fond blanc uni, badges ambre plein. Contraste bon."
+  * Médicaments : "Aucun dégradé. Boutons et cartes en couleurs pleines. Contraste texte/recherche bon (noir sur blanc)."
+  * Abonnement : "Boutons premium pleins sans gradient. Contraste bon."
+  * Mobile 390px : "Pas de dégradés. Texte lisible. Boutons en couleurs pleines. Design clair."
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- TOUS les dégradés supprimés de la plateforme SABLIN PHARMA
+- Couleurs pleines uniquement : vert pharmacie (brand), vert foncé (brand-dark), blanc (background), gris clair (muted/brand-light), ambre (amber-500/amber-50)
+- Boutons principaux : bg-brand text-white (vert plein) ou bg-amber-500 text-white (ambre plein)
+- Boutons secondaires : bg-background border-brand text-brand-dark (blanc + bordure verte)
+- Cartes : bg-background (blanc) border-border (gris clair) shadow-premium
+- Champs recherche/formulaires : bg-background text-foreground placeholder-muted (fond blanc, texte foncé, placeholder gris)
+- Contrastes vérifiés : texte toujours visible sur son fond
+- Responsive mobile/tablette/desktop vérifié

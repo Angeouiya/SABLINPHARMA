@@ -146,7 +146,7 @@ export function SubscriptionView() {
   return (
     <div className="flex flex-col">
       {/* ============ HEADER ATTRACTIF ============ */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-amber-50 via-background to-brand-light/40">
+      <section className="relative overflow-hidden bg-amber-50">
         <div className="absolute -right-16 -top-16 size-72 rounded-full bg-amber-300/20 blur-3xl" />
         <div className="absolute -bottom-24 -left-16 size-80 rounded-full bg-brand/10 blur-3xl" />
 
@@ -160,7 +160,7 @@ export function SubscriptionView() {
           </button>
 
           <div className="mx-auto mt-6 max-w-2xl text-center">
-            <Badge className="mx-auto inline-flex items-center gap-1.5 border-0 bg-gradient-to-br from-amber-400 to-amber-500 px-3 py-1 text-xs font-bold text-white shadow-premium">
+            <Badge className="mx-auto inline-flex items-center gap-1.5 border-0 bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-premium">
               <Crown className="size-3.5" />
               Offre Premium
             </Badge>
@@ -210,7 +210,7 @@ export function SubscriptionView() {
                   key={i}
                   className="group flex items-center gap-3 border-border/70 p-4 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium"
                 >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white transition-transform group-hover:scale-110">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white transition-transform group-hover:scale-110">
                     <a.icon className="size-5" />
                   </span>
                   <p className="text-sm font-semibold leading-snug text-foreground">
@@ -231,13 +231,13 @@ export function SubscriptionView() {
 
           {/* RIGHT — Carte Premium pricing (sticky) */}
           <div className="lg:sticky lg:top-24 lg:self-start">
-            <Card className="relative overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-50 via-card to-card p-0 shadow-premium-lg">
+            <Card className="relative overflow-hidden border-amber-500/30 bg-amber-50 p-0 shadow-premium-lg">
               <div className="absolute -right-10 -top-10 size-44 rounded-full bg-amber-300/30 blur-3xl" />
               <div className="absolute -bottom-12 -left-10 size-44 rounded-full bg-brand/10 blur-3xl" />
 
               <div className="relative flex h-full flex-col p-6 sm:p-7">
                 <div className="flex items-center justify-between">
-                  <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-premium">
+                  <span className="flex size-12 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-premium">
                     <Crown className="size-6" />
                   </span>
                   <Badge className="border-0 bg-amber-500 text-[11px] font-bold text-white">
@@ -282,7 +282,7 @@ export function SubscriptionView() {
                   </Button>
                 ) : (
                   <Button
-                    className="mt-5 w-full bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
+                    className="mt-5 w-full bg-amber-500 text-white hover:bg-amber-600"
                     size="lg"
                     onClick={() => navigate("payment")}
                   >
@@ -447,11 +447,11 @@ export function SubscriptionView() {
         {/* ============ CTA FINAL ============ */}
         {!premium && (
           <section className="mt-14">
-            <Card className="relative overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-50 via-card to-brand-light/40 p-8 text-center shadow-premium sm:p-10">
+            <Card className="relative overflow-hidden border-amber-500/30 bg-amber-50 p-8 text-center shadow-premium sm:p-10">
               <div className="absolute -right-12 -top-12 size-48 rounded-full bg-amber-300/20 blur-3xl" />
               <div className="absolute -bottom-12 -left-12 size-48 rounded-full bg-brand/10 blur-3xl" />
               <div className="relative">
-                <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-premium">
+                <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-premium">
                   <Crown className="size-7" />
                 </span>
                 <h2 className="mt-5 text-2xl font-extrabold text-foreground sm:text-3xl">
@@ -463,7 +463,7 @@ export function SubscriptionView() {
                   <span className="font-bold text-amber-700">500 FCFA / mois</span>.
                 </p>
                 <Button
-                  className="mt-6 bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
+                  className="mt-6 bg-amber-500 text-white hover:bg-amber-600"
                   size="lg"
                   onClick={() => navigate("payment")}
                 >
@@ -503,7 +503,7 @@ function SubscriptionStatus({
         {premium && subscription ? (
           <div className="space-y-4">
             <div className="flex items-center gap-2.5">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-amber-500 text-white">
                 <Crown className="size-5" />
               </span>
               <div>
@@ -525,7 +525,7 @@ function SubscriptionStatus({
               <StatusInfo label="Montant" value="500 FCFA" />
             </div>
             <Button
-              className="w-full bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
+              className="w-full bg-amber-500 text-white hover:bg-amber-600"
               onClick={onRenew}
             >
               <RotateCcw className="size-4" /> Renouveler

@@ -182,7 +182,7 @@ export function HomeView() {
                 alt="Pharmacie moderne à Abidjan"
                 className="aspect-[4/3] w-full object-cover"
               />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-5">
+              <div className="absolute inset-x-0 bottom-0 bg-black/60 p-5">
                 <div className="flex items-center gap-3 rounded-2xl bg-white/95 p-3 backdrop-blur-sm">
                   <span className="flex size-11 items-center justify-center rounded-xl bg-brand-light text-brand">
                     <Plus className="size-6" strokeWidth={3} />
@@ -320,7 +320,7 @@ export function HomeView() {
       <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <div className="grid gap-5 lg:grid-cols-2">
           {/* Estimation */}
-          <Card className="relative overflow-hidden border-brand/20 bg-gradient-to-br from-brand-light/60 to-background py-0">
+          <Card className="relative overflow-hidden border-brand/20 bg-brand-light py-0">
             <div className="absolute -right-8 -top-8 size-40 rounded-full bg-brand/10 blur-2xl" />
             <div className="relative flex h-full flex-col gap-4 p-6">
               <div className="flex items-center gap-3">
@@ -359,11 +359,11 @@ export function HomeView() {
           </Card>
 
           {/* Premium */}
-          <Card className="relative overflow-hidden border-amber-500/30 bg-gradient-to-br from-amber-50 to-background py-0">
+          <Card className="relative overflow-hidden border-amber-500/30 bg-amber-50 py-0">
             <div className="absolute -right-10 -top-10 size-44 rounded-full bg-amber-300/20 blur-3xl" />
             <div className="relative flex h-full flex-col gap-4 p-6">
               <div className="flex items-center justify-between">
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-premium">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-premium">
                   <Crown className="size-6" />
                 </span>
                 <Badge className="border-0 bg-amber-500 text-[11px] font-bold text-white">
@@ -396,7 +396,7 @@ export function HomeView() {
                 ))}
               </ul>
               <Button
-                className="mt-auto w-full bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
+                className="mt-auto w-full bg-amber-500 text-white hover:bg-amber-600"
                 size="lg"
                 onClick={() => navigate("subscription")}
               >

@@ -11,7 +11,7 @@ export function Footer() {
   const go = (v: View) => navigate(v);
 
   return (
-    <footer className="mt-auto border-t border-border/60 bg-gradient-to-b from-background to-brand-light/30">
+    <footer className="mt-auto border-t border-border/60 bg-background">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
           <div className="col-span-2 lg:col-span-2">

@@ -170,7 +170,7 @@ export function ProfileView() {
 
   // Account status badge
   const accountStatus = premium
-    ? { label: "Premium actif", className: "bg-gradient-to-br from-amber-400 to-amber-600 text-white", icon: Crown }
+    ? { label: "Premium actif", className: "bg-amber-500 text-white", icon: Crown }
     : { label: "Compte gratuit", className: "bg-brand-light text-brand-dark", icon: CircleUser };
 
   return (
@@ -281,9 +281,9 @@ export function ProfileView() {
             <SectionTitle icon={Crown} title="Abonnement" />
             {premium && subscription ? (
               <Card className="overflow-hidden border-amber-500/30 py-0 shadow-premium">
-                <div className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-background px-5 py-3">
+                <div className="flex items-center justify-between bg-amber-50 px-5 py-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white">
+                    <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
                       <Crown className="size-5" />
                     </span>
                     <div>
@@ -304,7 +304,7 @@ export function ProfileView() {
                 <div className="flex flex-wrap gap-2 border-t border-border/50 p-4">
                   <Button
                     size="sm"
-                    className="bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
+                    className="bg-amber-500 text-white hover:bg-amber-600"
                     onClick={() => navigate("subscription")}
                   >
                     <RotateCcw className="size-3.5" /> Renouveler mon abonnement

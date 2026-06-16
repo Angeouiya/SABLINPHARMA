@@ -312,7 +312,7 @@ export function PharmaciesView() {
       {!loading && onDutyPharmacies.length > 0 && (
         <section className="mt-6">
           <Card className="overflow-hidden border-amber-500/30 py-0 shadow-premium">
-            <div className="flex items-center gap-3 border-b border-amber-500/20 bg-gradient-to-r from-amber-50 to-background px-5 py-3.5">
+            <div className="flex items-center gap-3 border-b border-amber-500/20 bg-amber-50 px-5 py-3.5">
               <span className="flex size-10 items-center justify-center rounded-xl bg-amber-400 text-amber-950">
                 <Timer className="size-5" />
               </span>
@@ -347,14 +347,7 @@ export function PharmaciesView() {
         <Card className="relative overflow-hidden border-brand/20 py-0">
           <div className="relative flex h-44 items-center justify-center bg-brand-soft sm:h-52">
             {/* Decorative grid pattern resembling a map */}
-            <div
-              className="absolute inset-0 opacity-30"
-              style={{
-                backgroundImage:
-                  "linear-gradient(var(--brand-light) 1px, transparent 1px), linear-gradient(90deg, var(--brand-light) 1px, transparent 1px)",
-                backgroundSize: "32px 32px",
-              }}
-            />
+            <div className="absolute inset-0 opacity-30 bg-brand-light" />
             <div className="absolute left-1/4 top-1/3 size-3 rounded-full bg-brand ring-4 ring-brand/20" />
             <div className="absolute right-1/3 top-1/2 size-3 rounded-full bg-amber-500 ring-4 ring-amber-500/20" />
             <div className="absolute left-1/2 top-2/3 size-3 rounded-full bg-brand ring-4 ring-brand/20" />

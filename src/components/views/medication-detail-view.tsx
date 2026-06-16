@@ -293,12 +293,7 @@ export function MedicationDetailView() {
             }
           >
             <div
-              className="absolute inset-0 opacity-[0.06]"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle at 30% 30%, var(--brand) 1px, transparent 1px)",
-                backgroundSize: "16px 16px",
-              }}
+              className="absolute inset-0 opacity-[0.06] bg-dotted"
             />
             <div className="relative flex size-24 items-center justify-center rounded-3xl bg-background shadow-premium">
               {med.category ? (

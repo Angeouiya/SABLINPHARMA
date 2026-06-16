@@ -915,9 +915,9 @@ export function PrescriptionView() {
           {/* Premium upsell */}
           {!premium && (
             <Card className="overflow-hidden border-amber-500/30 py-0">
-              <div className="bg-gradient-to-br from-amber-50 to-background p-4">
+              <div className="bg-amber-50 p-4">
                 <div className="flex items-center gap-2">
-                  <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white">
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
                     <Crown className="size-5" />
                   </span>
                   <div>
@@ -938,7 +938,7 @@ export function PrescriptionView() {
                 </ul>
                 <Button
                   size="sm"
-                  className="mt-3 w-full bg-gradient-to-br from-amber-400 to-amber-600 text-white hover:opacity-90"
+                  className="mt-3 w-full bg-amber-500 text-white hover:bg-amber-600"
                   onClick={() => navigate("subscription")}
                 >
                   <Crown className="size-3.5" /> S&apos;abonner

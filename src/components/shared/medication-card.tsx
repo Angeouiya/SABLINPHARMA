@@ -38,15 +38,8 @@ export function MedicationCard({ med }: { med: Medication }) {
       className="group gap-0 cursor-pointer overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg"
     >
       {/* Header visual */}
-      <div className="relative flex h-28 items-center justify-center overflow-hidden bg-gradient-to-br from-brand-light/70 to-brand-light/30">
-        <div
-          className="absolute inset-0 opacity-[0.07]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 30% 30%, var(--brand) 1px, transparent 1px)",
-            backgroundSize: "16px 16px",
-          }}
-        />
+      <div className="relative flex h-28 items-center justify-center overflow-hidden bg-brand-light">
+        <div className="absolute inset-0 opacity-[0.07] bg-dotted" />
         <div className="relative flex size-16 items-center justify-center rounded-2xl bg-background shadow-premium">
           {med.category ? (
             <CategoryIcon

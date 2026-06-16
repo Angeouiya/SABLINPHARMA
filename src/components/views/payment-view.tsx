@@ -236,7 +236,7 @@ export function PaymentView() {
   return (
     <div className="flex flex-col">
       {/* ============ HEADER ============ */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-amber-50 via-background to-brand-light/40">
+      <section className="relative overflow-hidden bg-amber-50">
         <div className="absolute -right-16 -top-16 size-72 rounded-full bg-amber-300/20 blur-3xl" />
         <div className="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
           <button
@@ -248,7 +248,7 @@ export function PaymentView() {
           </button>
 
           <div className="mt-5">
-            <Badge className="inline-flex items-center gap-1.5 border-0 bg-gradient-to-br from-amber-400 to-amber-500 px-3 py-1 text-xs font-bold text-white shadow-premium">
+            <Badge className="inline-flex items-center gap-1.5 border-0 bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-premium">
               <Crown className="size-3.5" />
               Premium
             </Badge>
@@ -489,7 +489,7 @@ export function PaymentView() {
               </div>
 
               <div className="mt-4 flex items-start gap-3 rounded-xl bg-brand-light/40 p-4">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-amber-500 text-white">
                   <Crown className="size-5" />
                 </span>
                 <div className="flex-1">

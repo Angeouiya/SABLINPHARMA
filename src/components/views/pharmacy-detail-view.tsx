@@ -331,7 +331,7 @@ export function PharmacyDetailView() {
             {/* Garde special block */}
             {pharmacy.isOnDuty && (
               <Card className="mt-3 overflow-hidden border-amber-500/30 py-0">
-                <div className="flex items-center gap-3 bg-gradient-to-r from-amber-50 to-background p-4">
+                <div className="flex items-center gap-3 bg-amber-50 p-4">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-400 text-amber-950">
                     <Timer className="size-5" />
                   </span>
@@ -434,14 +434,7 @@ export function PharmacyDetailView() {
           {/* Map placeholder */}
           <Card className="overflow-hidden border-brand/20 py-0">
             <div className="relative flex h-48 items-center justify-center bg-brand-soft">
-              <div
-                className="absolute inset-0 opacity-30"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(var(--brand-light) 1px, transparent 1px), linear-gradient(90deg, var(--brand-light) 1px, transparent 1px)",
-                  backgroundSize: "28px 28px",
-                }}
-              />
+              <div className="absolute inset-0 opacity-30 bg-brand-light" />
               <span className="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand ring-4 ring-brand/30" />
               <div className="relative flex flex-col items-center gap-2 rounded-xl bg-background/90 px-4 py-2.5 text-center shadow-premium backdrop-blur-sm">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">

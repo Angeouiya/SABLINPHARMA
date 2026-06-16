@@ -27,8 +27,7 @@ export function PharmacyCard({ pharma, showPrice }: { pharma: Pharmacy; showPric
       className="group block w-full text-left"
     >
       <Card className="gap-0 overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
-        <div className="relative flex h-24 items-center justify-between overflow-hidden bg-gradient-to-br from-brand-dark to-brand px-4">
-          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(circle at 80% 20%, white 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+        <div className="relative flex h-24 items-center justify-between overflow-hidden bg-brand-dark px-4">
           <div className="relative flex items-center gap-3">
             <span className="flex size-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
               <Plus className="size-7 text-white" strokeWidth={3} />

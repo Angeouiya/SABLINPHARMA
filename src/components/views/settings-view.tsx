@@ -272,7 +272,7 @@ export function SettingsView() {
                             {row.label}
                           </p>
                           {row.premiumLocked && (
-                            <Badge className="border-0 bg-gradient-to-br from-amber-400 to-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                            <Badge className="border-0 bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
                               <Crown className="mr-1 size-3" />
                               Premium
                             </Badge>
@@ -466,7 +466,7 @@ export function SettingsView() {
           {/* 4. Abonnement */}
           <Card className="border-border/70 shadow-premium">
             <CardHeader className="flex flex-row items-center gap-3 px-6 pt-6">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-white">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
                 <Crown className="size-4" />
               </span>
               <CardTitle className="text-base font-bold text-foreground">
@@ -476,8 +476,8 @@ export function SettingsView() {
             <CardContent className="px-6 pb-6 pt-2">
               {premium ? (
                 <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-50 to-amber-100/50 p-4">
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white">
+                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-50 p-4">
+                    <span className="flex size-11 items-center justify-center rounded-xl bg-amber-500 text-white">
                       <Crown className="size-5" />
                     </span>
                     <div className="flex-1">
@@ -501,7 +501,7 @@ export function SettingsView() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-50 to-amber-100/40 p-4">
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-50 p-4">
                     <div className="flex items-center gap-2">
                       <Crown className="size-4 text-amber-600" />
                       <p className="text-sm font-bold text-amber-900">
@@ -515,7 +515,7 @@ export function SettingsView() {
                     </p>
                   </div>
                   <Button
-                    className="w-full bg-gradient-to-br from-amber-400 to-amber-500 text-white hover:opacity-90"
+                    className="w-full bg-amber-500 text-white hover:bg-amber-600"
                     onClick={() => navigate("subscription")}
                   >
                     <Crown className="size-4" />

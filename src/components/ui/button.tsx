@@ -19,7 +19,7 @@ const buttonVariants = cva(
         default:
           "bg-brand text-brand-foreground shadow-sm hover:bg-brand/90 hover:shadow-premium",
         "brand-gradient":
-          "bg-brand-gradient text-white shadow-sm hover:opacity-90 hover:shadow-premium",
+          "bg-brand text-white shadow-sm hover:bg-brand-dark hover:shadow-premium",
         outline:
           "border border-border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:border-brand/30 dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
         secondary:

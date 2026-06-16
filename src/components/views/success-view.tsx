@@ -54,14 +54,6 @@ export function SuccessView() {
 
   return (
     <div className="relative flex min-h-[80vh] items-center justify-center overflow-hidden px-4 py-12">
-      {/* Halo radial brand */}
-      <div
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 50% 30%, oklch(0.58 0.14 156 / 0.12), transparent 60%)",
-        }}
-      />
       {/* Soft amber glow top */}
       <div className="pointer-events-none absolute -top-24 left-1/2 -z-10 size-[480px] -translate-x-1/2 rounded-full bg-amber-300/20 blur-3xl" />
 
@@ -170,7 +162,7 @@ export function SuccessView() {
         </Card>
 
         {/* Bénéfices débloqués */}
-        <Card className="mt-5 w-full border-brand/30 bg-gradient-to-br from-brand-light/50 to-card p-6 shadow-premium sm:p-7">
+        <Card className="mt-5 w-full border-brand/30 bg-brand-light p-6 shadow-premium sm:p-7">
           <div className="flex items-center justify-center gap-2">
             <Zap className="size-4 text-brand" />
             <h2 className="text-sm font-bold uppercase tracking-wide text-brand-dark">

@@ -129,3 +129,25 @@ Stage Summary:
 - PharmacyDetailView : header brand-gradient riche (note numérique, badges garde/24/7, statut ouvert/fermé), 4 cartes infos pratiques, carte localisation avec lien Google Maps externe, section médicaments filtrable in-place avec navigation vers medication-detail.
 - Stores useNav consommés correctement (navigate, params.slug, params.filter). Types Pharmacy respectés.
 - Code TypeScript strict, sans test, sans z-ai-web-dev-sdk côté client.
+
+---
+Task ID: 8
+Agent: main (orchestrator)
+Task: Coller le logo SABLIN PHARMA comme il est (image de référence: croix médicale + feuille)
+
+Work Log:
+- Analyse VLM précise de l'image de référence (upload/WhatsApp Image 2026-06-16 at 17.52.27.jpeg) : croix médicale vert foncé + feuille vert clair insérée dans le bras inférieur, légèrement inclinée à droite, avec nervure centrale
+- Recréation du logo en SVG fidèle dans src/components/logo.tsx (LogoMark + Logo) :
+  * Croix médicale (plus) à coins arrondis, dégradé vert foncé (#0c7a50 → #095e3c)
+  * Feuille allongée vert clair (dégradé #9af3c0 → #5ccd92 → #38b074) dans le bras inférieur, inclinée 22° à droite, avec pointe acérée, tige, nervure centrale et 4 nervures latérales
+  * Texte SABLIN (extrabold, brand-dark, 17px) + PHARMA (bold, brand-dark/85, 11px, tracking 0.16em) en dessous
+  * Variante "light" (blanc) pour fonds verts
+- Mise à jour du favicon public/logo.svg (même symbole sur fond blanc arrondi)
+- Mise à jour des métadonnées layout.tsx : icons.icon = /logo.svg
+- Itérations VLM pour valider la fidélité (croix correcte, feuille bien en forme de feuille avec pointe/tige/nervures)
+- Vérification Agent Browser : rendu header correct, favicon 200 image/svg+xml, 0 erreur console, lint 0 erreur
+
+Stage Summary:
+- Logo officiel SABLIN PHARMA collé comme l'image de référence : croix médicale vert foncé + feuille vert clair (pointe, tige, nervures) dans le bras inférieur inclinée à droite + texte SABLIN/PHARMA vert foncé
+- L'utilisateur a explicitement demandé ce logo exact ; la contrainte "pas de feuille" est levée pour le logo de marque (demande explicite utilisateur)
+- Favicon mis à jour, rendu validé par VLM (correspondance globale confirmée), lint propre

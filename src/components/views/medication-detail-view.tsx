@@ -20,6 +20,7 @@ import {
   RefreshCw,
   ArrowRight,
   Info,
+  Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,12 +31,15 @@ import { CategoryIcon } from "@/components/category-icons";
 import { FavoriteButton } from "@/components/shared/favorite-button";
 import { AlertMessage } from "@/components/shared/alert-message";
 import { GoogleMap } from "@/components/shared/google-map";
+import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
+import { CreditCost } from "@/components/shared/credit-cost";
 import {
   MedicationStatusBadge,
 } from "@/components/shared/status-badge";
 import { getMedStatus } from "@/components/shared/medication-card";
 import { Heading, Eyebrow, Price, PriceRange, Muted } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
+import { useCredits, CREDIT_COSTS } from "@/store/credits";
 import { formatFCFA, distanceKm, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -87,6 +91,9 @@ export function MedicationDetailView() {
   const [quickQuery, setQuickQuery] = useState("");
   const [quickResults, setQuickResults] = useState<Medication[]>([]);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [showCreditDialog, setShowCreditDialog] = useState(false);
+  const [pharmaciesUnlocked, setPharmaciesUnlocked] = useState(false);
+  const { credits } = useCredits();
 
   // Fetch medication detail
   useEffect(() => {
@@ -97,6 +104,7 @@ export function MedicationDetailView() {
     let active = true;
     setLoading(true);
     setNotFound(false);
+    setPharmaciesUnlocked(false);
     (async () => {
       try {
         const r = await fetch(`/api/medications/${params.slug}`);
@@ -333,6 +341,7 @@ export function MedicationDetailView() {
                   <CheckCircle2 className="size-3" /> Libre accès
                 </Badge>
               )}
+              <CreditCost cost={0} />
             </div>
 
             <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
@@ -431,7 +440,10 @@ export function MedicationDetailView() {
       <section className="mt-8">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <Eyebrow>Disponibilité</Eyebrow>
+            <div className="flex items-center gap-2">
+              <Eyebrow>Disponibilité</Eyebrow>
+              <CreditCost cost={CREDIT_COSTS.seePharmacies} />
+            </div>
             <Heading level="h2">Pharmacies disponibles</Heading>
             <Muted className="mt-0.5">
               {inStock.length} pharmacie{inStock.length > 1 ? "s" : ""} ont ce médicament en stock
@@ -448,30 +460,82 @@ export function MedicationDetailView() {
           </Button>
         </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-2">
-          {sortedPharmacies.map((p) => (
-            <PharmacyMedCard
-              key={p.id}
-              pharma={p}
-              medicationName={med.name}
-              medicationSlug={med.slug}
-            />
-          ))}
-        </div>
-
-        {/* Carte des pharmacies ayant ce médicament */}
-        {sortedPharmacies.length > 0 && (
-          <Card className="mt-4 overflow-hidden border-brand/20 py-0">
-            <GoogleMap
-              lat={sortedPharmacies[0].latitude}
-              lng={sortedPharmacies[0].longitude}
-              zoom={13}
-              label={sortedPharmacies[0].name}
-              title="Pharmacies ayant ce médicament"
-              className="h-64"
-            />
+        {!pharmaciesUnlocked ? (
+          /* Portail crédits : l'utilisateur doit confirmer l'utilisation d'1 crédit */
+          <Card className="mt-5 border-brand/20 p-6 text-center shadow-card sm:p-8">
+            <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
+              <Coins className="size-7" />
+            </span>
+            <h3 className="mt-4 text-lg font-extrabold text-foreground">
+              Voir les pharmacies disponibles
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+              Cette action coûte 1 crédit. Elle vous permet de voir les pharmacies
+              où ce médicament est disponible.
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Votre solde :{" "}
+              <span className="font-bold text-foreground">
+                {credits} crédit{credits !== 1 ? "s" : ""}
+              </span>
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              <Button
+                className="bg-brand text-white hover:bg-brand-dark"
+                onClick={() => setShowCreditDialog(true)}
+              >
+                <Coins className="size-4" /> Utiliser 1 crédit
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("medications")}
+              >
+                Annuler
+              </Button>
+            </div>
           </Card>
+        ) : (
+          <>
+            <div className="mt-5 grid gap-3 lg:grid-cols-2">
+              {sortedPharmacies.map((p) => (
+                <PharmacyMedCard
+                  key={p.id}
+                  pharma={p}
+                  medicationName={med.name}
+                  medicationSlug={med.slug}
+                />
+              ))}
+            </div>
+
+            {/* Carte des pharmacies ayant ce médicament */}
+            {sortedPharmacies.length > 0 && (
+              <Card className="mt-4 overflow-hidden border-brand/20 py-0">
+                <GoogleMap
+                  lat={sortedPharmacies[0].latitude}
+                  lng={sortedPharmacies[0].longitude}
+                  zoom={13}
+                  label={sortedPharmacies[0].name}
+                  title="Pharmacies ayant ce médicament"
+                  className="h-64"
+                />
+              </Card>
+            )}
+          </>
         )}
+
+        <CreditConfirmDialog
+          open={showCreditDialog}
+          onOpenChange={setShowCreditDialog}
+          title="Voir les pharmacies disponibles"
+          cost={CREDIT_COSTS.seePharmacies}
+          description="Liste exacte des pharmacies avec ce médicament en stock"
+          benefits={[
+            "Voir toutes les pharmacies qui ont ce médicament",
+            "Prix indicatif par pharmacie",
+            "Distance et statut d'ouverture",
+          ]}
+          onConfirm={() => setPharmaciesUnlocked(true)}
+        />
       </section>
 
       {/* ============ ALTERNATIVES / ÉQUIVALENTS ============ */}

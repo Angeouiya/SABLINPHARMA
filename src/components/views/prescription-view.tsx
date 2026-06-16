@@ -45,8 +45,11 @@ import { CategoryIcon } from "@/components/category-icons";
 import { AlertMessage } from "@/components/shared/alert-message";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Heading, Eyebrow, Muted, Price, PriceRange } from "@/components/ui/typography";
+import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
+import { CreditCost } from "@/components/shared/credit-cost";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
+import { useCredits, CREDIT_COSTS } from "@/store/credits";
 import { formatFCFA } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Medication } from "@/lib/types";
@@ -125,6 +128,8 @@ const STATUS_CONFIG = {
 export function PrescriptionView() {
   const { navigate } = useNav();
   const { user, premium } = useAuth();
+  const { hasPass } = useCredits();
+  const [showCreditDialog, setShowCreditDialog] = useState(false);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -869,8 +874,14 @@ export function PrescriptionView() {
 
             {/* Estimate button */}
             <Button
-              className="mt-4 w-full bg-brand-gradient text-white hover:opacity-90"
-              onClick={handleEstimate}
+              className="mt-4 w-full bg-brand text-white hover:bg-brand-dark"
+              onClick={() => {
+                if (hasPass) {
+                  handleEstimate();
+                } else {
+                  setShowCreditDialog(true);
+                }
+              }}
               disabled={estimating || items.length === 0}
             >
               {estimating ? (
@@ -880,9 +891,24 @@ export function PrescriptionView() {
               ) : (
                 <>
                   <Calculator className="size-4" /> Estimer le coût
+                  <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.estimatePrescription} className="ml-1.5" />
                 </>
               )}
             </Button>
+
+            {/* Info message: free add / 2 credits estimate / Pass actif */}
+            <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
+              {hasPass ? (
+                <span className="inline-flex items-center gap-1 font-bold text-amber-700">
+                  <Crown className="size-3" /> Pass Ordonnance actif — estimation gratuite
+                </span>
+              ) : (
+                <>
+                  L&apos;ajout des médicaments est gratuit. L&apos;estimation complète coûte{" "}
+                  <span className="font-bold text-brand-dark">2 crédits</span>.
+                </>
+              )}
+            </p>
 
             {/* Estimate result detail */}
             {estimate && (
@@ -995,6 +1021,22 @@ export function PrescriptionView() {
           conseil à un pharmacien ou professionnel de santé avant tout déplacement.
         </AlertMessage>
       </div>
+
+      {/* ============ DIALOGUE DE CONFIRMATION DE CRÉDIT ============ */}
+      <CreditConfirmDialog
+        open={showCreditDialog}
+        onOpenChange={setShowCreditDialog}
+        title="Estimer mon ordonnance"
+        cost={CREDIT_COSTS.estimatePrescription}
+        description="Obtenez le total estimatif, les médicaments disponibles, les pharmacies recommandées et les options de comparaison"
+        benefits={[
+          "Coût total estimatif min/max",
+          "Médicaments disponibles",
+          "Pharmacies recommandées",
+          "Options de comparaison",
+        ]}
+        onConfirm={() => handleEstimate()}
+      />
     </div>
   );
 }

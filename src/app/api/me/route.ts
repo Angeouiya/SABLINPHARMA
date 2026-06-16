@@ -12,13 +12,18 @@ export async function GET() {
     where: { userId: user.id },
   });
 
+  const fullUser = await db.user.findUnique({
+    where: { id: user.id },
+    select: { credits: true },
+  });
+
   const isPremium =
     !!subscription &&
     subscription.status === "active" &&
     (!subscription.endDate || new Date(subscription.endDate) > new Date());
 
   return NextResponse.json({
-    user,
+    user: { ...user, credits: fullUser?.credits ?? 0 },
     subscription: isPremium ? subscription : null,
   });
 }

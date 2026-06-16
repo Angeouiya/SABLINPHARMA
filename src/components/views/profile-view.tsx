@@ -31,6 +31,9 @@ import {
   RotateCcw,
   Eye,
   KeyRound,
+  Wallet,
+  Coins,
+  Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "@/components/logo";
@@ -42,10 +45,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
+import { useCredits, FREE_FEATURES, PAID_FEATURES } from "@/store/credits";
+import { CreditBadge } from "@/components/shared/credit-badge";
+import { CreditCost, PassBadge } from "@/components/shared/credit-cost";
 import { useNotifications } from "@/store/notifications";
 import { useFavorites } from "@/store/favorites";
 import { useHistory } from "@/store/history";
-import { formatDate, distanceKm } from "@/lib/format";
+import { formatDate, distanceKm, formatFCFA } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Subscription, FavoriteItem, HistoryItem, AppNotification } from "@/lib/types";
 
@@ -65,6 +71,7 @@ const SETTINGS_MENU = [
   { icon: KeyRound, label: "Changer le mot de passe", view: "settings" as const },
   { icon: Bell, label: "Gérer les notifications", view: "settings" as const },
   { icon: CreditCard, label: "Gérer mon abonnement", view: "subscription" as const },
+  { icon: Wallet, label: "Mon portefeuille", view: "wallet" as const },
   { icon: ShieldCheck, label: "Confidentialité", view: "settings" as const },
   { icon: HelpCircle, label: "Aide et support", view: "settings" as const },
   { icon: FileText, label: "Conditions d'utilisation", view: "settings" as const },
@@ -80,6 +87,8 @@ function getInitials(name: string): string {
 export function ProfileView() {
   const { navigate } = useNav();
   const { user, premium, logout } = useAuth();
+  const credits = useCredits((s) => s.credits);
+  const hasPass = useCredits((s) => s.hasPass);
   const unreadCount = useNotifications((s) => s.unread);
   const notifications = useNotifications((s) => s.notifications);
   const favCount = useFavorites((s) => s.favorites.length);
@@ -212,10 +221,11 @@ export function ProfileView() {
                     </span>
                   )}
                 </div>
-                <div className="mt-2.5">
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   <Badge className={cn("border-0 text-xs font-bold", accountStatus.className)}>
                     <accountStatus.icon className="size-3" /> {accountStatus.label}
                   </Badge>
+                  <CreditBadge />
                 </div>
               </div>
             </div>
@@ -234,6 +244,71 @@ export function ProfileView() {
           <ProfileStat icon={Pill} value={history.filter((h) => h.kind === "medication").length || 24} label="Médicaments consultés" />
           <ProfileStat icon={ClipboardList} value={savedPrescriptions.length || 7} label="Ordonnances estimées" />
           <ProfileStat icon={Heart} value={favCount || 3} label="Pharmacies favorites" />
+        </div>
+      </Card>
+
+      {/* ============ MON PORTEFEUILLE ============ */}
+      <Card className="mt-6 border-border/70 bg-brand-light p-6 shadow-premium">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-brand text-white">
+                <Wallet className="size-5" />
+              </span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-brand-dark/70">
+                  Mon portefeuille
+                </p>
+                <p className="text-sm font-medium text-brand-dark/80">
+                  Crédits SABLIN PHARMA
+                  {hasPass && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                      <ClipboardList className="size-2.5" /> Pass Ordonnance
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3">
+              <p className="text-4xl font-extrabold tabular-nums text-brand-dark">
+                {credits}{" "}
+                <span className="text-xl font-bold">
+                  crédit{credits > 1 ? "s" : ""}
+                </span>
+              </p>
+              <p className="mt-1 text-sm font-semibold text-brand-dark/80">
+                ≈ {formatFCFA(credits * 100)}
+                <span className="ml-1 font-normal text-brand-dark/60">
+                  (1 crédit ≈ 100 FCFA)
+                </span>
+              </p>
+            </div>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-brand-dark/80">
+              Les recherches simples sont gratuites. Les services avancés utilisent vos crédits.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col gap-2 sm:w-56">
+            <Button
+              onClick={() => navigate("wallet")}
+              className="bg-brand text-white hover:bg-brand-dark"
+            >
+              <Coins className="size-4" /> Recharger
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate("wallet")}
+              className="border-brand/30 text-brand-dark hover:bg-brand"
+            >
+              <Receipt className="size-4" /> Voir les tarifs
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate("wallet")}
+              className="border-brand/30 text-brand-dark hover:bg-brand"
+            >
+              <ClipboardList className="size-4" /> Historique
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -343,6 +418,80 @@ export function ProfileView() {
                 </div>
               </Card>
             )}
+          </section>
+
+          {/* ============ MES ACCÈS SABLIN PHARMA ============ */}
+          <section>
+            <SectionTitle icon={CheckCircle2} title="Mes accès SABLIN PHARMA" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Bloc : Fonctionnalités gratuites */}
+              <Card className="border-success/30 bg-success-light/20 p-5">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-success text-white">
+                    <CheckCircle2 className="size-5" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-bold text-foreground">
+                      Fonctionnalités gratuites
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Accessibles à tous, sans crédits
+                    </p>
+                  </div>
+                </div>
+                <ul className="mt-4 max-h-72 space-y-2 overflow-y-auto scroll-thin pr-1">
+                  {FREE_FEATURES.map((f) => (
+                    <li
+                      key={f}
+                      className="flex items-start gap-2 text-sm text-foreground/85"
+                    >
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+
+              {/* Bloc : Fonctionnalités avec crédits */}
+              <Card className="border-brand/30 bg-brand-light/20 p-5">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-brand text-white">
+                    <Coins className="size-5" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-bold text-foreground">
+                      Fonctionnalités avec crédits
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Services avancés payants
+                    </p>
+                  </div>
+                </div>
+                <ul className="mt-4 max-h-72 space-y-2.5 overflow-y-auto scroll-thin pr-1">
+                  {PAID_FEATURES.map((f) => (
+                    <li
+                      key={f.label}
+                      className="flex items-start justify-between gap-2 text-sm text-foreground/85"
+                    >
+                      <span className="flex-1">{f.label}</span>
+                      {"isPass" in f && f.isPass ? (
+                        <PassBadge className="shrink-0" />
+                      ) : (
+                        <CreditCost cost={f.cost} className="shrink-0" />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+                  onClick={() => navigate("wallet")}
+                >
+                  <Wallet className="size-4" /> Gérer mes crédits
+                </Button>
+              </Card>
+            </div>
           </section>
 
           {/* ============ NOTIFICATIONS PERSONNALISÉES ============ */}

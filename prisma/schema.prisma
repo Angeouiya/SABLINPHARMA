@@ -18,6 +18,7 @@ model User {
   password     String
   commune      String?
   avatarColor  String           @default("#0c7a50")
+  credits      Int              @default(3)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   subscription Subscription?
@@ -25,6 +26,8 @@ model User {
   history      SearchHistory[]
   favorites    Favorite[]
   settings     UserSettings?
+  creditTransactions CreditTransaction[]
+  passOrdonnances   PassOrdonnance[]
 }
 
 model Category {
@@ -160,3 +163,24 @@ model UserSettings {
   defaultCommune  String?
   updatedAt       DateTime @updatedAt
 }
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // "recharge" | "debit" | "pass"
+  amount      Int      // positive for recharge, negative for debit
+  description String
+  balanceAfter Int
+  createdAt   DateTime @default(now())
+}
+
+model PassOrdonnance {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  active    Boolean  @default(true)
+  price     Int      @default(300)
+  createdAt DateTime @default(now())
+}
+

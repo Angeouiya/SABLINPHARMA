@@ -18,6 +18,7 @@ import {
   Receipt,
   Copy,
   ArrowRight,
+  Coins,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,8 +34,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
+import { CreditCost } from "@/components/shared/credit-cost";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
+import { useCredits, CREDIT_PACKS } from "@/store/credits";
 import { formatFCFA, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +87,8 @@ const PROVIDERS: {
 ];
 
 const PRICE = 500;
+const PASS_PRICE = 300;
+type PaymentMode = "premium" | "recharge" | "pass";
 
 // Fictive payment history
 const PAYMENT_HISTORY = [
@@ -122,8 +127,17 @@ const PAYMENT_HISTORY = [
 ];
 
 export function PaymentView() {
-  const { navigate } = useNav();
+  const { navigate, params } = useNav();
   const { user, premium, setPremium, fetchMe } = useAuth();
+  const { recharge, fetch: fetchCredits, hasPass } = useCredits();
+
+  // Mode dérivé des params (wallet → payment) ou du state local
+  const [mode, setMode] = useState<PaymentMode>(
+    params.packAmount ? "recharge" : params.passOrdonnance ? "pass" : "premium"
+  );
+  const [selectedPackAmount, setSelectedPackAmount] = useState<number>(
+    params.packAmount ?? 500
+  );
 
   const [provider, setProvider] = useState<Provider>("orange");
   const [phone, setPhone] = useState("");
@@ -139,6 +153,28 @@ export function PaymentView() {
     return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
   }, [phone]);
 
+  // Montant et libellé dynamiques selon le mode
+  const currentAmount = useMemo(() => {
+    if (mode === "recharge") return selectedPackAmount;
+    if (mode === "pass") return PASS_PRICE;
+    return PRICE;
+  }, [mode, selectedPackAmount]);
+
+  const currentLabel = useMemo(() => {
+    if (mode === "recharge") {
+      const pack = CREDIT_PACKS.find((p) => p.amount === selectedPackAmount);
+      return pack ? `${pack.label} (${pack.credits} crédits)` : "Recharge de crédits";
+    }
+    if (mode === "pass") return "Pass Ordonnance";
+    return "Abonnement Premium · 1 mois";
+  }, [mode, selectedPackAmount]);
+
+  const currentShortLabel = useMemo(() => {
+    if (mode === "recharge") return "Recharge de crédits";
+    if (mode === "pass") return "Pass Ordonnance";
+    return "Abonnement Premium";
+  }, [mode]);
+
   // Not connected
   if (!user) {
     return (
@@ -151,10 +187,10 @@ export function PaymentView() {
             Connectez-vous pour continuer
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Vous devez être connecté pour souscrire à l&apos;abonnement Premium.
+            Vous devez être connecté pour effectuer un paiement sur SABLIN PHARMA.
           </p>
           <Button
-            className="mt-6 w-full bg-brand-gradient text-white hover:opacity-90"
+            className="mt-6 w-full bg-brand text-white hover:bg-brand-dark"
             size="lg"
             onClick={() => navigate("auth", { authMode: "login" })}
           >
@@ -183,37 +219,78 @@ export function PaymentView() {
 
     setState("pending");
     try {
-      const res = await fetch("/api/subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          method: "mobile_money",
-          provider,
-        }),
-      });
+      if (mode === "recharge") {
+        const result = await recharge(selectedPackAmount, provider);
+        if (!result.success) {
+          throw new Error(result.error ?? "Échec de la recharge");
+        }
+        const ref = `SPL-RECHARGE-${Date.now()}`;
+        const now = new Date();
+        setTransactionRef(ref);
+        setPaymentDate(now.toISOString());
+        setExpiryDate("");
+        setState("success");
+        setShowSuccess(true);
+        toast.success("Recharge réussie !", {
+          description: `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits ajoutés à votre compte.`,
+        });
+      } else if (mode === "pass") {
+        const res = await fetch("/api/credits/pass", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ provider }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error ?? "Échec de l'achat du Pass");
+        }
+        await fetchCredits();
+        const ref = `SPL-PASS-${Date.now()}`;
+        const now = new Date();
+        const exp = new Date();
+        exp.setDate(exp.getDate() + 30);
+        setTransactionRef(ref);
+        setPaymentDate(now.toISOString());
+        setExpiryDate(exp.toISOString());
+        setState("success");
+        setShowSuccess(true);
+        toast.success("Pass Ordonnance activé !", {
+          description: "Vos estimations d'ordonnance sont désormais gratuites.",
+        });
+      } else {
+        // Premium (comportement existant)
+        const res = await fetch("/api/subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            method: "mobile_money",
+            provider,
+          }),
+        });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? "Échec du paiement");
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error ?? "Échec du paiement");
+        }
+
+        const result = await res.json();
+        const ref = `SPL-${Date.now()}`;
+        const now = new Date();
+        const exp = new Date();
+        exp.setMonth(exp.getMonth() + 1);
+
+        setTransactionRef(ref);
+        setPaymentDate(now.toISOString());
+        setExpiryDate(exp.toISOString());
+        setPremium(true);
+        await fetchMe();
+        setState("success");
+        setShowSuccess(true);
+        toast.success("Paiement réussi ! Abonnement Premium activé", {
+          description: "Bienvenue dans l'expérience Premium SABLIN PHARMA.",
+        });
+        void result;
       }
-
-      const result = await res.json();
-      const ref = `SPL-${Date.now()}`;
-      const now = new Date();
-      const exp = new Date();
-      exp.setMonth(exp.getMonth() + 1);
-
-      setTransactionRef(ref);
-      setPaymentDate(now.toISOString());
-      setExpiryDate(exp.toISOString());
-      setPremium(true);
-      await fetchMe();
-      setState("success");
-      setShowSuccess(true);
-      toast.success("Paiement réussi ! Abonnement Premium activé", {
-        description: "Bienvenue dans l'expérience Premium SABLIN PHARMA.",
-      });
-      void result;
     } catch (err) {
       setState("failed");
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
@@ -236,35 +313,261 @@ export function PaymentView() {
   return (
     <div className="flex flex-col">
       {/* ============ HEADER ============ */}
-      <section className="relative overflow-hidden bg-amber-50">
-        <div className="absolute -right-16 -top-16 size-72 rounded-full bg-amber-300/20 blur-3xl" />
-        <div className="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+      <section className="bg-brand-light">
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
           <button
-            onClick={() => navigate("subscription")}
+            onClick={() => navigate(mode === "premium" ? "subscription" : "wallet")}
             className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
           >
             <ChevronLeft className="size-4" />
-            Abonnement
+            {mode === "premium" ? "Abonnement" : "Mon portefeuille"}
           </button>
 
-          <div className="mt-5">
-            <Badge className="inline-flex items-center gap-1.5 border-0 bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-premium">
-              <Crown className="size-3.5" />
-              Premium
-            </Badge>
-            <h1 className="mt-3 text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl">
-              Paiement de l&apos;abonnement Premium
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              Activez votre accès aux fonctionnalités avancées : recherche illimitée,
-              estimation d&apos;ordonnance, pharmacies de garde, favoris, historique et
-              alertes. Simple, rapide et sécurisé.
-            </p>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-brand text-white shadow-premium">
+              {mode === "premium" ? (
+                <Crown className="size-6" />
+              ) : mode === "pass" ? (
+                <Receipt className="size-6" />
+              ) : (
+                <Coins className="size-6" />
+              )}
+            </span>
+            <div>
+              <Eyebrow className="text-brand-dark">Paiement sécurisé</Eyebrow>
+              <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-foreground sm:text-3xl">
+                {mode === "premium"
+                  ? "Paiement de l'abonnement Premium"
+                  : mode === "pass"
+                    ? "Achat du Pass Ordonnance"
+                    : "Recharge de vos crédits"}
+              </h1>
+            </div>
           </div>
+          <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
+            {mode === "premium" ? (
+              <>
+                Activez votre accès aux fonctionnalités avancées : recherche illimitée,
+                estimation d&apos;ordonnance, pharmacies de garde, favoris, historique et
+                alertes. Simple, rapide et sécurisé.
+              </>
+            ) : mode === "pass" ? (
+              <>
+                Profitez d&apos;estimations d&apos;ordonnance gratuites pendant 30 jours.
+                Idéal pour un usage occasionnel sans engagement.
+              </>
+            ) : (
+              <>
+                Rechargez vos crédits quand vous voulez. Aucun abonnement obligatoire —
+                vous payez uniquement ce que vous consommez.
+              </>
+            )}
+          </p>
         </div>
       </section>
 
       <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+        {/* ============ SÉLECTION DU MODE ============ */}
+        <section className="mb-6">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+              <Zap className="size-4" />
+            </span>
+            <h2 className="text-base font-bold text-foreground">
+              Que souhaitez-vous payer ?
+            </h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* Premium card */}
+            <button
+              type="button"
+              onClick={() => setMode("premium")}
+              className={cn(
+                "flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all",
+                mode === "premium"
+                  ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+                  : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
+              )}
+              aria-pressed={mode === "premium"}
+            >
+              <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
+                <Crown className="size-4" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-foreground">Abonnement Premium</p>
+                <p className="text-[11px] text-muted-foreground">Accès complet · 1 mois</p>
+              </div>
+              <p className="mt-1 text-base font-extrabold text-brand-dark">{formatFCFA(PRICE)}</p>
+              {mode === "premium" && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand">
+                  <CheckCircle2 className="size-3" /> Sélectionné
+                </span>
+              )}
+            </button>
+
+            {/* Pass Ordonnance card */}
+            <button
+              type="button"
+              onClick={() => setMode("pass")}
+              disabled={hasPass}
+              className={cn(
+                "flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all",
+                mode === "pass"
+                  ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+                  : "border-border/70 hover:border-brand/30 hover:bg-accent/30",
+                hasPass && "opacity-60"
+              )}
+              aria-pressed={mode === "pass"}
+            >
+              <span className="flex size-9 items-center justify-center rounded-xl bg-brand text-white">
+                <Receipt className="size-4" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-foreground">Pass Ordonnance</p>
+                <p className="text-[11px] text-muted-foreground">Estimations gratuites · 30 jours</p>
+              </div>
+              <p className="mt-1 text-base font-extrabold text-brand-dark">{formatFCFA(PASS_PRICE)}</p>
+              {hasPass ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-success">
+                  <CheckCircle2 className="size-3" /> Déjà actif
+                </span>
+              ) : mode === "pass" ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand">
+                  <CheckCircle2 className="size-3" /> Sélectionné
+                </span>
+              ) : null}
+            </button>
+
+            {/* Recharge card */}
+            <button
+              type="button"
+              onClick={() => setMode("recharge")}
+              className={cn(
+                "flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all",
+                mode === "recharge"
+                  ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+                  : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
+              )}
+              aria-pressed={mode === "recharge"}
+            >
+              <span className="flex size-9 items-center justify-center rounded-xl bg-brand text-white">
+                <Coins className="size-4" />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-foreground">Recharger mes crédits</p>
+                <p className="text-[11px] text-muted-foreground">Sans engagement · À la carte</p>
+              </div>
+              <p className="mt-1 text-base font-extrabold text-brand-dark">
+                dès {formatFCFA(CREDIT_PACKS[0].amount)}
+              </p>
+              {mode === "recharge" && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand">
+                  <CheckCircle2 className="size-3" /> Sélectionné
+                </span>
+              )}
+            </button>
+          </div>
+        </section>
+
+        {/* ============ SECTION RECHARGER MES CRÉDITS (visible si mode=recharge) ============ */}
+        {mode === "recharge" && (
+          <section className="mb-6">
+            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+              <div className="mb-4 flex items-center gap-2">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+                  <Coins className="size-4" />
+                </span>
+                <div>
+                  <h2 className="text-base font-bold text-foreground">Recharger mes crédits</h2>
+                  <p className="text-[11px] text-muted-foreground">
+                    Rechargez vos crédits quand vous voulez. Aucun abonnement obligatoire.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {CREDIT_PACKS.map((pack) => {
+                  const active = selectedPackAmount === pack.amount;
+                  return (
+                    <button
+                      key={pack.amount}
+                      type="button"
+                      onClick={() => setSelectedPackAmount(pack.amount)}
+                      className={cn(
+                        "relative flex flex-col items-center gap-1 rounded-xl border p-3 text-center transition-all",
+                        active
+                          ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+                          : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
+                      )}
+                      aria-pressed={active}
+                    >
+                      {pack.popular && (
+                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold text-white">
+                          Populaire
+                        </span>
+                      )}
+                      <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
+                        <Coins className="size-4" />
+                      </span>
+                      <p className="text-sm font-extrabold text-foreground">
+                        {pack.credits} crédits
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">{pack.label}</p>
+                      <p className="mt-1 text-sm font-bold text-brand-dark">
+                        {formatFCFA(pack.amount)}
+                      </p>
+                      {active && (
+                        <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-bold text-brand">
+                          <CheckCircle2 className="size-3" /> Choisi
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+          </section>
+        )}
+
+        {/* ============ SECTION PASS ORDONNANCE (visible si mode=pass) ============ */}
+        {mode === "pass" && (
+          <section className="mb-6">
+            <Card className="border-brand/20 p-5 shadow-premium sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand text-white">
+                    <Receipt className="size-6" />
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold text-foreground">Pass Ordonnance</h2>
+                      <Badge className="border-0 bg-brand text-white">
+                        {formatFCFA(PASS_PRICE)}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                      Profitez d&apos;estimations d&apos;ordonnance gratuites et illimitées
+                      pendant 30 jours. Idéal pour un usage occasionnel sans souscrire à
+                      l&apos;abonnement Premium.
+                    </p>
+                    {hasPass && (
+                      <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-success-light px-2 py-0.5 text-[11px] font-bold text-success">
+                        <CheckCircle2 className="size-3" /> Pass déjà actif sur votre compte
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <CreditCost cost={0} />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Soit 0 crédit par estimation
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </section>
+        )}
+
         {/* ============ PAYMENT STATE BANNERS ============ */}
         {state === "pending" && (
           <StateBanner
@@ -424,26 +727,28 @@ export function PaymentView() {
                 <div className="space-y-1.5">
                   <Label>Montant à payer</Label>
                   <div className="flex items-center justify-between rounded-lg border border-brand/20 bg-brand-light/30 px-3 py-2.5">
-                    <span className="text-sm text-muted-foreground">Abonnement Premium · 1 mois</span>
-                    <Price amount={PRICE} size="md" variant="brand" />
+                    <span className="text-sm text-muted-foreground">{currentLabel}</span>
+                    <Price amount={currentAmount} size="md" variant="brand" />
                   </div>
                 </div>
 
                 {/* Bouton Payer maintenant */}
                 <Button
-                  className="h-12 w-full bg-brand-gradient text-base font-semibold text-white shadow-premium hover:opacity-90"
+                  className="h-12 w-full bg-brand text-base font-semibold text-white shadow-premium hover:bg-brand-dark"
                   onClick={handlePay}
-                  disabled={state === "pending"}
+                  disabled={state === "pending" || (mode === "pass" && hasPass)}
                 >
                   {state === "pending" ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
                       Traitement en cours…
                     </>
+                  ) : mode === "pass" && hasPass ? (
+                    <>Pass déjà actif</>
                   ) : (
                     <>
                       <Lock className="size-4" />
-                      Payer maintenant {formatFCFA(PRICE)}
+                      Payer {formatFCFA(currentAmount)}
                     </>
                   )}
                 </Button>
@@ -489,13 +794,28 @@ export function PaymentView() {
               </div>
 
               <div className="mt-4 flex items-start gap-3 rounded-xl bg-brand-light/40 p-4">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-amber-500 text-white">
-                  <Crown className="size-5" />
+                <span
+                  className={cn(
+                    "flex size-10 items-center justify-center rounded-xl text-white",
+                    mode === "premium" ? "bg-amber-500" : "bg-brand"
+                  )}
+                >
+                  {mode === "premium" ? (
+                    <Crown className="size-5" />
+                  ) : mode === "pass" ? (
+                    <Receipt className="size-5" />
+                  ) : (
+                    <Coins className="size-5" />
+                  )}
                 </span>
                 <div className="flex-1">
-                  <p className="text-sm font-bold text-foreground">Abonnement Premium</p>
+                  <p className="text-sm font-bold text-foreground">{currentShortLabel}</p>
                   <p className="text-xs text-muted-foreground">
-                    Formule mensuelle · Activation immédiate
+                    {mode === "premium"
+                      ? "Formule mensuelle · Activation immédiate"
+                      : mode === "pass"
+                        ? "Validité 30 jours · Activation immédiate"
+                        : `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits · Activation immédiate`}
                   </p>
                 </div>
                 <Badge className="border-0 bg-success text-white">
@@ -506,15 +826,17 @@ export function PaymentView() {
               <div className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Formule</span>
-                  <span className="font-semibold text-foreground">Premium</span>
+                  <span className="font-semibold text-foreground">{currentShortLabel}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Montant</span>
-                  <span className="font-semibold text-foreground">{formatFCFA(PRICE)}</span>
+                  <span className="font-semibold text-foreground">{formatFCFA(currentAmount)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Durée</span>
-                  <span className="font-semibold text-foreground">1 mois</span>
+                  <span className="font-semibold text-foreground">
+                    {mode === "premium" ? "1 mois" : mode === "pass" ? "30 jours" : "Illimité"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Frais</span>
@@ -530,22 +852,24 @@ export function PaymentView() {
 
               <div className="flex items-baseline justify-between">
                 <span className="text-base font-bold text-foreground">Total à payer</span>
-                <Price amount={PRICE} size="lg" variant="brand" />
+                <Price amount={currentAmount} size="lg" variant="brand" />
               </div>
 
               <Button
-                className="mt-4 w-full bg-brand-gradient text-white hover:opacity-90"
+                className="mt-4 w-full bg-brand text-white hover:bg-brand-dark"
                 size="lg"
                 onClick={handlePay}
-                disabled={state === "pending"}
+                disabled={state === "pending" || (mode === "pass" && hasPass)}
               >
                 {state === "pending" ? (
                   <>
                     <Loader2 className="size-4 animate-spin" /> Traitement…
                   </>
+                ) : mode === "pass" && hasPass ? (
+                  <>Pass déjà actif</>
                 ) : (
                   <>
-                    <Lock className="size-4" /> Confirmer le paiement
+                    <Lock className="size-4" /> Payer {formatFCFA(currentAmount)}
                   </>
                 )}
               </Button>
@@ -553,10 +877,10 @@ export function PaymentView() {
               <Button
                 variant="ghost"
                 className="mt-2 w-full text-muted-foreground"
-                onClick={() => navigate("subscription")}
+                onClick={() => navigate(mode === "premium" ? "subscription" : "wallet")}
                 disabled={state === "pending"}
               >
-                <ChevronLeft className="size-4" /> Modifier l&apos;offre
+                <ChevronLeft className="size-4" /> {mode === "premium" ? "Modifier l'offre" : "Retour au portefeuille"}
               </Button>
             </Card>
           </div>
@@ -640,25 +964,37 @@ export function PaymentView() {
           </DialogHeader>
           <div className="overflow-hidden rounded-xl">
             {/* Header succès */}
-            <div className="relative flex flex-col items-center bg-brand-gradient px-6 py-8 text-center text-white">
-              <div className="absolute inset-0 bg-dotted-white opacity-15" />
-              <span className="relative flex size-16 items-center justify-center rounded-full bg-white/15 ring-8 ring-white/10 backdrop-blur-sm animate-scale-in">
+            <div className="relative flex flex-col items-center bg-brand px-6 py-8 text-center text-white">
+              <span className="relative flex size-16 items-center justify-center rounded-full bg-white/15 ring-8 ring-white/10 animate-scale-in">
                 <CheckCircle2 className="size-9 text-white" />
               </span>
               <h2 className="relative mt-4 text-xl font-extrabold">
                 Paiement confirmé !
               </h2>
               <p className="relative mt-1 text-sm text-white/85">
-                Abonnement Premium activé avec succès
+                {mode === "premium"
+                  ? "Abonnement Premium activé avec succès"
+                  : mode === "pass"
+                    ? "Pass Ordonnance activé avec succès"
+                    : "Recharge de crédits effectuée avec succès"}
               </p>
             </div>
 
             {/* Détails */}
             <div className="space-y-3 p-6">
               <div className="grid grid-cols-2 gap-3">
-                <DetailItem label="Montant payé" value={formatFCFA(PRICE)} />
+                <DetailItem label="Montant payé" value={formatFCFA(currentAmount)} />
                 <DetailItem label="Date de paiement" value={paymentDate ? formatDate(paymentDate) : "—"} />
-                <DetailItem label="Date d'expiration" value={expiryDate ? formatDate(expiryDate) : "—"} />
+                <DetailItem
+                  label={mode === "recharge" ? "Crédits obtenus" : "Date d'expiration"}
+                  value={
+                    mode === "recharge"
+                      ? `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits`
+                      : expiryDate
+                        ? formatDate(expiryDate)
+                        : "—"
+                  }
+                />
                 <DetailItem label="Moyen de paiement" value={PROVIDERS.find((p) => p.id === provider)?.label ?? "—"} />
               </div>
 
@@ -683,14 +1019,18 @@ export function PaymentView() {
               </div>
 
               <Button
-                className="w-full bg-brand-gradient text-white hover:opacity-90"
+                className="w-full bg-brand text-white hover:bg-brand-dark"
                 size="lg"
                 onClick={() => {
                   setShowSuccess(false);
-                  navigate("profile");
+                  navigate(mode === "premium" ? "profile" : "wallet");
                 }}
               >
-                Accéder à mon compte <ArrowRight className="size-4" />
+                {mode === "premium" ? (
+                  <>Accéder à mon compte <ArrowRight className="size-4" /></>
+                ) : (
+                  <>Retour à mon portefeuille <ArrowRight className="size-4" /></>
+                )}
               </Button>
               <Button
                 variant="ghost"

@@ -17,6 +17,7 @@ import {
   Pill,
   Headphones,
   ArrowRight,
+  Coins,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { SearchBar } from "@/components/shared/search-bar";
@@ -24,12 +25,13 @@ import { SectionHeader } from "@/components/shared/section-header";
 import { StatBlock } from "@/components/shared/stat-block";
 import { MedicationStatusBadge } from "@/components/shared/status-badge";
 import { GoogleMap } from "@/components/shared/google-map";
+import { AlertMessage } from "@/components/shared/alert-message";
 import { CategoryIcon } from "@/components/category-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Heading, Eyebrow, Price } from "@/components/ui/typography";
+import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { formatFCFA, distanceKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -239,6 +241,74 @@ export function HomeView() {
               value="12"
               label="Communes couvertes"
             />
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================
+          2.5. COMMENT FONCTIONNE SABLIN PHARMA
+          ======================================================== */}
+      <section className="border-b border-border/60 bg-background">
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+          <div className="mx-auto max-w-2xl text-center">
+            <Eyebrow>Comment ça marche</Eyebrow>
+            <Heading level="h2" className="mt-2">
+              Comment fonctionne SABLIN PHARMA ?
+            </Heading>
+            <Muted className="mt-2" size="md">
+              Simple, rapide et transparent.
+            </Muted>
+          </div>
+
+          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {/* Étape 1 */}
+            <Card className="gap-0 border-border/70 p-6 text-center shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
+              <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
+                <Search className="size-6" />
+              </span>
+              <h3 className="mt-4 text-base font-extrabold text-foreground">
+                1. Recherchez gratuitement
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Recherchez un médicament ou une pharmacie. C&rsquo;est gratuit et
+                illimité.
+              </p>
+            </Card>
+
+            {/* Étape 2 */}
+            <Card className="gap-0 border-border/70 p-6 text-center shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
+              <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
+                <Coins className="size-6" />
+              </span>
+              <h3 className="mt-4 text-base font-extrabold text-foreground">
+                2. Utilisez vos crédits
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Les services avancés utilisent vos crédits. Vous payez seulement
+                ce que vous utilisez.
+              </p>
+            </Card>
+
+            {/* Étape 3 */}
+            <Card className="gap-0 border-border/70 p-6 text-center shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
+              <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
+                <CheckCircle2 className="size-6" />
+              </span>
+              <h3 className="mt-4 text-base font-extrabold text-foreground">
+                3. Gagnez du temps
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Vérifiez la disponibilité avant de vous déplacer en pharmacie.
+              </p>
+            </Card>
+          </div>
+
+          <div className="mt-8">
+            <AlertMessage variant="info">
+              Les recherches simples sont gratuites. Les services avancés
+              fonctionnent avec des crédits à partir de 200 FCFA. Aucun abonnement
+              obligatoire.
+            </AlertMessage>
           </div>
         </div>
       </section>

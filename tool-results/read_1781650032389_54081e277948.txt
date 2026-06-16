@@ -1,0 +1,1029 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+     4→import {
+     5→  ChevronLeft,
+     6→  ClipboardList,
+     7→  Plus,
+     8→  Minus,
+     9→  Search,
+    10→  Trash2,
+    11→  Pencil,
+    12→  CheckCircle2,
+    13→  XCircle,
+    14→  HelpCircle,
+    15→  Crown,
+    16→  ShieldAlert,
+    17→  Pill,
+    18→  MapPin,
+    19→  X,
+    20→  Loader2,
+    21→  Calculator,
+    22→  Save,
+    23→  RotateCcw,
+    24→  ArrowRight,
+    25→  Info,
+    26→  AlertTriangle,
+    27→  Store,
+    28→} from "lucide-react";
+    29→import { toast } from "sonner";
+    30→import { Button } from "@/components/ui/button";
+    31→import { Card } from "@/components/ui/card";
+    32→import { Badge } from "@/components/ui/badge";
+    33→import { Input } from "@/components/ui/input";
+    34→import { Label } from "@/components/ui/label";
+    35→import { Textarea } from "@/components/ui/textarea";
+    36→import {
+    37→  Select,
+    38→  SelectTrigger,
+    39→  SelectValue,
+    40→  SelectContent,
+    41→  SelectItem,
+    42→} from "@/components/ui/select";
+    43→import { Skeleton } from "@/components/ui/skeleton";
+    44→import { CategoryIcon } from "@/components/category-icons";
+    45→import { AlertMessage } from "@/components/shared/alert-message";
+    46→import { EmptyState } from "@/components/shared/empty-state";
+    47→import { Heading, Eyebrow, Muted, Price, PriceRange } from "@/components/ui/typography";
+    48→import { useNav } from "@/store/nav";
+    49→import { useAuth } from "@/store/auth";
+    50→import { formatFCFA } from "@/lib/format";
+    51→import { cn } from "@/lib/utils";
+    52→import type { Medication } from "@/lib/types";
+    53→
+    54→const FORMS = [
+    55→  "Comprimé",
+    56→  "Comprimé effervescent",
+    57→  "Gélule",
+    58→  "Sirop",
+    59→  "Sachet",
+    60→  "Pommade",
+    61→  "Crème",
+    62→  "Flacon",
+    63→  "Suppositoire",
+    64→  "Inhalateur",
+    65→  "Injectable",
+    66→];
+    67→
+    68→interface CartItem {
+    69→  slug: string;
+    70→  name: string;
+    71→  genericName: string;
+    72→  form: string;
+    73→  dosage: string;
+    74→  quantity: number;
+    75→  duration: string;
+    76→  note: string;
+    77→  avgPrice: number;
+    78→  pharmacyCount: number;
+    79→  requiresRx: boolean;
+    80→  category?: { iconName: string; color: string; name: string } | null;
+    81→}
+    82→
+    83→interface EstimateLine {
+    84→  medication: {
+    85→    id: string;
+    86→    name: string;
+    87→    slug: string;
+    88→    form: string;
+    89→    dosage: string;
+    90→    packSize: string;
+    91→    requiresRx: boolean;
+    92→  };
+    93→  quantity: number;
+    94→  unitMin: number;
+    95→  unitMax: number;
+    96→  lineMin: number;
+    97→  lineMax: number;
+    98→  pharmacyCount: number;
+    99→}
+   100→
+   101→interface EstimateResult {
+   102→  lines: EstimateLine[];
+   103→  totalMin: number;
+   104→  totalMax: number;
+   105→  availablePharmacies: number;
+   106→}
+   107→
+   108→// Deterministic status for cart items
+   109→function itemStatus(item: CartItem): "available" | "low-stock" | "to-confirm" | "out-of-stock" {
+   110→  if (item.pharmacyCount === 0) return "out-of-stock";
+   111→  const hash = item.slug.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+   112→  const pct = hash % 10;
+   113→  if (pct < 6) return "available";
+   114→  if (pct < 9) return "low-stock";
+   115→  return "to-confirm";
+   116→}
+   117→
+   118→const STATUS_CONFIG = {
+   119→  available: { label: "Disponible", icon: CheckCircle2, className: "bg-success-light text-success" },
+   120→  "low-stock": { label: "Stock faible", icon: AlertTriangle, className: "bg-warning-light text-warning-foreground" },
+   121→  "to-confirm": { label: "À confirmer", icon: HelpCircle, className: "bg-neutral-light text-neutral-foreground" },
+   122→  "out-of-stock": { label: "Rupture", icon: XCircle, className: "bg-danger-light text-danger" },
+   123→} as const;
+   124→
+   125→export function PrescriptionView() {
+   126→  const { navigate } = useNav();
+   127→  const { user, premium } = useAuth();
+   128→
+   129→  // Form state
+   130→  const [showForm, setShowForm] = useState(false);
+   131→  const [query, setQuery] = useState("");
+   132→  const [suggestions, setSuggestions] = useState<Medication[]>([]);
+   133→  const [showSuggestions, setShowSuggestions] = useState(false);
+   134→  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+   135→  const searchBoxRef = useRef<HTMLDivElement>(null);
+   136→
+   137→  // Form fields
+   138→  const [formName, setFormName] = useState("");
+   139→  const [formDci, setFormDci] = useState("");
+   140→  const [formDosage, setFormDosage] = useState("");
+   141→  const [formForm, setFormForm] = useState("");
+   142→  const [formQty, setFormQty] = useState("1");
+   143→  const [formDuration, setFormDuration] = useState("");
+   144→  const [formNote, setFormNote] = useState("");
+   145→  const [editingSlug, setEditingSlug] = useState<string | null>(null);
+   146→  const [selectedMed, setSelectedMed] = useState<Medication | null>(null);
+   147→
+   148→  // Cart
+   149→  const [items, setItems] = useState<CartItem[]>([]);
+   150→  const [estimating, setEstimating] = useState(false);
+   151→  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+   152→
+   153→  // Debounced search for suggestions
+   154→  useEffect(() => {
+   155→    if (!query.trim()) {
+   156→      setSuggestions([]);
+   157→      setShowSuggestions(false);
+   158→      setLoadingSuggestions(false);
+   159→      return;
+   160→    }
+   161→    setLoadingSuggestions(true);
+   162→    const t = setTimeout(async () => {
+   163→      try {
+   164→        const url = `/api/medications?q=${encodeURIComponent(query.trim())}&limit=6`;
+   165→        const res = await fetch(url);
+   166→        if (!res.ok) throw new Error();
+   167→        const data: Medication[] = await res.json();
+   168→        setSuggestions(data);
+   169→        setShowSuggestions(true);
+   170→      } catch {
+   171→        setSuggestions([]);
+   172→      } finally {
+   173→        setLoadingSuggestions(false);
+   174→      }
+   175→    }, 250);
+   176→    return () => clearTimeout(t);
+   177→  }, [query]);
+   178→
+   179→  // Close suggestions on outside click
+   180→  useEffect(() => {
+   181→    function handleClick(e: MouseEvent) {
+   182→      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+   183→        setShowSuggestions(false);
+   184→      }
+   185→    }
+   186→    document.addEventListener("mousedown", handleClick);
+   187→    return () => document.removeEventListener("mousedown", handleClick);
+   188→  }, []);
+   189→
+   190→  const resetForm = useCallback(() => {
+   191→    setFormName("");
+   192→    setFormDci("");
+   193→    setFormDosage("");
+   194→    setFormForm("");
+   195→    setFormQty("1");
+   196→    setFormDuration("");
+   197→    setFormNote("");
+   198→    setQuery("");
+   199→    setSuggestions([]);
+   200→    setShowSuggestions(false);
+   201→    setEditingSlug(null);
+   202→    setSelectedMed(null);
+   203→  }, []);
+   204→
+   205→  const pickSuggestion = (med: Medication) => {
+   206→    setSelectedMed(med);
+   207→    setFormName(med.name);
+   208→    setFormDci(med.genericName);
+   209→    setFormDosage(med.dosage);
+   210→    setFormForm(med.form);
+   211→    setQuery("");
+   212→    setSuggestions([]);
+   213→    setShowSuggestions(false);
+   214→  };
+   215→
+   216→  const handleSubmit = (e: React.FormEvent) => {
+   217→    e.preventDefault();
+   218→    if (!formName.trim()) {
+   219→      toast.error("Veuillez saisir le nom du médicament.");
+   220→      return;
+   221→    }
+   222→    const qty = Math.max(1, parseInt(formQty || "1", 10) || 1);
+   223→
+   224→    // Find matching med in suggestions for richer data
+   225→    const matched = selectedMed ?? suggestions.find(
+   226→      (s) => s.name.toLowerCase() === formName.toLowerCase()
+   227→    );
+   228→
+   229→    const item: CartItem = {
+   230→      slug: matched?.slug ?? `custom-${Date.now()}`,
+   231→      name: formName.trim(),
+   232→      genericName: formDci.trim() || matched?.genericName || "—",
+   233→      form: formForm || matched?.form || "Comprimé",
+   234→      dosage: formDosage.trim() || matched?.dosage || "—",
+   235→      quantity: qty,
+   236→      duration: formDuration.trim(),
+   237→      note: formNote.trim(),
+   238→      avgPrice: matched?.avgPrice ?? 0,
+   239→      pharmacyCount: matched?.pharmacyCount ?? 0,
+   240→      requiresRx: matched?.requiresRx ?? false,
+   241→      category: matched?.category
+   242→        ? {
+   243→            iconName: matched.category.iconName,
+   244→            color: matched.category.color,
+   245→            name: matched.category.name,
+   246→          }
+   247→        : null,
+   248→    };
+   249→
+   250→    if (editingSlug) {
+   251→      setItems((prev) =>
+   252→        prev.map((it) => (it.slug === editingSlug ? item : it))
+   253→      );
+   254→      toast.success("Médicament modifié.");
+   255→    } else {
+   256→      setItems((prev) => {
+   257→        if (prev.some((it) => it.name.toLowerCase() === item.name.toLowerCase())) {
+   258→          toast.info(`${item.name} est déjà dans votre ordonnance.`);
+   259→          return prev;
+   260→        }
+   261→        return [...prev, item];
+   262→      });
+   263→      toast.success(`${item.name} ajouté à l'ordonnance.`);
+   264→    }
+   265→
+   266→    resetForm();
+   267→    setShowForm(false);
+   268→    setEstimate(null);
+   269→  };
+   270→
+   271→  const removeItem = (slug: string) => {
+   272→    setItems((prev) => prev.filter((it) => it.slug !== slug));
+   273→    setEstimate(null);
+   274→    toast.success("Médicament retiré.");
+   275→  };
+   276→
+   277→  const editItem = (item: CartItem) => {
+   278→    setEditingSlug(item.slug);
+   279→    setFormName(item.name);
+   280→    setFormDci(item.genericName);
+   281→    setFormDosage(item.dosage);
+   282→    setFormForm(item.form);
+   283→    setFormQty(String(item.quantity));
+   284→    setFormDuration(item.duration);
+   285→    setFormNote(item.note);
+   286→    setShowForm(true);
+   287→    window.scrollTo({ top: 0, behavior: "smooth" });
+   288→  };
+   289→
+   290→  const updateQty = (slug: string, delta: number) => {
+   291→    setItems((prev) =>
+   292→      prev.map((it) =>
+   293→        it.slug === slug ? { ...it, quantity: Math.max(1, it.quantity + delta) } : it
+   294→      )
+   295→    );
+   296→    setEstimate(null);
+   297→  };
+   298→
+   299→  // Recalcul
+   300→  const stats = useMemo(() => {
+   301→    const total = items.length;
+   302→    const totalUnits = items.reduce((s, it) => s + it.quantity, 0);
+   303→    const totalCost = items.reduce((s, it) => s + it.avgPrice * it.quantity, 0);
+   304→    const available = items.filter((i) => itemStatus(i) === "available").length;
+   305→    const lowStock = items.filter((i) => itemStatus(i) === "low-stock").length;
+   306→    const toConfirm = items.filter((i) => itemStatus(i) === "to-confirm").length;
+   307→    const outStock = items.filter((i) => itemStatus(i) === "out-of-stock").length;
+   308→    return { total, totalUnits, totalCost, available, lowStock, toConfirm, outStock };
+   309→  }, [items]);
+   310→
+   311→  const handleEstimate = async () => {
+   312→    if (items.length === 0) {
+   313→      toast.error("Ajoutez au moins un médicament à votre ordonnance.");
+   314→      return;
+   315→    }
+   316→    // Only estimate items with a real slug (matched from DB)
+   317→    const estimable = items.filter((it) => !it.slug.startsWith("custom-"));
+   318→    if (estimable.length === 0) {
+   319→      toast.info("Aucun médicamenent référencé à estimer.");
+   320→      return;
+   321→    }
+   322→    setEstimating(true);
+   323→    setEstimate(null);
+   324→    try {
+   325→      const res = await fetch("/api/prescription/estimate", {
+   326→        method: "POST",
+   327→        headers: { "Content-Type": "application/json" },
+   328→        body: JSON.stringify({
+   329→          items: estimable.map((it) => ({ slug: it.slug, quantity: it.quantity })),
+   330→        }),
+   331→      });
+   332→      if (!res.ok) throw new Error();
+   333→      const data: EstimateResult = await res.json();
+   334→      setEstimate(data);
+   335→      toast.success("Estimation calculée avec succès.");
+   336→      // Navigate to the dedicated result view
+   337→      navigate("prescription-result", {
+   338→        estimateItems: estimable.map((it) => ({ slug: it.slug, quantity: it.quantity })),
+   339→      });
+   340→    } catch {
+   341→      toast.error("Erreur lors de l'estimation.");
+   342→    } finally {
+   343→      setEstimating(false);
+   344→    }
+   345→  };
+   346→
+   347→  const handleSave = () => {
+   348→    if (items.length === 0) {
+   349→      toast.error("Votre ordonnance est vide.");
+   350→      return;
+   351→    }
+   352→    if (!user) {
+   353→      toast.info("Connectez-vous pour enregistrer votre ordonnance.");
+   354→      navigate("auth", { authMode: "login" });
+   355→      return;
+   356→    }
+   357→    // Persist to localStorage as a simple save
+   358→    try {
+   359→      const saved = JSON.parse(localStorage.getItem("sablin-prescriptions") || "[]");
+   360→      saved.push({
+   361→        id: `rx-${Date.now()}`,
+   362→        date: new Date().toISOString(),
+   363→        items: items.map((it) => ({
+   364→          name: it.name,
+   365→          form: it.form,
+   366→          dosage: it.dosage,
+   367→          quantity: it.quantity,
+   368→          duration: it.duration,
+   369→        })),
+   370→        totalCost: stats.totalCost,
+   371→      });
+   372→      localStorage.setItem("sablin-prescriptions", JSON.stringify(saved));
+   373→      toast.success("Ordonnance enregistrée dans votre profil.", {
+   374→        description: "Retrouvez-la dans la section Historique.",
+   375→      });
+   376→    } catch {
+   377→      toast.error("Impossible d'enregistrer l'ordonnance.");
+   378→    }
+   379→  };
+   380→
+   381→  const handleNew = () => {
+   382→    if (items.length > 0) {
+   383→      if (!window.confirm("Voulez-vous vraiment recommencer ? Votre ordonnance actuelle sera effacée.")) return;
+   384→    }
+   385→    setItems([]);
+   386→    setEstimate(null);
+   387→    resetForm();
+   388→    setShowForm(false);
+   389→    toast.success("Nouvelle ordonnance prête.");
+   390→  };
+   391→
+   392→  return (
+   393→    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+   394→      {/* Back link */}
+   395→      <button
+   396→        onClick={() => navigate("home")}
+   397→        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+   398→      >
+   399→        <ChevronLeft className="size-4" /> Accueil
+   400→      </button>
+   401→
+   402→      {/* ============ INTRO ============ */}
+   403→      <Card className="overflow-hidden border-brand/20 py-0 shadow-premium">
+   404→        <div className="relative bg-brand-gradient">
+   405→          <div className="absolute inset-0 bg-dotted-white opacity-15" />
+   406→          <div className="absolute -right-12 -top-12 size-44 rounded-full bg-white/10 blur-3xl" />
+   407→          <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+   408→            <div className="flex items-start gap-4">
+   409→              <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
+   410→                <ClipboardList className="size-7 text-white" />
+   411→              </span>
+   412→              <div className="text-white">
+   413→                <h1 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
+   414→                  Estimez votre ordonnance
+   415→                </h1>
+   416→                <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-white/85">
+   417→                  Ajoutez les médicaments prescrits, précisez les dosages et quantités, puis
+   418→                  obtenez une estimation claire du coût total avant de vous rendre en pharmacie.
+   419→                </p>
+   420→              </div>
+   421→            </div>
+   422→            <Button
+   423→              size="lg"
+   424→              className="shrink-0 bg-white text-brand-dark hover:bg-white/90"
+   425→              onClick={() => {
+   426→                if (showForm) {
+   427→                  resetForm();
+   428→                  setShowForm(false);
+   429→                } else {
+   430→                  setShowForm(true);
+   431→                  setTimeout(() => document.getElementById("rx-name")?.focus(), 100);
+   432→                }
+   433→              }}
+   434→            >
+   435→              {showForm ? (
+   436→                <>
+   437→                  <X className="size-4" /> Fermer
+   438→                </>
+   439→              ) : (
+   440→                <>
+   441→                  <Plus className="size-4" /> Ajouter un médicament
+   442→                </>
+   443→              )}
+   444→            </Button>
+   445→          </div>
+   446→        </div>
+   447→      </Card>
+   448→
+   449→      {/* ============ MAIN LAYOUT ============ */}
+   450→      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+   451→        {/* LEFT: Form + list */}
+   452→        <div className="space-y-6">
+   453→          {/* Form */}
+   454→          {showForm && (
+   455→            <Card className="border-border/70 p-5 shadow-premium animate-fade-up">
+   456→              <div className="mb-4 flex items-center gap-2">
+   457→                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   458→                  <Plus className="size-4" />
+   459→                </span>
+   460→                <h2 className="text-base font-bold text-foreground">
+   461→                  {editingSlug ? "Modifier le médicament" : "Ajouter un médicament"}
+   462→                </h2>
+   463→              </div>
+   464→
+   465→              <form onSubmit={handleSubmit} className="space-y-4">
+   466→                {/* Name with autocomplete */}
+   467→                <div ref={searchBoxRef} className="relative">
+   468→                  <Label htmlFor="rx-name">Nom du médicament *</Label>
+   469→                  <div className="relative mt-1.5">
+   470→                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+   471→                    <Input
+   472→                      id="rx-name"
+   473→                      value={query || formName}
+   474→                      onChange={(e) => {
+   475→                        setQuery(e.target.value);
+   476→                        setFormName(e.target.value);
+   477→                      }}
+   478→                      onFocus={() => query && setShowSuggestions(true)}
+   479→                      placeholder="Ex : Paracétamol, Amoxicilline, Doliprane…"
+   480→                      className="h-11 pl-10"
+   481→                      autoComplete="off"
+   482→                    />
+   483→                    {loadingSuggestions && (
+   484→                      <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-brand" />
+   485→                    )}
+   486→                  </div>
+   487→                  {showSuggestions && suggestions.length > 0 && (
+   488→                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-premium-lg">
+   489→                      <ul className="max-h-60 overflow-y-auto scroll-thin py-1">
+   490→                        {suggestions.map((s) => (
+   491→                          <li key={s.id}>
+   492→                            <button
+   493→                              type="button"
+   494→                              onClick={() => pickSuggestion(s)}
+   495→                              className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent"
+   496→                            >
+   497→                              <span
+   498→                                className="flex size-8 items-center justify-center rounded-lg"
+   499→                                style={{
+   500→                                  backgroundColor: s.category ? `${s.category.color}14` : undefined,
+   501→                                }}
+   502→                              >
+   503→                                {s.category ? (
+   504→                                  <CategoryIcon
+   505→                                    name={s.category.iconName}
+   506→                                    size={16}
+   507→                                    color={s.category.color}
+   508→                                  />
+   509→                                ) : (
+   510→                                  <Pill className="size-4 text-brand" />
+   511→                                )}
+   512→                              </span>
+   513→                              <span className="min-w-0 flex-1">
+   514→                                <span className="block truncate text-sm font-semibold">
+   515→                                  {s.name}
+   516→                                </span>
+   517→                                <span className="block truncate text-xs text-muted-foreground">
+   518→                                  {s.form} {s.dosage} · {formatFCFA(s.avgPrice)}
+   519→                                </span>
+   520→                              </span>
+   521→                            </button>
+   522→                          </li>
+   523→                        ))}
+   524→                      </ul>
+   525→                    </div>
+   526→                  )}
+   527→                </div>
+   528→
+   529→                {/* DCI + Dosage */}
+   530→                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   531→                  <div>
+   532→                    <Label htmlFor="rx-dci">DCI (principe actif)</Label>
+   533→                    <Input
+   534→                      id="rx-dci"
+   535→                      value={formDci}
+   536→                      onChange={(e) => setFormDci(e.target.value)}
+   537→                      placeholder="Ex : Paracétamol"
+   538→                      className="mt-1.5 h-11"
+   539→                    />
+   540→                  </div>
+   541→                  <div>
+   542→                    <Label htmlFor="rx-dosage">Dosage</Label>
+   543→                    <Input
+   544→                      id="rx-dosage"
+   545→                      value={formDosage}
+   546→                      onChange={(e) => setFormDosage(e.target.value)}
+   547→                      placeholder="Ex : 500 mg"
+   548→                      className="mt-1.5 h-11"
+   549→                    />
+   550→                  </div>
+   551→                </div>
+   552→
+   553→                {/* Form + Qty */}
+   554→                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   555→                  <div>
+   556→                    <Label htmlFor="rx-form">Forme</Label>
+   557→                    <Select value={formForm} onValueChange={setFormForm}>
+   558→                      <SelectTrigger id="rx-form" className="mt-1.5 h-11">
+   559→                        <SelectValue placeholder="Sélectionner" />
+   560→                      </SelectTrigger>
+   561→                      <SelectContent>
+   562→                        {FORMS.map((f) => (
+   563→                          <SelectItem key={f} value={f}>
+   564→                            {f}
+   565→                          </SelectItem>
+   566→                        ))}
+   567→                      </SelectContent>
+   568→                    </Select>
+   569→                  </div>
+   570→                  <div>
+   571→                    <Label htmlFor="rx-qty">Quantité *</Label>
+   572→                    <div className="mt-1.5 flex items-center gap-2">
+   573→                      <Button
+   574→                        type="button"
+   575→                        variant="outline"
+   576→                        size="icon"
+   577→                        className="size-11 shrink-0"
+   578→                        onClick={() =>
+   579→                          setFormQty((q) => String(Math.max(1, parseInt(q || "1", 10) - 1)))
+   580→                        }
+   581→                      >
+   582→                        <Minus className="size-4" />
+   583→                      </Button>
+   584→                      <Input
+   585→                        id="rx-qty"
+   586→                        type="number"
+   587→                        min="1"
+   588→                        value={formQty}
+   589→                        onChange={(e) => setFormQty(e.target.value)}
+   590→                        className="h-11 text-center"
+   591→                      />
+   592→                      <Button
+   593→                        type="button"
+   594→                        variant="outline"
+   595→                        size="icon"
+   596→                        className="size-11 shrink-0"
+   597→                        onClick={() =>
+   598→                          setFormQty((q) => String(parseInt(q || "1", 10) + 1))
+   599→                        }
+   600→                      >
+   601→                        <Plus className="size-4" />
+   602→                      </Button>
+   603→                    </div>
+   604→                  </div>
+   605→                </div>
+   606→
+   607→                {/* Duration */}
+   608→                <div>
+   609→                  <Label htmlFor="rx-duration">Durée du traitement</Label>
+   610→                  <Input
+   611→                    id="rx-duration"
+   612→                    value={formDuration}
+   613→                    onChange={(e) => setFormDuration(e.target.value)}
+   614→                    placeholder="Ex : 7 jours, 2 semaines…"
+   615→                    className="mt-1.5 h-11"
+   616→                  />
+   617→                </div>
+   618→
+   619→                {/* Note */}
+   620→                <div>
+   621→                  <Label htmlFor="rx-note">Remarque (optionnel)</Label>
+   622→                  <Textarea
+   623→                    id="rx-note"
+   624→                    value={formNote}
+   625→                    onChange={(e) => setFormNote(e.target.value)}
+   626→                    placeholder="Ex : À prendre après les repas, 2 comprimés matin et soir…"
+   627→                    className="mt-1.5 min-h-[70px]"
+   628→                    rows={2}
+   629→                  />
+   630→                </div>
+   631→
+   632→                <div className="flex flex-wrap gap-2">
+   633→                  <Button type="submit" className="bg-brand-gradient text-white hover:opacity-90">
+   634→                    <Plus className="size-4" />
+   635→                    {editingSlug ? "Modifier" : "Ajouter à l'ordonnance"}
+   636→                  </Button>
+   637→                  <Button
+   638→                    type="button"
+   639→                    variant="outline"
+   640→                    onClick={() => {
+   641→                      resetForm();
+   642→                      setShowForm(false);
+   643→                    }}
+   644→                  >
+   645→                    Annuler
+   646→                  </Button>
+   647→                </div>
+   648→              </form>
+   649→            </Card>
+   650→          )}
+   651→
+   652→          {/* Items list */}
+   653→          <section>
+   654→            <div className="mb-3 flex items-center justify-between">
+   655→              <div>
+   656→                <Eyebrow>Votre liste</Eyebrow>
+   657→                <Heading level="h3">
+   658→                  Médicaments de l&apos;ordonnance{" "}
+   659→                  {items.length > 0 && (
+   660→                    <span className="ml-1 text-base font-bold text-brand">({items.length})</span>
+   661→                  )}
+   662→                </Heading>
+   663→              </div>
+   664→              {items.length > 0 && (
+   665→                <Button size="sm" variant="ghost" onClick={handleNew} className="text-muted-foreground">
+   666→                  <RotateCcw className="size-3.5" /> Tout effacer
+   667→                </Button>
+   668→              )}
+   669→            </div>
+   670→
+   671→            {items.length === 0 ? (
+   672→              <EmptyState
+   673→                icon={ClipboardList}
+   674→                title="Aucun médicament ajouté"
+   675→                description="Cliquez sur « Ajouter un médicament » pour commencer à constituer votre ordonnance. Vous pourrez ensuite estimer le coût total."
+   676→                action={{
+   677→                  label: "Ajouter un médicament",
+   678→                  onClick: () => {
+   679→                    setShowForm(true);
+   680→                    setTimeout(() => document.getElementById("rx-name")?.focus(), 100);
+   681→                  },
+   682→                }}
+   683→              />
+   684→            ) : (
+   685→              <div className="space-y-2.5">
+   686→                {items.map((item, idx) => {
+   687→                  const status = itemStatus(item);
+   688→                  const sc = STATUS_CONFIG[status];
+   689→                  const StatusIcon = sc.icon;
+   690→                  return (
+   691→                    <Card
+   692→                      key={item.slug}
+   693→                      className="border-border/60 py-0 transition-all hover:border-brand/30 hover:shadow-premium"
+   694→                    >
+   695→                      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+   696→                        {/* Icon + index */}
+   697→                        <div className="flex items-center gap-3">
+   698→                          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-light text-xs font-bold text-brand">
+   699→                            {idx + 1}
+   700→                          </span>
+   701→                          <span
+   702→                            className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+   703→                            style={{
+   704→                              backgroundColor: item.category
+   705→                                ? `${item.category.color}14`
+   706→                                : "var(--brand-light)",
+   707→                            }}
+   708→                          >
+   709→                            {item.category ? (
+   710→                              <CategoryIcon
+   711→                                name={item.category.iconName}
+   712→                                size={20}
+   713→                                color={item.category.color}
+   714→                              />
+   715→                            ) : (
+   716→                              <Pill className="size-5 text-brand" />
+   717→                            )}
+   718→                          </span>
+   719→                        </div>
+   720→
+   721→                        {/* Info */}
+   722→                        <div className="min-w-0 flex-1">
+   723→                          <div className="flex flex-wrap items-center gap-2">
+   724→                            <h3 className="text-sm font-bold text-foreground">{item.name}</h3>
+   725→                            {item.requiresRx && (
+   726→                              <Badge
+   727→                                variant="outline"
+   728→                                className="border-amber-500/40 bg-amber-50 px-1.5 py-0 text-[9px] font-semibold text-amber-700"
+   729→                              >
+   730→                                <ShieldAlert className="size-2.5" /> Rx
+   731→                              </Badge>
+   732→                            )}
+   733→                            <span
+   734→                              className={cn(
+   735→                                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold",
+   736→                                sc.className
+   737→                              )}
+   738→                            >
+   739→                              <StatusIcon className="size-2.5" /> {sc.label}
+   740→                            </span>
+   741→                          </div>
+   742→                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+   743→                            {item.genericName} · {item.form} {item.dosage}
+   744→                            {item.duration && ` · ${item.duration}`}
+   745→                          </p>
+   746→                          {item.note && (
+   747→                            <p className="mt-0.5 truncate text-[11px] italic text-muted-foreground/80">
+   748→                              « {item.note} »
+   749→                            </p>
+   750→                          )}
+   751→                        </div>
+   752→
+   753→                        {/* Qty stepper */}
+   754→                        <div className="flex items-center gap-1.5 shrink-0">
+   755→                          <Button
+   756→                            size="icon"
+   757→                            variant="outline"
+   758→                            className="size-8"
+   759→                            onClick={() => updateQty(item.slug, -1)}
+   760→                          >
+   761→                            <Minus className="size-3" />
+   762→                          </Button>
+   763→                          <span className="w-8 text-center text-sm font-bold text-foreground">
+   764→                            {item.quantity}
+   765→                          </span>
+   766→                          <Button
+   767→                            size="icon"
+   768→                            variant="outline"
+   769→                            className="size-8"
+   770→                            onClick={() => updateQty(item.slug, 1)}
+   771→                          >
+   772→                            <Plus className="size-3" />
+   773→                          </Button>
+   774→                        </div>
+   775→
+   776→                        {/* Price */}
+   777→                        <div className="shrink-0 text-right">
+   778→                          {item.avgPrice > 0 ? (
+   779→                            <Price
+   780→                              amount={item.avgPrice * item.quantity}
+   781→                              size="md"
+   782→                              variant="brand"
+   783→                            />
+   784→                          ) : (
+   785→                            <span className="text-xs text-muted-foreground">Prix à confirmer</span>
+   786→                          )}
+   787→                          {item.avgPrice > 0 && (
+   788→                            <p className="text-[10px] text-muted-foreground">
+   789→                              {item.pharmacyCount} pharmacies
+   790→                            </p>
+   791→                          )}
+   792→                        </div>
+   793→
+   794→                        {/* Actions */}
+   795→                        <div className="flex shrink-0 gap-1">
+   796→                          <Button
+   797→                            size="icon"
+   798→                            variant="ghost"
+   799→                            className="size-8 text-muted-foreground hover:text-brand"
+   800→                            onClick={() => editItem(item)}
+   801→                            aria-label="Modifier"
+   802→                          >
+   803→                            <Pencil className="size-3.5" />
+   804→                          </Button>
+   805→                          <Button
+   806→                            size="icon"
+   807→                            variant="ghost"
+   808→                            className="size-8 text-muted-foreground hover:text-red-600"
+   809→                            onClick={() => removeItem(item.slug)}
+   810→                            aria-label="Supprimer"
+   811→                          >
+   812→                            <Trash2 className="size-3.5" />
+   813→                          </Button>
+   814→                        </div>
+   815→                      </div>
+   816→                    </Card>
+   817→                  );
+   818→                })}
+   819→              </div>
+   820→            )}
+   821→          </section>
+   822→        </div>
+   823→
+   824→        {/* RIGHT: Recap */}
+   825→        <div className="space-y-4">
+   826→          {/* Summary card (sticky) */}
+   827→          <Card className="sticky top-24 border-border/70 p-5 shadow-premium">
+   828→            <div className="flex items-center gap-2">
+   829→              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   830→                <Calculator className="size-4" />
+   831→              </span>
+   832→              <h3 className="text-base font-bold text-foreground">Récapitulatif</h3>
+   833→            </div>
+   834→
+   835→            {/* Stats grid */}
+   836→            <div className="mt-4 grid grid-cols-2 gap-2">
+   837→              <StatBox label="Médicaments" value={stats.total} tone="brand" />
+   838→              <StatBox label="Unités" value={stats.totalUnits} tone="neutral" />
+   839→              <StatBox label="Disponibles" value={stats.available} tone="success" />
+   840→              <StatBox label="Stock faible" value={stats.lowStock} tone="warning" />
+   841→              <StatBox label="À confirmer" value={stats.toConfirm} tone="info" />
+   842→              <StatBox label="Rupture" value={stats.outStock} tone="danger" />
+   843→            </div>
+   844→
+   845→            {/* Total cost */}
+   846→            <div className="mt-4 rounded-xl bg-brand-light/50 p-4 text-center">
+   847→              <p className="text-[10px] font-bold uppercase tracking-wide text-brand">
+   848→                Coût estimatif total
+   849→              </p>
+   850→              {estimate ? (
+   851→                <PriceRange
+   852→                  min={estimate.totalMin}
+   853→                  max={estimate.totalMax}
+   854→                  size="xl"
+   855→                  variant="brand"
+   856→                  className="mt-1 block"
+   857→                />
+   858→              ) : stats.totalCost > 0 ? (
+   859→                <p className="mt-1 text-3xl font-extrabold text-brand-dark">
+   860→                  {formatFCFA(stats.totalCost)}
+   861→                </p>
+   862→              ) : (
+   863→                <p className="mt-1 text-2xl font-extrabold text-muted-foreground">— FCFA</p>
+   864→              )}
+   865→              <p className="mt-1 text-[11px] text-muted-foreground">
+   866→                Basé sur les prix indicatifs moyens
+   867→              </p>
+   868→            </div>
+   869→
+   870→            {/* Estimate button */}
+   871→            <Button
+   872→              className="mt-4 w-full bg-brand-gradient text-white hover:opacity-90"
+   873→              onClick={handleEstimate}
+   874→              disabled={estimating || items.length === 0}
+   875→            >
+   876→              {estimating ? (
+   877→                <>
+   878→                  <Loader2 className="size-4 animate-spin" /> Calcul…
+   879→                </>
+   880→              ) : (
+   881→                <>
+   882→                  <Calculator className="size-4" /> Estimer le coût
+   883→                </>
+   884→              )}
+   885→            </Button>
+   886→
+   887→            {/* Estimate result detail */}
+   888→            {estimate && (
+   889→              <div className="mt-3 space-y-1.5 rounded-lg border border-brand/20 bg-background p-3 animate-fade-up">
+   890→                <p className="text-xs font-bold text-foreground">Détail de l&apos;estimation</p>
+   891→                {estimate.lines.map((line, i) => (
+   892→                  <div key={i} className="flex items-center justify-between text-xs">
+   893→                    <span className="truncate text-muted-foreground">
+   894→                      {line.medication.name} ×{line.quantity}
+   895→                    </span>
+   896→                    <span className="font-semibold text-foreground">
+   897→                      {formatFCFA(line.lineMin)} — {formatFCFA(line.lineMax)}
+   898→                    </span>
+   899→                  </div>
+   900→                ))}
+   901→              </div>
+   902→            )}
+   903→
+   904→            {/* Save + New */}
+   905→            <div className="mt-3 grid grid-cols-2 gap-2">
+   906→              <Button size="sm" variant="outline" onClick={handleSave}>
+   907→                <Save className="size-3.5" /> Enregistrer
+   908→              </Button>
+   909→              <Button size="sm" variant="outline" onClick={handleNew}>
+   910→                <RotateCcw className="size-3.5" /> Nouvelle
+   911→              </Button>
+   912→            </div>
+   913→          </Card>
+   914→
+   915→          {/* Premium upsell */}
+   916→          {!premium && (
+   917→            <Card className="overflow-hidden border-amber-500/30 py-0">
+   918→              <div className="bg-amber-50 p-4">
+   919→                <div className="flex items-center gap-2">
+   920→                  <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
+   921→                    <Crown className="size-5" />
+   922→                  </span>
+   923→                  <div>
+   924→                    <p className="text-sm font-bold text-foreground">Passez Premium</p>
+   925→                    <p className="text-[11px] text-muted-foreground">500 FCFA / mois</p>
+   926→                  </div>
+   927→                </div>
+   928→                <ul className="mt-3 space-y-1 text-xs text-foreground/80">
+   929→                  <li className="flex items-center gap-1.5">
+   930→                    <CheckCircle2 className="size-3.5 text-amber-500" /> Estimations illimitées
+   931→                  </li>
+   932→                  <li className="flex items-center gap-1.5">
+   933→                    <CheckCircle2 className="size-3.5 text-amber-500" /> Ordonnances sauvegardées
+   934→                  </li>
+   935→                  <li className="flex items-center gap-1.5">
+   936→                    <CheckCircle2 className="size-3.5 text-amber-500" /> Alertes de disponibilité
+   937→                  </li>
+   938→                </ul>
+   939→                <Button
+   940→                  size="sm"
+   941→                  className="mt-3 w-full bg-amber-500 text-white hover:bg-amber-600"
+   942→                  onClick={() => navigate("subscription")}
+   943→                >
+   944→                  <Crown className="size-3.5" /> S&apos;abonner
+   945→                </Button>
+   946→              </div>
+   947→            </Card>
+   948→          )}
+   949→        </div>
+   950→      </div>
+   951→
+   952→      {/* ============ TROUVER UNE PHARMACIE ============ */}
+   953→      {items.length > 0 && (
+   954→        <section className="mt-8">
+   955→          <Card className="overflow-hidden border-brand/20 py-0">
+   956→            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+   957→              <div className="flex items-start gap-4">
+   958→                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-light text-brand">
+   959→                  <Store className="size-6" />
+   960→                </span>
+   961→                <div>
+   962→                  <Heading level="h3">Trouver une pharmacie</Heading>
+   963→                  <p className="mt-1 max-w-md text-sm text-muted-foreground">
+   964→                    Voir les pharmacies pouvant fournir toute l&apos;ordonnance ou une partie
+   965→                    des médicaments à Abidjan.
+   966→                  </p>
+   967→                </div>
+   968→              </div>
+   969→              <Button
+   970→                className="shrink-0 bg-brand-gradient text-white hover:opacity-90"
+   971→                onClick={() => navigate("pharmacies")}
+   972→              >
+   973→                Voir les résultats <ArrowRight className="size-4" />
+   974→              </Button>
+   975→            </div>
+   976→            {estimate && (
+   977→              <div className="border-t border-border/50 bg-brand-light/30 px-5 py-3 sm:px-6">
+   978→                <p className="text-sm text-foreground">
+   979→                  <span className="font-bold text-brand-dark">
+   980→                    {estimate.availablePharmacies}
+   981→                  </span>{" "}
+   982→                  pharmacie{estimate.availablePharmacies > 1 ? "s" : ""} peuve
+   983→                  {estimate.availablePharmacies > 1 ? "nt" : ""} fournir tous vos médicaments.
+   984→                </p>
+   985→              </div>
+   986→            )}
+   987→          </Card>
+   988→        </section>
+   989→      )}
+   990→
+   991→      {/* ============ PRUDENCE ============ */}
+   992→      <div className="mt-6">
+   993→        <AlertMessage variant="warning" icon={Info}>
+   994→          Cette estimation est indicative. Vérifiez toujours les disponibilités et demandez
+   995→          conseil à un pharmacien ou professionnel de santé avant tout déplacement.
+   996→        </AlertMessage>
+   997→      </div>
+   998→    </div>
+   999→  );
+  1000→}
+  1001→
+  1002→/* ============================================================
+  1003→   StatBox — petite statistique colorée
+  1004→   ============================================================ */
+  1005→function StatBox({
+  1006→  label,
+  1007→  value,
+  1008→  tone,
+  1009→}: {
+  1010→  label: string;
+  1011→  value: number;
+  1012→  tone: "brand" | "success" | "warning" | "danger" | "info" | "neutral";
+  1013→}) {
+  1014→  const tones = {
+  1015→    brand: "bg-brand-light text-brand-dark",
+  1016→    success: "bg-success-light text-success",
+  1017→    warning: "bg-warning-light text-warning-foreground",
+  1018→    danger: "bg-danger-light text-danger",
+  1019→    info: "bg-info-light text-info",
+  1020→    neutral: "bg-neutral-light text-neutral-foreground",
+  1021→  };
+  1022→  return (
+  1023→    <div className={cn("rounded-lg px-3 py-2 text-center", tones[tone])}>
+  1024→      <p className="text-xl font-extrabold leading-none tabular-nums">{value}</p>
+  1025→      <p className="mt-0.5 text-[10px] font-semibold leading-tight">{label}</p>
+  1026→    </div>
+  1027→  );
+  1028→}
+  1029→

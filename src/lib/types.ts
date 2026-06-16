@@ -17,7 +17,8 @@ export type View =
   | "history"
   | "favorites"
   | "settings"
-  | "design-system";
+  | "design-system"
+  | "wallet";
 
 export interface NavParams {
   slug?: string;
@@ -28,6 +29,10 @@ export interface NavParams {
   fromEstimate?: boolean;
   // Prescription estimate payload (passed from prescription view to result view)
   estimateItems?: { slug: string; quantity: number }[];
+  // Wallet → Payment : montant du pack de crédits sélectionné (FCFA)
+  packAmount?: number;
+  // Wallet → Payment : achat du Pass Ordonnance
+  passOrdonnance?: boolean;
 }
 
 export interface Category {
@@ -94,6 +99,7 @@ export interface User {
   phone: string | null;
   commune: string | null;
   avatarColor?: string;
+  credits?: number;
 }
 
 export interface Subscription {

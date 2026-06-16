@@ -924,3 +924,203 @@ Work Log:
 Stage Summary:
 - Logo SABLIN PHARMA affiché sans aucun contour disgracieux sur fond blanc (header, footer, mobile)
 - Conteneur blanc élégant uniquement sur fond vert (page connexion) pour la lisibilité
+
+---
+Task ID: 203-a
+Agent: Agent 203-a (Credit system — Home + Medication Detail)
+
+Task: Ajouter une section pédagogique "Comment fonctionne SABLIN PHARMA ?" sur la home et un système de crédits (1 crédit) pour déverrouiller la liste des pharmacies sur la vue détail médicament. Tout en FRANÇAIS.
+
+Work Log:
+- Lecture du worklog partagé, de src/store/credits.ts (CREDIT_COSTS, FREE_FEATURES, PAID_FEATURES), src/components/shared/credit-cost.tsx (CreditCost), src/components/shared/credit-confirm-dialog.tsx (CreditConfirmDialog), src/components/shared/alert-message.tsx (AlertMessage), src/components/ui/typography.tsx (Heading/Eyebrow/Muted).
+- Lecture des 2 fichiers cibles (home-view.tsx, medication-detail-view.tsx) pour identifier les points d'insertion.
+
+FICHIER 1 — src/components/views/home-view.tsx (modifications par Edit, pas de Write complet) :
+- Ajout import `Coins` depuis lucide-react.
+- Ajout import `AlertMessage` depuis @/components/shared/alert-message.
+- Ajout import `Muted` depuis @/components/ui/typography (manquant pour la nouvelle section).
+- Insertion d'une nouvelle section "2.5. COMMENT FONCTIONNE SABLIN PHARMA" APRÈS la section confiance (stats StatBlock) et AVANT la section catégories (3. CATÉGORIES).
+  * En-tête centré : Eyebrow "Comment ça marche" + Heading h2 "Comment fonctionne SABLIN PHARMA ?" + Muted "Simple, rapide et transparent."
+  * Grille sm:grid-cols-3 de 3 Cards (border-border/70, p-6, shadow-card, hover -translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg) :
+    - Card 1 : icône Search dans cercle bg-brand-light text-brand, titre "1. Recherchez gratuitement", texte "Recherchez un médicament ou une pharmacie. C'est gratuit et illimité."
+    - Card 2 : icône Coins dans cercle bg-brand-light text-brand, titre "2. Utilisez vos crédits", texte "Les services avancés utilisent vos crédits. Vous payez seulement ce que vous utilisez."
+    - Card 3 : icône CheckCircle2 dans cercle bg-brand-light text-brand, titre "3. Gagnez du temps", texte "Vérifiez la disponibilité avant de vous déplacer en pharmacie."
+  * AlertMessage variant="info" en bas : "Les recherches simples sont gratuites. Les services avancés fonctionnent avec des crédits à partir de 200 FCFA. Aucun abonnement obligatoire."
+
+FICHIER 2 — src/components/views/medication-detail-view.tsx (modifications par MultiEdit, pas de Write complet) :
+- Ajout import `Coins` depuis lucide-react.
+- Ajout imports `CreditConfirmDialog` et `CreditCost` depuis @/components/shared/.
+- Ajout import `useCredits, CREDIT_COSTS` depuis @/store/credits.
+- State ajouté après les states existants : `const [showCreditDialog, setShowCreditDialog] = useState(false); const [pharmaciesUnlocked, setPharmaciesUnlocked] = useState(false); const { credits } = useCredits();`
+- Reset `setPharmaciesUnlocked(false)` ajouté au début du useEffect de fetch (pour ré-initialiser le portail à chaque changement de slug/medication).
+- Badge `<CreditCost cost={0} />` ("Gratuit") ajouté à la fin de la ligne de badges des infos générales (à côté de category/status/Rx).
+- Section "PHARMACIES DISPONIBLES" réécrite :
+  * Eyebrow "Disponibilité" + `<CreditCost cost={CREDIT_COSTS.seePharmacies} />` ("1 crédit") dans un flex items-center gap-2.
+  * Si `!pharmaciesUnlocked` : Card portail (border-brand/20, p-6 sm:p-8, text-center, shadow-card) avec icône Coins dans cercle bg-brand-light text-brand, titre "Voir les pharmacies disponibles", texte explicatif "Cette action coûte 1 crédit. Elle vous permet de voir les pharmacies où ce médicament est disponible.", affichage du solde courant (credits depuis useCredits), bouton "Utiliser 1 crédit" (bg-brand text-white hover:bg-brand-dark, ouvre CreditConfirmDialog via setShowCreditDialog(true)) + bouton "Annuler" (variant outline, navigate('medications')).
+  * Si `pharmaciesUnlocked` : rendu normal (grille lg:grid-cols-2 de PharmacyMedCard + GoogleMap).
+  * CreditConfirmDialog rendu à la fin de la section : open={showCreditDialog}, onOpenChange={setShowCreditDialog}, title="Voir les pharmacies disponibles", cost={CREDIT_COSTS.seePharmacies} (=1), description="Liste exacte des pharmacies avec ce médicament en stock", benefits=["Voir toutes les pharmacies qui ont ce médicament","Prix indicatif par pharmacie","Distance et statut d'ouverture"], onConfirm={() => setPharmaciesUnlocked(true)}.
+- Les informations générales (nom, DCI, dosage, forme, catégorie, description, prix indicatif) restent gratuites et visibles sans crédit.
+
+Contraintes critiques respectées :
+- AUCUNE couleur dégradée : couleurs pleines uniquement (bg-brand, bg-brand-light, text-brand, text-foreground, text-white).
+- Titres en text-foreground ou text-white (sur fond vert). Pas de vert sur vert.
+- Boutons principaux : bg-brand text-white hover:bg-brand-dark.
+- Icônes autorisées uniquement (Search, Coins, CheckCircle2). Aucune étoile/feuille/bâtiment.
+- TypeScript strict, pas de tests, pas de z-ai-web-dev-sdk côté client.
+- `bun run lint` : 0 erreur / 0 warning sur les 2 fichiers modifiés.
+- Dev server : ✓ Compiled sans erreur après modifications (vérifié dans dev.log).
+
+Stage Summary:
+- 2 vues mises à jour avec le système de crédits pédagogique et fonctionnel.
+- Home : la nouvelle section "Comment fonctionne SABLIN PHARMA ?" explique clairement le modèle gratuit/crédits avec 3 étapes visuelles + message pédagogique.
+- Medication Detail : la liste des pharmacies est désormais protégée par un portail à 1 crédit (CreditConfirmDialog), tandis que toutes les infos générales du médicament restent gratuites (badge "Gratuit" visible).
+- Le portail se ré-initialise automatiquement quand l'utilisateur navigue vers un autre médicament (reset sur changement de slug).
+- Le solde de crédits est affiché dans le portail pour informer l'utilisateur avant confirmation.
+- Stores et composants partagés consommés correctement : useCredits (credits), CREDIT_COSTS.seePharmacies, CreditConfirmDialog (debit interne + toast + navigation wallet si insuffisant), CreditCost (badges Gratuit/1 crédit).
+
+---
+Task ID: 202-a
+Agent: fullstack-developer (wallet + profile credits)
+Task: Vue "Mon portefeuille" (wallet-view.tsx) + enrichissement profile-view.tsx (sections crédits)
+
+Work Log:
+- Lecture du worklog, du store useCredits (CREDIT_COSTS, CREDIT_PACKS, FREE_FEATURES, PAID_FEATURES), et des composants partagés CreditBadge, CreditCost, PassBadge, CreditConfirmDialog.
+- Extension de `src/lib/types.ts` : ajout de `packAmount?: number` et `passOrdonnance?: boolean` sur `NavParams` pour permettre `navigate("payment", { packAmount })` et `navigate("payment", { passOrdonnance: true })` sans erreur TypeScript.
+- Création de `src/components/views/wallet-view.tsx` (écrase le stub) :
+  * Export nommé `WalletView`, directive `"use client"`.
+  * Layout `max-w-4xl` responsive, lien retour Accueil.
+  * En-tête : Eyebrow "Gestion des crédits", titre "Mon portefeuille", sous-texte.
+  * Carte "Solde actuel" (bg-brand-light) : grand nombre de crédits (text-4xl font-extrabold text-brand-dark), valeur FCFA estimée (1 crédit ≈ 100 FCFA), message pédagogique, boutons "Recharger" (scroll → packs) et "Voir les tarifs" (scroll → tableau). Bloc latéral "Pass Ordonnance" (amber-50) affichant l'état hasPass.
+  * Messages pédagogiques en grid sm:grid-cols-3 : "Aucun abonnement obligatoire", "Vous payez seulement les services avancés", "Rechargez vos crédits quand vous voulez".
+  * Section "Packs de recharge" : grille sm:grid-cols-2 lg:grid-cols-4 des CREDIT_PACKS (200/2, 500/6 POPULAIRE, 1000/13, 2000/28). Badge "Populaire" (bg-amber-500 text-white) sur le pack 500. Bouton "Recharger" → navigate("payment", { packAmount: pack.amount }).
+  * Section "Pass Ordonnance" : Card amber (bg-amber-50 border-amber-500/30), prix 300 FCFA, 4 avantages (estimation complète, pharmacies disponibles, comparaison simple, sauvegarde), bouton "Acheter le Pass — 300 FCFA" → navigate("payment", { passOrdonnance: true }). Badge "Vous possédez déjà le Pass" si hasPass.
+  * Section "Fonctionnalités & Tarifs" : tableau responsive (min-w-[640px] + scroll-x) avec colonnes Fonctionnalité / Description / Type d'accès / Coût. FREE_FEATURES (badge vert "Gratuit" + 0 FCFA) et PAID_FEATURES (badge "Crédits" + CreditCost, ou PassBadge + 300 FCFA pour l'item isPass).
+  * Section "Historique des crédits" : liste des transactions (icône +/-, description, type + date, solde après). Skeleton pendant loading, EmptyState si tableau vide.
+  * Bloc assistance : Card avec bouton "Contacter le support" → settings.
+  * Helpers internes : SectionTitle, InfoNote.
+- Mise à jour de `src/components/views/profile-view.tsx` :
+  * Imports ajoutés : Wallet, Coins, Receipt (lucide) ; useCredits, FREE_FEATURES, PAID_FEATURES (@/store/credits) ; CreditBadge (@/components/shared/credit-badge) ; CreditCost, PassBadge (@/components/shared/credit-cost) ; formatFCFA (@/lib/format).
+  * SETTINGS_MENU : nouvelle entrée { icon: Wallet, label: "Mon portefeuille", view: "wallet" as const } insérée après "Gérer mon abonnement".
+  * Header profil : CreditBadge ajouté à côté du badge de statut du compte.
+  * Carte "Mon portefeuille" (Card bg-brand-light) insérée APRÈS la stats strip du profil et AVANT le MAIN LAYOUT grid : solde crédits (text-4xl font-extrabold text-brand-dark), valeur FCFA estimée, badge "Pass Ordonnance" si hasPass, message pédagogique, 3 boutons "Recharger" / "Voir les tarifs" / "Historique" (→ wallet).
+  * Section "Mes accès SABLIN PHARMA" insérée APRÈS la section Abonnement et AVANT la section Notifications : grid sm:grid-cols-2 avec 2 blocs (Fonctionnalités gratuites bg-success-light/20 avec coches vertes CheckCircle2 text-success, Fonctionnalités avec crédits bg-brand-light/20 avec CreditCost/PassBadge à droite). Listes en max-h-72 overflow-y-auto scroll-thin.
+
+Contraintes critiques respectées :
+- AUCUNE couleur dégradée : couleurs pleines uniquement (bg-brand, bg-brand-light, text-brand, text-foreground, text-brand-dark, bg-amber-50, bg-amber-500, bg-success-light, text-success). bg-brand-gradient pré-existant conserve sa résolution en couleur solide via globals.css.
+- Titres en text-foreground / text-brand-dark (pas de vert sur vert). Texte toujours lisible sur son fond (amber-900 sur amber-50, brand-dark sur brand-light, etc.).
+- Icônes lucide restreintes à la liste autorisée (Coins, Wallet, CheckCircle2, Crown, Pill, Timer, ClipboardList, Phone, ChevronRight, ChevronLeft, Plus, CreditCard, Receipt, Zap, Info, AlertCircle, Headphones, MapPin, Search).
+- TypeScript strict, pas de tests, pas de z-ai-web-dev-sdk.
+- `bun run lint` : 0 erreur / 0 warning.
+- Dev server : ✓ Compiled sans erreur après modifications (vérifié dans dev.log).
+
+Stage Summary:
+- Vue WalletView complète et fonctionnelle : solde, packs de recharge, Pass Ordonnance, tableau des fonctionnalités, historique des transactions, messages pédagogiques.
+- ProfileView enrichi avec carte "Mon portefeuille" (accès rapide au wallet) et section "Mes accès SABLIN PHARMA" (gratuit vs crédits).
+- Entrée "Mon portefeuille" ajoutée au menu des paramètres du profil pour navigation rapide.
+- NavParams étendu (packAmount, passOrdonnance) pour supporter les flux de paiement depuis le wallet.
+- Stores et composants partagés consommés correctement : useCredits (credits, hasPass, transactions, fetch, loading), CREDIT_PACKS, FREE_FEATURES, PAID_FEATURES, CreditBadge, CreditCost, PassBadge.
+- Toutes les couleurs sont solides, les titres sont en text-foreground/text-brand-dark, aucun dégradé.
+
+---
+Task ID: 204-a
+Agent: fullstack-developer (vues prescription + payment)
+Task: Mise à jour de 2 vues pour SABLIN PHARMA — prescription-view (estimation à 2 crédits) + payment-view (recharge crédits + Pass Ordonnance)
+
+Work Log:
+- Lecture du worklog, src/store/credits.ts (CREDIT_COSTS, CREDIT_PACKS), src/components/shared/credit-confirm-dialog.tsx, src/components/shared/credit-cost.tsx
+- Lecture des 2 fichiers cibles (prescription-view.tsx 1029 lignes, payment-view.tsx 783 lignes) + lib/types.ts (NavParams étendu avec packAmount et passOrdonnance)
+- Création route API POST /api/credits/pass (300 FCFA) — crée PassOrdonnance actif, enregistre Payment, CreditTransaction type "pass", vérifie absence de pass actif
+
+FICHIER 1 — prescription-view.tsx (modifications ciblées par Edit) :
+- Imports ajoutés : CreditConfirmDialog (@/components/shared/credit-confirm-dialog), CreditCost (@/components/shared/credit-cost), useCredits + CREDIT_COSTS (@/store/credits)
+- Hook useCredits() ajouté → const { hasPass } = useCredits()
+- State local : const [showCreditDialog, setShowCreditDialog] = useState(false)
+- Bouton "Estimer le coût" modifié :
+  * className remplacé de bg-brand-gradient vers bg-brand text-white hover:bg-brand-dark (couleur pleine, pas de dégradé)
+  * onClick : si hasPass → handleEstimate() direct ; sinon → setShowCreditDialog(true)
+  * Badge <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.estimatePrescription} className="ml-1.5" /> ajouté dans le bouton
+- Message informatif ajouté sous le bouton :
+  * Si hasPass : "Pass Ordonnance actif — estimation gratuite" (texte amber-700 + icône Crown)
+  * Sinon : "L'ajout des médicaments est gratuit. L'estimation complète coûte 2 crédits."
+- CreditConfirmDialog ajouté en fin de composant :
+  * title="Estimer mon ordonnance", cost={CREDIT_COSTS.estimatePrescription} (=2)
+  * description="Obtenez le total estimatif, les médicaments disponibles, les pharmacies recommandées et les options de comparaison"
+  * benefits=["Coût total estimatif min/max","Médicaments disponibles","Pharmacies recommandées","Options de comparaison"]
+  * onConfirm={() => handleEstimate()}
+
+FICHIER 2 — payment-view.tsx (modifications ciblées par Edit) :
+- Imports ajoutés : useCredits + CREDIT_PACKS (@/store/credits), CreditCost (@/components/shared/credit-cost), Coins (lucide-react)
+- Hook useNav : const { navigate, params } = useNav() — récupère params.packAmount et params.passOrdonnance
+- Hook useCredits : const { recharge, fetch: fetchCredits, hasPass } = useCredits()
+- Nouveau type local : type PaymentMode = "premium" | "recharge" | "pass"
+- Nouveaux states : mode (initialisé depuis params), selectedPackAmount (initialisé depuis params.packAmount)
+- Nouveaux useMemo : currentAmount, currentLabel, currentShortLabel (selon mode)
+- Header refactorisé : bg-brand-light (couleur pleine), icône mode-aware (Crown/Receipt/Coins), titre mode-aware, description mode-aware, bouton retour dynamique (subscription ou wallet)
+- Nouvelle section "Que souhaitez-vous payer ?" : 3 cartes cliquables (Premium 500 FCFA / Pass Ordonnance 300 FCFA / Recharger mes crédits dès 200 FCFA) avec état visuel sélectionné + badge "Sélectionné"/"Déjà actif" pour pass
+- Nouvelle section "Recharger mes crédits" (visible si mode=recharge) : 4 cartes CREDIT_PACKS (200/2, 500/6, 1000/13, 2000/28) — Pack Standard marqué "Populaire" (badge amber), sélection met à jour selectedPackAmount
+- Nouvelle section "Pass Ordonnance" (visible si mode=pass) : carte avec description, badge 300 FCFA, CreditCost cost=0, message "Soit 0 crédit par estimation", indicateur "Pass déjà actif" si hasPass
+- handlePay refactorisé en 3 branches :
+  * recharge : recharge(selectedPackAmount, provider) → toast "Recharge réussie !"
+  * pass : POST /api/credits/pass { provider } → fetchCredits() pour rafraîchir hasPass → toast "Pass Ordonnance activé !"
+  * premium : POST /api/subscription (comportement existant conservé)
+- Formulaire de paiement conservé (operator, phone, holder) — Montant mode-aware via currentLabel + currentAmount
+- Bouton "Payer {currentAmount} FCFA" (anciennement "Payer maintenant 500 FCFA") — désactivé si pass déjà actif
+- Récapitulatif mode-aware : icône (Crown/Receipt/Coins), libellé (Abonnement Premium / Pass Ordonnance / Recharge de crédits), montant, durée (1 mois / 30 jours / Illimité)
+- Modale succès mode-aware : bg-brand (couleur pleine, dégradé supprimé), message ("Abonnement Premium activé" / "Pass Ordonnance activé" / "Recharge de crédits effectuée"), 3e détail dynamic ("Crédits obtenus" pour recharge / "Date d'expiration" sinon), bouton CTA mode-aware ("Accéder à mon compte" / "Retour à mon portefeuille")
+- Messages obligatoires ajoutés : "Rechargez vos crédits quand vous voulez" + "Aucun abonnement obligatoire" dans la section recharge
+- Si non connecté : "Connectez-vous pour continuer" (déjà présent, légèrement ajusté pour être générique)
+- Toutes les classes bg-brand-gradient remplacées par bg-brand text-white hover:bg-brand-dark (couleurs pleines uniquement, conformément à la contrainte critique)
+
+Vérifications :
+- bun run lint : 0 erreur, 0 warning
+- TypeScript strict respecté (types PaymentMode, PaymentState, Provider conservés)
+- Pas de tests écrits (conforme aux règles)
+- Navbar params déjà étendus (packAmount, passOrdonnance) par un agent précédent — aucune modification de types nécessaire
+- dev.log surveillé : aucune erreur de compilation liée à mes modifications
+
+Stage Summary:
+- prescription-view.tsx : estimation protégée par CreditConfirmDialog (2 crédits), bypass si Pass Ordonnance actif, message informatif contextuel
+- payment-view.tsx : 3 modes de paiement unifiés (Premium 500 / Pass 300 / Recharge 200-2000) avec sélection visuelle, formulaire unique adaptatif, route API /api/credits/pass créée pour l'achat du Pass Ordonnance
+- Toutes les couleurs pleines (bg-brand, bg-brand-light, text-brand, text-brand-dark) — aucun dégradé
+- Titres en text-foreground, texte toujours lisible sur fonds clairs (bg-brand-light) et fonds sombres (bg-brand avec text-white)
+- UX cohérente avec le reste de la plateforme (cartes cliquables, badges, toasts sonner, états visuels sélection/actif/désactivé)
+
+---
+Task ID: 30
+Agent: main (orchestrator)
+Task: Modèle économique à crédits SABLIN PHARMA — implémentation complète
+
+Work Log:
+- Schéma Prisma : modèle CreditTransaction (id, userId, type, amount, description, balanceAfter, createdAt), modèle PassOrdonnance (id, userId, active, price, createdAt), champ credits (default 3) sur User
+- API routes : /api/credits (GET solde+transactions+pass), /api/credits/debit (POST débit avec vérification solde), /api/credits/recharge (POST recharge avec 4 packs), /api/credits/pass (POST achat Pass Ordonnance 300 FCFA)
+- Store useCredits (persist) : credits, hasPass, transactions, fetch, debit, recharge + CREDIT_COSTS (7 actions payantes), CREDIT_PACKS (4 packs), FREE_FEATURES (11 gratuits), PAID_FEATURES (8 payants)
+- Composants partagés : CreditBadge (solde dans header), CreditConfirmDialog (modale confirmation avec coût/solde/solde après/avantages/boutons Confirmer+Annuler/solde insuffisant→Recharger), CreditCost (badge Gratuit/X crédits), PassBadge
+- Header : CreditBadge cliquable (→ wallet) visible desktop sm+, "Mon portefeuille" dans menu compte déroulant
+- /api/me mis à jour : inclut credits dans la réponse user
+- Type View étendu : "wallet" ajouté + NavParams (packAmount?, passOrdonnance?)
+- Page Portefeuille (WalletView) : solde crédits + valeur FCFA, 4 packs recharge (200/2, 500/6, 1000/13, 2000/28), Pass Ordonnance 300 FCFA, tableau Fonctionnalités & Tarifs (Gratuit/X crédits/Pass), historique transactions, messages pédagogiques
+- Page Profil : section "Mes accès SABLIN PHARMA" (2 blocs : Fonctionnalités gratuites + Fonctionnalités avec crédits), carte "Mon portefeuille" (solde, FCFA, boutons Recharger/Tarifs/Historique), SETTINGS_MENU "Mon portefeuille"
+- Page Accueil : section "Comment fonctionne SABLIN PHARMA ?" (3 étapes : Recherchez gratuitement / Utilisez vos crédits / Gagnez du temps) + AlertMessage pédagogique
+- Page Détail médicament : badge "Gratuit" sur infos générales, section "Voir les pharmacies disponibles — 1 crédit" avec CreditConfirmDialog (coût 1, solde, solde après, bénéfices, boutons Confirmer/Annuler, solde insuffisant→Recharger)
+- Page Ordonnance : badge "2 crédits" sur bouton Estimer, CreditConfirmDialog (coût 2, description, 4 bénéfices), message "L'ajout est gratuit. L'estimation coûte 2 crédits.", Pass Ordonnance actif = gratuit
+- Page Paiement : 3 modes (Premium 500 / Pass 300 / Recharge crédits), 4 packs recharge, formulaire Mobile Money, bouton "Payer {montant} FCFA", recharge() ou achat Pass après paiement, messages pédagogiques
+- Vérification Agent Browser + VLM :
+  * Accueil : "Section 'Comment fonctionne SABLIN PHARMA ?' avec 3 étapes présente"
+  * Détail médicament : "Section 'Voir les pharmacies disponibles' demande 1 crédit"
+  * Ordonnance : "Message indique que l'estimation coûte 2 crédits, badge '2 crédits' sur le bouton"
+  * Mobile : "Sections lisibles, contraste bon, aucun problème"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Modèle économique à crédits complet et cohérent sur toute la plateforme
+- 11 fonctionnalités gratuites (recherche, infos médicament, pharmacies proches/ouvertes/garde, horaires, adresse, téléphone, profil, aide)
+- 7 actions payantes à crédits (voir pharmacies dispos 1 crédit, prix détaillés 1, estimation ordonnance 2, meilleure pharmacie 1, comparaison 1, alerte 1, confirmation 3)
+- Pass Ordonnance 300 FCFA pour usage occasionnel
+- 4 packs de recharge (200/2, 500/6, 1000/13, 2000/28 FCFA/crédits)
+- Modale de confirmation avant toute action payante (coût, solde, solde après, bénéfices)
+- Badge solde crédits dans le header
+- Page Portefeuille complète (solde, packs, Pass, tarifs, historique)
+- Section "Mes accès" dans le profil (gratuit vs crédits)
+- Section "Comment ça marche" sur l'accueil (3 étapes)
+- Messages pédagogiques partout ("Gratuit", "Cette action utilise des crédits", "Aucun abonnement obligatoire")
+- Couleurs pleines uniquement, pas de dégradé, contrastes vérifiés

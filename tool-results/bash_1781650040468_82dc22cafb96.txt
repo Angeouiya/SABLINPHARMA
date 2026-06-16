@@ -1,0 +1,633 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState } from "react";
+     4→import {
+     5→  Search,
+     6→  ClipboardList,
+     7→  Crown,
+     8→  ChevronRight,
+     9→  Timer,
+    10→  Plus,
+    11→  MapPin,
+    12→  Phone,
+    13→  Navigation,
+    14→  CheckCircle2,
+    15→  ShieldAlert,
+    16→  Zap,
+    17→  Pill,
+    18→  Headphones,
+    19→  ArrowRight,
+    20→} from "lucide-react";
+    21→import { Logo } from "@/components/logo";
+    22→import { SearchBar } from "@/components/shared/search-bar";
+    23→import { SectionHeader } from "@/components/shared/section-header";
+    24→import { StatBlock } from "@/components/shared/stat-block";
+    25→import { MedicationStatusBadge } from "@/components/shared/status-badge";
+    26→import { GoogleMap } from "@/components/shared/google-map";
+    27→import { CategoryIcon } from "@/components/category-icons";
+    28→import { Button } from "@/components/ui/button";
+    29→import { Card } from "@/components/ui/card";
+    30→import { Badge } from "@/components/ui/badge";
+    31→import { Skeleton } from "@/components/ui/skeleton";
+    32→import { Heading, Eyebrow, Price } from "@/components/ui/typography";
+    33→import { useNav } from "@/store/nav";
+    34→import { formatFCFA, distanceKm } from "@/lib/format";
+    35→import { cn } from "@/lib/utils";
+    36→import type { Category, Medication, Pharmacy } from "@/lib/types";
+    37→
+    38→// Abidjan center reference for distance display
+    39→const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
+    40→
+    41→// The 7 categories requested, mapped to DB slugs with friendly names
+    42→const HOME_CATEGORIES: { slug: string; fallbackName: string }[] = [
+    43→  { slug: "douleur-fievre", fallbackName: "Douleur & Fièvre" },
+    44→  { slug: "antibiotiques", fallbackName: "Antibiotiques" },
+    45→  { slug: "respiratoire", fallbackName: "Toux & Rhume" },
+    46→  { slug: "vitamines", fallbackName: "Vitamines" },
+    47→  { slug: "digestif", fallbackName: "Digestion" },
+    48→  { slug: "dermatologie", fallbackName: "Peau & Soins" },
+    49→  { slug: "mere-enfant", fallbackName: "Bébé & Maman" },
+    50→];
+    51→
+    52→// Deterministic status assignment for the "recently searched" table
+    53→function medStatus(med: Medication): "available" | "low-stock" | "out-of-stock" {
+    54→  const hash = med.slug.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+    55→  const pct = hash % 10;
+    56→  if (pct < 7) return "available";
+    57→  if (pct < 9) return "low-stock";
+    58→  return "out-of-stock";
+    59→}
+    60→
+    61→export function HomeView() {
+    62→  const { navigate } = useNav();
+    63→  const [categories, setCategories] = useState<Category[]>([]);
+    64→  const [popularMeds, setPopularMeds] = useState<Medication[]>([]);
+    65→  const [onDuty, setOnDuty] = useState<Pharmacy[]>([]);
+    66→  const [loading, setLoading] = useState(true);
+    67→
+    68→  useEffect(() => {
+    69→    let active = true;
+    70→    (async () => {
+    71→      try {
+    72→        const [cats, meds, pharma] = await Promise.all([
+    73→          fetch("/api/categories").then((r) => r.json()),
+    74→          fetch("/api/medications?limit=8").then((r) => r.json()),
+    75→          fetch("/api/pharmacies?filter=on-duty").then((r) => r.json()),
+    76→        ]);
+    77→        if (!active) return;
+    78→        setCategories(cats);
+    79→        setPopularMeds(meds);
+    80→        setOnDuty(pharma.slice(0, 4));
+    81→      } catch {
+    82→        /* noop */
+    83→      } finally {
+    84→        if (active) setLoading(false);
+    85→      }
+    86→    })();
+    87→    return () => {
+    88→      active = false;
+    89→    };
+    90→  }, []);
+    91→
+    92→  // Filter to the 7 requested categories, in the defined order
+    93→  const homeCategories = HOME_CATEGORIES.map((hc) => {
+    94→    const found = categories.find((c) => c.slug === hc.slug);
+    95→    return found ? { ...found, name: hc.fallbackName } : null;
+    96→  }).filter(Boolean) as Category[];
+    97→
+    98→  // Top 6 meds for the "recently searched" table
+    99→  const recentMeds = popularMeds.slice(0, 6);
+   100→
+   101→  return (
+   102→    <div className="flex flex-col">
+   103→      {/* ========================================================
+   104→          1. HERO
+   105→          ======================================================== */}
+   106→      <section className="relative overflow-hidden bg-brand-gradient">
+   107→        <div className="absolute inset-0 bg-dotted-white opacity-20" />
+   108→        <div className="absolute -right-20 -top-20 size-72 rounded-full bg-white/10 blur-3xl" />
+   109→        <div className="absolute -bottom-32 -left-20 size-80 rounded-full bg-emerald-300/10 blur-3xl" />
+   110→
+   111→        <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[1.1fr_1fr] lg:items-center lg:gap-12 lg:px-8 lg:py-20">
+   112→          <div className="text-white">
+   113→            {/* Logo prominent */}
+   114→            <div className="mb-5 hidden items-center gap-2.5 lg:flex">
+   115→              <Logo size={44} variant="light" />
+   116→            </div>
+   117→
+   118→            <h1 className="mt-4 text-3xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-4xl lg:text-5xl">
+   119→              Trouvez vos médicaments{" "}
+   120→              <span className="text-amber-300">plus rapidement</span>{" "}
+   121→              en Côte d&apos;Ivoire
+   122→            </h1>
+   123→
+   124→            <p className="mt-4 max-w-lg text-sm leading-relaxed text-white/85 sm:text-base">
+   125→              Recherchez un médicament, trouvez une pharmacie disponible près de chez vous,
+   126→              consultez les pharmacies ouvertes ou de garde, et estimez le coût de votre
+   127→              ordonnance. Simple, rapide et fiable.
+   128→            </p>
+   129→
+   130→            {/* Large search bar */}
+   131→            <div className="mt-6 max-w-xl">
+   132→              <SearchBar
+   133→                variant="hero"
+   134→                placeholder="Rechercher un médicament (ex : Paracétamol)..."
+   135→              />
+   136→            </div>
+   137→
+   138→            {/* Secondary action button */}
+   139→            <div className="mt-3 flex flex-wrap gap-2.5">
+   140→              <Button
+   141→                size="lg"
+   142→                variant="outline"
+   143→                className="border-white/30 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
+   144→                onClick={() => navigate("prescription")}
+   145→              >
+   146→                <ClipboardList className="size-4" /> Estimer mon ordonnance
+   147→              </Button>
+   148→              <Button
+   149→                size="lg"
+   150→                variant="ghost"
+   151→                className="text-white hover:bg-white/10 hover:text-white"
+   152→                onClick={() => navigate("pharmacies", { filter: "on-duty" })}
+   153→              >
+   154→                <Timer className="size-4" /> Pharmacies de garde
+   155→              </Button>
+   156→            </div>
+   157→
+   158→            {/* Popular searches */}
+   159→            <div className="mt-5 flex flex-wrap items-center gap-2">
+   160→              <span className="text-xs font-medium text-white/70">Recherches populaires :</span>
+   161→              {["Paracétamol", "Amoxicilline", "Vitamine C", "Coartem"].map((p) => (
+   162→                <button
+   163→                  key={p}
+   164→                  onClick={() => navigate("medications", { query: p })}
+   165→                  className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+   166→                >
+   167→                  {p}
+   168→                </button>
+   169→              ))}
+   170→            </div>
+   171→          </div>
+   172→
+   173→          {/* Hero visual */}
+   174→          <div className="relative hidden lg:block">
+   175→            <div className="relative overflow-hidden rounded-3xl border border-white/20 shadow-2xl">
+   176→              <img
+   177→                src="/images/hero-pharmacy.png"
+   178→                alt="Pharmacie moderne à Abidjan"
+   179→                className="aspect-[4/3] w-full object-cover"
+   180→              />
+   181→              <div className="absolute inset-x-0 bottom-0 bg-black/60 p-5">
+   182→                <div className="flex items-center gap-3 rounded-2xl bg-white/95 p-3 backdrop-blur-sm">
+   183→                  <span className="flex size-11 items-center justify-center rounded-xl bg-brand-light text-brand">
+   184→                    <Plus className="size-6" strokeWidth={3} />
+   185→                  </span>
+   186→                  <div className="flex-1">
+   187→                    <p className="text-sm font-bold text-foreground">Pharmacie de la Riviera</p>
+   188→                    <p className="text-xs text-muted-foreground">Cocody · Ouvert maintenant</p>
+   189→                  </div>
+   190→                  <Badge className="border-0 bg-amber-400 text-[10px] font-bold text-amber-950">
+   191→                    <Timer className="size-3" /> De garde
+   192→                  </Badge>
+   193→                </div>
+   194→              </div>
+   195→            </div>
+   196→            {/* Floating badge */}
+   197→            <div className="absolute -left-4 top-6 hidden rounded-2xl bg-white p-3 shadow-premium-lg xl:block">
+   198→              <div className="flex items-center gap-2">
+   199→                <span className="flex size-9 items-center justify-center rounded-xl bg-success-light text-success">
+   200→                  <CheckCircle2 className="size-5" />
+   201→                </span>
+   202→                <div>
+   203→                  <p className="text-xs font-bold text-foreground">12 pharmacies</p>
+   204→                  <p className="text-[10px] text-muted-foreground">de garde ce soir</p>
+   205→                </div>
+   206→              </div>
+   207→            </div>
+   208→          </div>
+   209→        </div>
+   210→      </section>
+   211→
+   212→      {/* ========================================================
+   213→          2. CONFIANCE — chiffres clés
+   214→          ======================================================== */}
+   215→      <section className="border-b border-border/60 bg-background">
+   216→        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+   217→          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+   218→            <StatBlock
+   219→              icon={Plus}
+   220→              tone="brand"
+   221→              value="12"
+   222→              label="Pharmacies partenaires"
+   223→            />
+   224→            <StatBlock
+   225→              icon={Pill}
+   226→              tone="success"
+   227→              value="33+"
+   228→              label="Médicaments référencés"
+   229→            />
+   230→            <StatBlock
+   231→              icon={Search}
+   232→              tone="info"
+   233→              value="15 000+"
+   234→              label="Recherches effectuées"
+   235→            />
+   236→            <StatBlock
+   237→              icon={MapPin}
+   238→              tone="warning"
+   239→              value="12"
+   240→              label="Communes couvertes"
+   241→            />
+   242→          </div>
+   243→        </div>
+   244→      </section>
+   245→
+   246→      {/* ========================================================
+   247→          3. CATÉGORIES
+   248→          ======================================================== */}
+   249→      <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+   250→        <SectionHeader
+   251→          title="Catégories de médicaments"
+   252→          subtitle="Explorez nos familles de produits santé en un clic"
+   253→          icon={<Pill className="size-5" />}
+   254→          action={{ label: "Voir tout", onClick: () => navigate("medications") }}
+   255→        />
+   256→        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+   257→          {loading
+   258→            ? Array.from({ length: 7 }).map((_, i) => (
+   259→                <Skeleton key={i} className="h-28 rounded-2xl" />
+   260→              ))
+   261→            : homeCategories.map((cat) => (
+   262→                <button
+   263→                  key={cat.id}
+   264→                  onClick={() => navigate("medications", { category: cat.slug })}
+   265→                  className="group flex flex-col items-center gap-3 rounded-2xl border border-border/60 bg-background p-5 text-center shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg"
+   266→                >
+   267→                  <span
+   268→                    className="flex size-14 items-center justify-center rounded-2xl transition-transform group-hover:scale-110"
+   269→                    style={{ backgroundColor: `${cat.color}14` }}
+   270→                  >
+   271→                    <CategoryIcon name={cat.iconName} size={28} color={cat.color} />
+   272→                  </span>
+   273→                  <span className="text-sm font-bold leading-tight text-foreground">
+   274→                    {cat.name}
+   275→                  </span>
+   276→                </button>
+   277→              ))}
+   278→        </div>
+   279→      </section>
+   280→
+   281→      {/* ========================================================
+   282→          4. PHARMACIES DE GARDE PROCHES
+   283→          ======================================================== */}
+   284→      <section className="bg-brand-soft/40">
+   285→        <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+   286→          <SectionHeader
+   287→            title="Pharmacies de garde proches"
+   288→            subtitle="Ouvertes maintenant près de chez vous à Abidjan"
+   289→            icon={<Timer className="size-5" />}
+   290→            action={{
+   291→              label: "Voir toutes",
+   292→              onClick: () => navigate("pharmacies", { filter: "on-duty" }),
+   293→            }}
+   294→          />
+   295→          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+   296→            {loading
+   297→              ? Array.from({ length: 4 }).map((_, i) => (
+   298→                  <Skeleton key={i} className="h-56 rounded-2xl" />
+   299→                ))
+   300→              : onDuty.length > 0 ? (
+   301→                onDuty.map((p) => (
+   302→                  <DutyPharmacyCard key={p.id} pharma={p} />
+   303→                ))
+   304→              ) : (
+   305→                <Card className="col-span-full p-8 text-center text-sm text-muted-foreground">
+   306→                  Aucune pharmacie de garde pour le moment.
+   307→                </Card>
+   308→              )}
+   309→          </div>
+   310→
+   311→          {/* Carte Google Maps des pharmacies de garde */}
+   312→          {onDuty.length > 0 && (
+   313→            <Card className="mt-6 overflow-hidden border-brand/20 py-0">
+   314→              <GoogleMap
+   315→                lat={onDuty[0].latitude}
+   316→                lng={onDuty[0].longitude}
+   317→                zoom={13}
+   318→                label="Pharmacies de garde Abidjan"
+   319→                title="Carte des pharmacies de garde"
+   320→                className="h-64 sm:h-72"
+   321→              />
+   322→            </Card>
+   323→          )}
+   324→        </div>
+   325→      </section>
+   326→
+   327→      {/* ========================================================
+   328→          5. ESTIMATION ORDONNANCE + PREMIUM
+   329→          ======================================================== */}
+   330→      <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+   331→        <div className="grid gap-5 lg:grid-cols-2">
+   332→          {/* Estimation */}
+   333→          <Card className="relative overflow-hidden border-brand/20 bg-brand-light py-0">
+   334→            <div className="absolute -right-8 -top-8 size-40 rounded-full bg-brand/10 blur-2xl" />
+   335→            <div className="relative flex h-full flex-col gap-4 p-6">
+   336→              <div className="flex items-center gap-3">
+   337→                <span className="flex size-12 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-premium">
+   338→                  <ClipboardList className="size-6" />
+   339→                </span>
+   340→                <Eyebrow>Estimation gratuite</Eyebrow>
+   341→              </div>
+   342→              <div>
+   343→                <Heading level="h3">Estimez votre ordonnance</Heading>
+   344→                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+   345→                  Ajoutez plusieurs médicaments et obtenez instantanément un coût total
+   346→                  estimatif, avec la liste des pharmacies où les trouver au meilleur prix.
+   347→                </p>
+   348→              </div>
+   349→              <ul className="space-y-1.5 text-sm text-foreground/80">
+   350→                {[
+   351→                  "Ajoutez autant de médicaments que nécessaire",
+   352→                  "Fourchette de coût min. / max. en temps réel",
+   353→                  "Comparaison des prix par pharmacie",
+   354→                ].map((f) => (
+   355→                  <li key={f} className="flex items-center gap-2">
+   356→                    <CheckCircle2 className="size-4 shrink-0 text-brand" /> {f}
+   357→                  </li>
+   358→                ))}
+   359→              </ul>
+   360→              <Button
+   361→                className="mt-auto w-full bg-brand-gradient text-white hover:opacity-90"
+   362→                size="lg"
+   363→                onClick={() => navigate("prescription")}
+   364→              >
+   365→                <ClipboardList className="size-4" /> Commencer l&apos;estimation
+   366→                <ArrowRight className="size-4" />
+   367→              </Button>
+   368→            </div>
+   369→          </Card>
+   370→
+   371→          {/* Premium */}
+   372→          <Card className="relative overflow-hidden border-amber-500/30 bg-amber-50 py-0">
+   373→            <div className="absolute -right-10 -top-10 size-44 rounded-full bg-amber-300/20 blur-3xl" />
+   374→            <div className="relative flex h-full flex-col gap-4 p-6">
+   375→              <div className="flex items-center justify-between">
+   376→                <span className="flex size-12 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-premium">
+   377→                  <Crown className="size-6" />
+   378→                </span>
+   379→                <Badge className="border-0 bg-amber-500 text-[11px] font-bold text-white">
+   380→                  Recommandé
+   381→                </Badge>
+   382→              </div>
+   383→              <div>
+   384→                <Heading level="h3">Abonnement Premium</Heading>
+   385→                <p className="mt-1.5 text-sm text-muted-foreground">
+   386→                  Débloquez toutes les fonctionnalités avancées de SABLIN PHARMA.
+   387→                </p>
+   388→              </div>
+   389→              <div className="flex items-baseline gap-1.5">
+   390→                <span className="text-4xl font-extrabold text-brand-dark">500</span>
+   391→                <span className="text-sm font-semibold text-muted-foreground">FCFA / mois</span>
+   392→              </div>
+   393→              <ul className="grid grid-cols-1 gap-1.5 text-sm text-foreground/80 sm:grid-cols-2">
+   394→                {[
+   395→                  "Recherche illimitée",
+   396→                  "Estimation d'ordonnance",
+   397→                  "Pharmacies ouvertes",
+   398→                  "Pharmacies de garde",
+   399→                  "Historique complet",
+   400→                  "Favoris illimités",
+   401→                  "Alertes de disponibilité",
+   402→                ].map((f) => (
+   403→                  <li key={f} className="flex items-center gap-2">
+   404→                    <CheckCircle2 className="size-4 shrink-0 text-amber-500" /> {f}
+   405→                  </li>
+   406→                ))}
+   407→              </ul>
+   408→              <Button
+   409→                className="mt-auto w-full bg-amber-500 text-white hover:bg-amber-600"
+   410→                size="lg"
+   411→                onClick={() => navigate("subscription")}
+   412→              >
+   413→                <Crown className="size-4" /> S&apos;abonner maintenant
+   414→              </Button>
+   415→            </div>
+   416→          </Card>
+   417→        </div>
+   418→      </section>
+   419→
+   420→      {/* ========================================================
+   421→          6. MÉDICAMENTS RÉCEMMENT RECHERCHÉS — tableau
+   422→          ======================================================== */}
+   423→      <section className="bg-brand-soft/40">
+   424→        <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+   425→          <SectionHeader
+   426→            title="Médicaments récemment recherchés"
+   427→            subtitle="Prix indicatifs et disponibilité dans nos pharmacies partenaires"
+   428→            icon={<Zap className="size-5" />}
+   429→            action={{ label: "Voir tout", onClick: () => navigate("medications") }}
+   430→          />
+   431→          <Card className="mt-6 overflow-hidden border-border/60 py-0 shadow-premium">
+   432→            <div className="overflow-x-auto scroll-thin">
+   433→              <table className="w-full min-w-[760px] text-left text-sm">
+   434→                <thead className="border-b border-border/60 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+   435→                  <tr>
+   436→                    <th className="px-5 py-3.5 font-semibold">Médicament</th>
+   437→                    <th className="px-5 py-3.5 font-semibold">Dosage</th>
+   438→                    <th className="px-5 py-3.5 font-semibold">Forme</th>
+   439→                    <th className="px-5 py-3.5 font-semibold">Prix indicatif</th>
+   440→                    <th className="px-5 py-3.5 font-semibold">Pharmacies</th>
+   441→                    <th className="px-5 py-3.5 font-semibold">Statut</th>
+   442→                  </tr>
+   443→                </thead>
+   444→                <tbody className="divide-y divide-border/50">
+   445→                  {loading ? (
+   446→                    Array.from({ length: 6 }).map((_, i) => (
+   447→                      <tr key={i}>
+   448→                        <td colSpan={6} className="px-5 py-3">
+   449→                          <Skeleton className="h-6 w-full" />
+   450→                        </td>
+   451→                      </tr>
+   452→                    ))
+   453→                  ) : (
+   454→                    recentMeds.map((m) => {
+   455→                      const status = medStatus(m);
+   456→                      return (
+   457→                        <tr
+   458→                          key={m.id}
+   459→                          onClick={() => navigate("medication-detail", { slug: m.slug })}
+   460→                          className="cursor-pointer transition-colors hover:bg-accent/40"
+   461→                        >
+   462→                          <td className="px-5 py-3.5">
+   463→                            <div className="flex items-center gap-2">
+   464→                              <span className="font-bold text-foreground">{m.name}</span>
+   465→                              {m.requiresRx && (
+   466→                                <ShieldAlert className="size-3.5 text-amber-500" />
+   467→                              )}
+   468→                            </div>
+   469→                            <span className="text-xs text-muted-foreground">{m.genericName}</span>
+   470→                          </td>
+   471→                          <td className="px-5 py-3.5 text-muted-foreground">{m.dosage}</td>
+   472→                          <td className="px-5 py-3.5 text-muted-foreground">{m.form}</td>
+   473→                          <td className="px-5 py-3.5">
+   474→                            <Price amount={m.avgPrice} size="sm" variant="brand" />
+   475→                          </td>
+   476→                          <td className="px-5 py-3.5 text-muted-foreground">
+   477→                            {m.pharmacyCount} dispo
+   478→                          </td>
+   479→                          <td className="px-5 py-3.5">
+   480→                            <MedicationStatusBadge status={status} />
+   481→                          </td>
+   482→                        </tr>
+   483→                      );
+   484→                    })
+   485→                  )}
+   486→                </tbody>
+   487→              </table>
+   488→            </div>
+   489→          </Card>
+   490→        </div>
+   491→      </section>
+   492→
+   493→      {/* ========================================================
+   494→          7. SUPPORT
+   495→          ======================================================== */}
+   496→      <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+   497→        <Card className="relative overflow-hidden border-brand/20 bg-brand-gradient py-0">
+   498→          <div className="absolute inset-0 bg-dotted-white opacity-15" />
+   499→          <div className="absolute -right-16 -top-16 size-56 rounded-full bg-white/10 blur-3xl" />
+   500→          <div className="relative flex flex-col items-center gap-6 p-8 text-center text-white sm:flex-row sm:p-10 sm:text-left">
+   501→            <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
+   502→              <Headphones className="size-8" />
+   503→            </span>
+   504→            <div className="flex-1">
+   505→              <h3 className="text-xl font-extrabold text-foreground sm:text-2xl">
+   506→                Besoin d&apos;aide ?
+   507→              </h3>
+   508→              <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-white/85 sm:text-base">
+   509→                Notre équipe vous accompagne pour trouver vos médicaments plus facilement.
+   510→                Disponible 24h/24 pour vous orienter vers la pharmacie la plus proche.
+   511→              </p>
+   512→            </div>
+   513→            <div className="flex flex-col gap-2.5 sm:flex-row">
+   514→              <Button
+   515→                variant="outline"
+   516→                size="lg"
+   517→                className="border-white/30 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
+   518→                asChild
+   519→              >
+   520→                <a href="tel:+2250700000000">
+   521→                  <Phone className="size-4" /> Appeler
+   522→                </a>
+   523→              </Button>
+   524→              <Button
+   525→                size="lg"
+   526→                className="bg-white text-brand-dark hover:bg-white/90"
+   527→                onClick={() => navigate("pharmacies", { filter: "on-duty" })}
+   528→              >
+   529→                Contacter le support <ArrowRight className="size-4" />
+   530→              </Button>
+   531→            </div>
+   532→          </div>
+   533→        </Card>
+   534→      </section>
+   535→    </div>
+   536→  );
+   537→}
+   538→
+   539→/* ========================================================
+   540→   DutyPharmacyCard — carte pharmacie de garde enrichie
+   541→   Affiche : nom, commune, quartier, statut, distance, téléphone,
+   542→   boutons Voir détails / Itinéraire.
+   543→   ======================================================== */
+   544→function DutyPharmacyCard({ pharma }: { pharma: Pharmacy }) {
+   545→  const { navigate } = useNav();
+   546→  const dist = distanceKm(
+   547→    ABIDJAN_CENTER.lat,
+   548→    ABIDJAN_CENTER.lon,
+   549→    pharma.latitude,
+   550→    pharma.longitude
+   551→  );
+   552→  // Extract quartier from address (part after commune)
+   553→  const quartier = pharma.address.split(",")[0]?.trim() ?? pharma.commune;
+   554→  const mapsUrl = `https://www.google.com/maps?q=${pharma.latitude},${pharma.longitude}`;
+   555→
+   556→  return (
+   557→    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg">
+   558→      {/* Header banner */}
+   559→      <div className="relative flex items-center justify-between bg-brand px-4 py-3">
+   560→        {pharma.imageUrl && (
+   561→          <img
+   562→            src={pharma.imageUrl}
+   563→            alt={pharma.name}
+   564→            className="absolute inset-0 size-full object-cover"
+   565→          />
+   566→        )}
+   567→        <div className="absolute inset-0 bg-black/40" />
+   568→        <div className="relative flex items-center gap-2.5">
+   569→          <span className="flex size-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
+   570→            <Plus className="size-5 text-white" strokeWidth={3} />
+   571→          </span>
+   572→          <Badge className="border-0 bg-amber-400 text-[10px] font-bold text-amber-950">
+   573→            <Timer className="size-3" /> De garde
+   574→          </Badge>
+   575→        </div>
+   576→        <span className="relative inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+   577→          <span className="size-1.5 rounded-full bg-emerald-300 animate-pulse" />
+   578→          Ouvert
+   579→        </span>
+   580→      </div>
+   581→
+   582→      {/* Body */}
+   583→      <div className="space-y-3 p-4">
+   584→        <div>
+   585→          <h3 className="text-sm font-bold leading-tight text-foreground">
+   586→            {pharma.name}
+   587→          </h3>
+   588→          <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
+   589→            <MapPin className="mt-0.5 size-3.5 shrink-0 text-brand/70" />
+   590→            <span>
+   591→              {quartier}, <span className="font-medium text-foreground/70">{pharma.commune}</span>
+   592→            </span>
+   593→          </p>
+   594→        </div>
+   595→
+   596→        <div className="flex items-center justify-between text-xs">
+   597→          <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand-light px-2 py-1 font-semibold text-brand-dark">
+   598→            <Navigation className="size-3.5" /> {dist} km
+   599→          </span>
+   600→          <a
+   601→            href={`tel:${pharma.phone.replace(/\s/g, "")}`}
+   602→            className="inline-flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-brand"
+   603→            onClick={(e) => e.stopPropagation()}
+   604→          >
+   605→            <Phone className="size-3.5" /> {pharma.phone.replace("+225 ", "")}
+   606→          </a>
+   607→        </div>
+   608→
+   609→        {/* Actions */}
+   610→        <div className="flex gap-2 pt-1">
+   611→          <Button
+   612→            size="sm"
+   613→            className="flex-1 bg-brand-gradient text-white hover:opacity-90"
+   614→            onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
+   615→          >
+   616→            Voir détails <ChevronRight className="size-3.5" />
+   617→          </Button>
+   618→          <Button
+   619→            size="sm"
+   620→            variant="outline"
+   621→            className="flex-1"
+   622→            asChild
+   623→          >
+   624→            <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+   625→              <Navigation className="size-3.5" /> Itinéraire
+   626→            </a>
+   627→          </Button>
+   628→        </div>
+   629→      </div>
+   630→    </Card>
+   631→  );
+   632→}
+   633→

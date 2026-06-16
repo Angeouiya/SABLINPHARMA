@@ -1,0 +1,763 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useEffect, useState } from "react";
+     4→     4→import {
+     5→     5→  CircleUser,
+     6→     6→  Crown,
+     7→     7→  LogOut,
+     8→     8→  ChevronLeft,
+     9→     9→  ChevronRight,
+    10→    10→  Mail,
+    11→    11→  Phone,
+    12→    12→  MapPin,
+    13→    13→  ShieldCheck,
+    14→    14→  Settings,
+    15→    15→  Pill,
+    16→    16→  ClipboardList,
+    17→    17→  CheckCircle2,
+    18→    18→  Bell,
+    19→    19→  Heart,
+    20→    20→  Clock,
+    21→    21→  Loader2,
+    22→    22→  Lock,
+    23→    23→  HelpCircle,
+    24→    24→  FileText,
+    25→    25→  CreditCard,
+    26→    26→  Timer,
+    27→    27→  Search,
+    28→    28→  Navigation,
+    29→    29→  AlertCircle,
+    30→    30→  Info,
+    31→    31→  RotateCcw,
+    32→    32→  Eye,
+    33→    33→  KeyRound,
+    34→    34→} from "lucide-react";
+    35→    35→import { toast } from "sonner";
+    36→    36→import { Logo } from "@/components/logo";
+    37→    37→import { Button } from "@/components/ui/button";
+    38→    38→import { Card } from "@/components/ui/card";
+    39→    39→import { Badge } from "@/components/ui/badge";
+    40→    40→import { Separator } from "@/components/ui/separator";
+    41→    41→import { Skeleton } from "@/components/ui/skeleton";
+    42→    42→import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
+    43→    43→import { useNav } from "@/store/nav";
+    44→    44→import { useAuth } from "@/store/auth";
+    45→    45→import { useNotifications } from "@/store/notifications";
+    46→    46→import { useFavorites } from "@/store/favorites";
+    47→    47→import { useHistory } from "@/store/history";
+    48→    48→import { formatDate, distanceKm } from "@/lib/format";
+    49→    49→import { cn } from "@/lib/utils";
+    50→    50→import type { Subscription, FavoriteItem, HistoryItem, AppNotification } from "@/lib/types";
+    51→    51→
+    52→    52→const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
+    53→    53→
+    54→    54→// Fictive saved prescriptions (localStorage)
+    55→    55→interface SavedPrescription {
+    56→    56→  id: string;
+    57→    57→  name: string;
+    58→    58→  medCount: number;
+    59→    59→  totalCost: number;
+    60→    60→  date: string;
+    61→    61→}
+    62→    62→
+    63→    63→const SETTINGS_MENU = [
+    64→    64→  { icon: CircleUser, label: "Modifier mes informations", view: "settings" as const },
+    65→    65→  { icon: KeyRound, label: "Changer le mot de passe", view: "settings" as const },
+    66→    66→  { icon: Bell, label: "Gérer les notifications", view: "settings" as const },
+    67→    67→  { icon: CreditCard, label: "Gérer mon abonnement", view: "subscription" as const },
+    68→    68→  { icon: ShieldCheck, label: "Confidentialité", view: "settings" as const },
+    69→    69→  { icon: HelpCircle, label: "Aide et support", view: "settings" as const },
+    70→    70→  { icon: FileText, label: "Conditions d'utilisation", view: "settings" as const },
+    71→    71→];
+    72→    72→
+    73→    73→function getInitials(name: string): string {
+    74→    74→  const parts = name.trim().split(/\s+/).filter(Boolean);
+    75→    75→  if (parts.length === 0) return "?";
+    76→    76→  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    77→    77→  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    78→    78→}
+    79→    79→
+    80→    80→export function ProfileView() {
+    81→    81→  const { navigate } = useNav();
+    82→    82→  const { user, premium, logout } = useAuth();
+    83→    83→  const unreadCount = useNotifications((s) => s.unread);
+    84→    84→  const notifications = useNotifications((s) => s.notifications);
+    85→    85→  const favCount = useFavorites((s) => s.favorites.length);
+    86→    86→  const favorites = useFavorites((s) => s.favorites);
+    87→    87→  const history = useHistory((s) => s.history);
+    88→    88→  const [subscription, setSubscription] = useState<Subscription | null>(null);
+    89→    89→  const [loading, setLoading] = useState(true);
+    90→    90→  const [loggingOut, setLoggingOut] = useState(false);
+    91→    91→  const [savedPrescriptions, setSavedPrescriptions] = useState<SavedPrescription[]>([]);
+    92→    92→
+    93→    93→  useEffect(() => {
+    94→    94→    let active = true;
+    95→    95→    (async () => {
+    96→    96→      try {
+    97→    97→        const res = await fetch("/api/me");
+    98→    98→        if (res.ok) {
+    99→    99→          const data = await res.json();
+   100→   100→          if (active) setSubscription(data.subscription ?? null);
+   101→   101→        }
+   102→   102→      } catch {
+   103→   103→        /* noop */
+   104→   104→      } finally {
+   105→   105→        if (active) setLoading(false);
+   106→   106→      }
+   107→   107→    })();
+   108→   108→    // Load saved prescriptions from localStorage
+   109→   109→    try {
+   110→   110→      const saved = JSON.parse(localStorage.getItem("sablin-prescriptions") || "[]");
+   111→   111→      setSavedPrescriptions(saved);
+   112→   112→    } catch {
+   113→   113→      /* noop */
+   114→   114→    }
+   115→   115→    return () => {
+   116→   116→      active = false;
+   117→   117→    };
+   118→   118→  }, []);
+   119→   119→
+   120→   120→  // ---------- Not logged in ----------
+   121→   121→  if (!user) {
+   122→   122→    return (
+   123→   123→      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col items-center justify-center px-4 py-12">
+   124→   124→        <Card className="w-full border-border/70 p-8 text-center shadow-premium">
+   125→   125→          <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-full bg-brand-light">
+   126→   126→            <CircleUser className="size-10 text-brand" />
+   127→   127→          </div>
+   128→   128→          <h1 className="text-xl font-bold tracking-tight text-brand-dark">
+   129→   129→            Connectez-vous pour accéder à votre profil
+   130→   130→          </h1>
+   131→   131→          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+   132→   132→            Connectez-vous ou créez un compte gratuit pour suivre vos médicaments
+   133→   133→            consultés, vos ordonnances estimées et vos pharmacies favorites à Abidjan.
+   134→   134→          </p>
+   135→   135→          <div className="mt-6 flex flex-col gap-2.5">
+   136→   136→            <Button
+   137→   137→              onClick={() => navigate("auth", { authMode: "login" })}
+   138→   138→              className="h-11 w-full bg-brand-gradient text-base font-semibold text-white shadow-premium transition-all hover:opacity-95 hover:shadow-premium-lg"
+   139→   139→            >
+   140→   140→              Se connecter
+   141→   141→            </Button>
+   142→   142→            <Button
+   143→   143→              variant="outline"
+   144→   144→              onClick={() => navigate("auth", { authMode: "register" })}
+   145→   145→              className="h-11 w-full border-brand/30 text-base font-semibold text-brand transition-colors hover:bg-brand-light"
+   146→   146→            >
+   147→   147→              Créer un compte
+   148→   148→            </Button>
+   149→   149→          </div>
+   150→   150→          <button
+   151→   151→            type="button"
+   152→   152→            onClick={() => navigate("home")}
+   153→   153→            className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
+   154→   154→          >
+   155→   155→            <ChevronLeft className="size-4" />
+   156→   156→            Retour à l&apos;accueil
+   157→   157→          </button>
+   158→   158→        </Card>
+   159→   159→      </div>
+   160→   160→    );
+   161→   161→  }
+   162→   162→
+   163→   163→  const handleLogout = async () => {
+   164→   164→    setLoggingOut(true);
+   165→   165→    await logout();
+   166→   166→    toast.success("Vous êtes déconnecté. À bientôt !");
+   167→   167→    setLoggingOut(false);
+   168→   168→    navigate("home");
+   169→   169→  };
+   170→   170→
+   171→   171→  // Account status badge
+   172→   172→  const accountStatus = premium
+   173→   173→    ? { label: "Premium actif", className: "bg-amber-500 text-white", icon: Crown }
+   174→   174→    : { label: "Compte gratuit", className: "bg-brand-light text-brand-dark", icon: CircleUser };
+   175→   175→
+   176→   176→  return (
+   177→   177→    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+   178→   178→      {/* Back link */}
+   179→   179→      <button
+   180→   180→        onClick={() => navigate("home")}
+   181→   181→        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+   182→   182→      >
+   183→   183→        <ChevronLeft className="size-4" /> Accueil
+   184→   184→      </button>
+   185→   185→
+   186→   186→      {/* ============ PROFILE CARD ============ */}
+   187→   187→      <Card className="overflow-hidden border-border/70 py-0 shadow-premium">
+   188→   188→        <div className="relative bg-brand-gradient">
+   189→   189→          <div className="absolute inset-0 bg-dotted-white opacity-15" />
+   190→   190→          <div className="absolute -right-12 -top-12 size-44 rounded-full bg-white/10 blur-3xl" />
+   191→   191→          <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+   192→   192→            <div className="flex items-center gap-4">
+   193→   193→              <span className="flex size-20 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-2xl font-extrabold text-white backdrop-blur-sm ring-4 ring-white/10">
+   194→   194→                {getInitials(user.name)}
+   195→   195→              </span>
+   196→   196→              <div className="text-white">
+   197→   197→                <h1 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
+   198→   198→                  {user.name}
+   199→   199→                </h1>
+   200→   200→                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/85">
+   201→   201→                  {user.phone && (
+   202→   202→                    <span className="flex items-center gap-1">
+   203→   203→                      <Phone className="size-3.5" /> {user.phone}
+   204→   204→                    </span>
+   205→   205→                  )}
+   206→   206→                  <span className="flex items-center gap-1">
+   207→   207→                    <Mail className="size-3.5" /> {user.email}
+   208→   208→                  </span>
+   209→   209→                  {user.commune && (
+   210→   210→                    <span className="flex items-center gap-1">
+   211→   211→                      <MapPin className="size-3.5" /> {user.commune}
+   212→   212→                    </span>
+   213→   213→                  )}
+   214→   214→                </div>
+   215→   215→                <div className="mt-2.5">
+   216→   216→                  <Badge className={cn("border-0 text-xs font-bold", accountStatus.className)}>
+   217→   217→                    <accountStatus.icon className="size-3" /> {accountStatus.label}
+   218→   218→                  </Badge>
+   219→   219→                </div>
+   220→   220→              </div>
+   221→   221→            </div>
+   222→   222→            <Button
+   223→   223→              variant="outline"
+   224→   224→              className="border-white/30 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
+   225→   225→              onClick={() => navigate("settings")}
+   226→   226→            >
+   227→   227→              <Settings className="size-4" /> Paramètres
+   228→   228→            </Button>
+   229→   229→          </div>
+   230→   230→        </div>
+   231→   231→
+   232→   232→        {/* Stats strip */}
+   233→   233→        <div className="grid grid-cols-3 divide-x divide-border/50">
+   234→   234→          <ProfileStat icon={Pill} value={history.filter((h) => h.kind === "medication").length || 24} label="Médicaments consultés" />
+   235→   235→          <ProfileStat icon={ClipboardList} value={savedPrescriptions.length || 7} label="Ordonnances estimées" />
+   236→   236→          <ProfileStat icon={Heart} value={favCount || 3} label="Pharmacies favorites" />
+   237→   237→        </div>
+   238→   238→      </Card>
+   239→   239→
+   240→   240→      {/* ============ MAIN LAYOUT ============ */}
+   241→   241→      <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
+   242→   242→        {/* LEFT: Settings menu */}
+   243→   243→        <aside>
+   244→   244→          <Card className="border-border/70 py-0">
+   245→   245→            <div className="border-b border-border/50 bg-muted/30 px-4 py-3">
+   246→   246→              <h3 className="text-sm font-bold text-foreground">Menu du profil</h3>
+   247→   247→            </div>
+   248→   248→            <div className="flex flex-col p-2">
+   249→   249→              {SETTINGS_MENU.map((item, i) => (
+   250→   250→                <button
+   251→   251→                  key={i}
+   252→   252→                  onClick={() => navigate(item.view)}
+   253→   253→                  className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 transition-colors hover:bg-accent hover:text-brand"
+   254→   254→                >
+   255→   255→                  <item.icon className="size-4 shrink-0 text-muted-foreground group-hover:text-brand" />
+   256→   256→                  <span className="flex-1">{item.label}</span>
+   257→   257→                  <ChevronRight className="size-3.5 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
+   258→   258→                </button>
+   259→   259→              ))}
+   260→   260→              <Separator className="my-2" />
+   261→   261→              <button
+   262→   262→                onClick={handleLogout}
+   263→   263→                disabled={loggingOut}
+   264→   264→                className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+   265→   265→              >
+   266→   266→                {loggingOut ? (
+   267→   267→                  <Loader2 className="size-4 shrink-0 animate-spin" />
+   268→   268→                ) : (
+   269→   269→                  <LogOut className="size-4 shrink-0" />
+   270→   270→                )}
+   271→   271→                <span className="flex-1">Se déconnecter</span>
+   272→   272→              </button>
+   273→   273→            </div>
+   274→   274→          </Card>
+   275→   275→        </aside>
+   276→   276→
+   277→   277→        {/* RIGHT: content sections */}
+   278→   278→        <div className="space-y-6">
+   279→   279→          {/* ============ ABONNEMENT ============ */}
+   280→   280→          <section>
+   281→   281→            <SectionTitle icon={Crown} title="Abonnement" />
+   282→   282→            {premium && subscription ? (
+   283→   283→              <Card className="overflow-hidden border-amber-500/30 py-0 shadow-premium">
+   284→   284→                <div className="flex items-center justify-between bg-amber-50 px-5 py-3">
+   285→   285→                  <div className="flex items-center gap-2.5">
+   286→   286→                    <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
+   287→   287→                      <Crown className="size-5" />
+   288→   288→                    </span>
+   289→   289→                    <div>
+   290→   290→                      <p className="text-sm font-bold text-foreground">Premium actif</p>
+   291→   291→                      <p className="text-[11px] text-muted-foreground">Formule mensuelle</p>
+   292→   292→                    </div>
+   293→   293→                  </div>
+   294→   294→                  <Badge className="border-0 bg-success text-white">
+   295→   295→                    <CheckCircle2 className="size-3" /> Payé
+   296→   296→                  </Badge>
+   297→   297→                </div>
+   298→   298→                <div className="grid grid-cols-2 divide-x divide-border/50 border-t border-border/50 sm:grid-cols-4">
+   299→   299→                  <SubInfo label="Prix" value="500 FCFA/mois" />
+   300→   300→                  <SubInfo label="Début" value={formatDate(subscription.startDate)} />
+   301→   301→                  <SubInfo label="Expiration" value={subscription.endDate ? formatDate(subscription.endDate) : "—"} />
+   302→   302→                  <SubInfo label="Statut" value="Actif" success />
+   303→   303→                </div>
+   304→   304→                <div className="flex flex-wrap gap-2 border-t border-border/50 p-4">
+   305→   305→                  <Button
+   306→   306→                    size="sm"
+   307→   307→                    className="bg-amber-500 text-white hover:bg-amber-600"
+   308→   308→                    onClick={() => navigate("subscription")}
+   309→   309→                  >
+   310→   310→                    <RotateCcw className="size-3.5" /> Renouveler mon abonnement
+   311→   311→                  </Button>
+   312→   312→                  <Button size="sm" variant="outline" onClick={() => navigate("payment")}>
+   313→   313→                    <CreditCard className="size-3.5" /> Historique paiements
+   314→   314→                  </Button>
+   315→   315→                </div>
+   316→   316→              </Card>
+   317→   317→            ) : (
+   318→   318→              <Card className="overflow-hidden border-brand/20 py-0 shadow-premium">
+   319→   319→                <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+   320→   320→                  <div className="flex items-start gap-3">
+   321→   321→                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-light text-brand">
+   322→   322→                      <Crown className="size-6" />
+   323→   323→                    </span>
+   324→   324→                    <div>
+   325→   325→                      <h3 className="text-base font-bold text-foreground">
+   326→   326→                        Compte gratuit
+   327→   327→                      </h3>
+   328→   328→                      <p className="mt-0.5 text-sm text-muted-foreground">
+   329→   329→                        Passez à Premium pour débloquer les estimations illimitées,
+   330→   330→                        les alertes de garde et l&apos;assistance prioritaire.
+   331→   331→                      </p>
+   332→   332→                      <p className="mt-1.5 text-lg font-extrabold text-brand-dark">
+   333→   333→                        500 FCFA <span className="text-xs font-medium text-muted-foreground">/ mois</span>
+   334→   334→                      </p>
+   335→   335→                    </div>
+   336→   336→                  </div>
+   337→   337→                  <Button
+   338→   338→                    className="shrink-0 bg-brand-gradient text-white hover:opacity-90"
+   339→   339→                    onClick={() => navigate("subscription")}
+   340→   340→                  >
+   341→   341→                    <Crown className="size-4" /> Passer à Premium
+   342→   342→                  </Button>
+   343→   343→                </div>
+   344→   344→              </Card>
+   345→   345→            )}
+   346→   346→          </section>
+   347→   347→
+   348→   348→          {/* ============ NOTIFICATIONS PERSONNALISÉES ============ */}
+   349→   349→          {notifications.length > 0 && (
+   350→   350→            <section>
+   351→   351→              <SectionTitle
+   352→   352→                icon={Bell}
+   353→   353→                title="Notifications personnalisées"
+   354→   354→                action={{ label: "Tout voir", onClick: () => navigate("notifications") }}
+   355→   355→              />
+   356→   356→              <div className="space-y-2">
+   357→   357→                {notifications.slice(0, 3).map((n) => (
+   358→   358→                  <NotifRow key={n.id} notif={n} onClick={() => navigate("notifications")} />
+   359→   359→                ))}
+   360→   360→              </div>
+   361→   361→            </section>
+   362→   362→          )}
+   363→   363→
+   364→   364→          {/* ============ HISTORIQUE DES RECHERCHES ============ */}
+   365→   365→          <section>
+   366→   366→            <SectionTitle
+   367→   367→              icon={Search}
+   368→   368→              title="Historique des recherches"
+   369→   369→              action={{ label: "Tout voir", onClick: () => navigate("history") }}
+   370→   370→            />
+   371→   371→            {history.filter((h) => h.kind === "medication").length > 0 ? (
+   372→   372→              <Card className="divide-y divide-border/50 border-border/70 py-0">
+   373→   373→                {history
+   374→   374→                  .filter((h) => h.kind === "medication")
+   375→   375→                  .slice(0, 4)
+   376→   376→                  .map((h) => (
+   377→   377→                    <HistoryRow key={h.id} item={h} />
+   378→   378→                  ))}
+   379→   379→              </Card>
+   380→   380→            ) : (
+   381→   381→              <FictiveHistory />
+   382→   382→            )}
+   383→   383→          </section>
+   384→   384→
+   385→   385→          {/* ============ ORDONNANCES ENREGISTRÉES ============ */}
+   386→   386→          <section>
+   387→   387→            <SectionTitle icon={ClipboardList} title="Ordonnances enregistrées" />
+   388→   388→            {savedPrescriptions.length > 0 ? (
+   389→   389→              <div className="grid gap-3 sm:grid-cols-2">
+   390→   390→                {savedPrescriptions.slice(0, 4).map((rx) => (
+   391→   391→                  <Card key={rx.id} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+   392→   392→                    <div className="flex items-start justify-between gap-2">
+   393→   393→                      <div className="flex items-center gap-2.5">
+   394→   394→                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+   395→   395→                          <ClipboardList className="size-5" />
+   396→   396→                        </span>
+   397→   397→                        <div>
+   398→   398→                          <h3 className="text-sm font-bold text-foreground">{rx.name}</h3>
+   399→   399→                          <p className="text-xs text-muted-foreground">
+   400→   400→                            {rx.medCount} médicament{rx.medCount > 1 ? "s" : ""} · {formatDate(rx.date)}
+   401→   401→                          </p>
+   402→   402→                        </div>
+   403→   403→                      </div>
+   404→   404→                      <Price amount={rx.totalCost} size="sm" variant="brand" />
+   405→   405→                    </div>
+   406→   406→                    <Button
+   407→   407→                      size="sm"
+   408→   408→                      variant="outline"
+   409→   409→                      className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   410→   410→                      onClick={() => navigate("prescription")}
+   411→   411→                    >
+   412→   412→                      <Eye className="size-3.5" /> Voir le détail
+   413→   413→                    </Button>
+   414→   414→                  </Card>
+   415→   415→                ))}
+   416→   416→              </div>
+   417→   417→            ) : (
+   418→   418→              <FictivePrescriptions />
+   419→   419→            )}
+   420→   420→          </section>
+   421→   421→
+   422→   422→          {/* ============ PHARMACIES FAVORITES ============ */}
+   423→   423→          <section>
+   424→   424→            <SectionTitle
+   425→   425→              icon={Heart}
+   426→   426→              title="Pharmacies favorites"
+   427→   427→              action={{ label: "Tout voir", onClick: () => navigate("favorites") }}
+   428→   428→            />
+   429→   429→            {favorites.filter((f) => f.kind === "pharmacy").length > 0 ? (
+   430→   430→              <div className="grid gap-3 sm:grid-cols-2">
+   431→   431→                {favorites
+   432→   432→                  .filter((f) => f.kind === "pharmacy")
+   433→   433→                  .slice(0, 4)
+   434→   434→                  .map((f) => (
+   435→   435→                    <FavPharmacyCard key={f.id} fav={f} />
+   436→   436→                  ))}
+   437→   437→              </div>
+   438→   438→            ) : (
+   439→   439→              <FictiveFavorites />
+   440→   440→            )}
+   441→   441→          </section>
+   442→   442→
+   443→   443→          {/* Disclaimer */}
+   444→   444→          <p className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+   445→   445→            <Info className="mr-1 inline size-3.5" />
+   446→   446→            SABLIN PHARMA est une plateforme d&apos;information. Vos données sont
+   447→   447→            confidentielles et sécurisées. Aucune vente en ligne.
+   448→   448→          </p>
+   449→   449→        </div>
+   450→   450→      </div>
+   451→   451→    </div>
+   452→   452→  );
+   453→   453→}
+   454→   454→
+   455→   455→/* ============================================================
+   456→   456→   SectionTitle — en-tête de section avec icône + action
+   457→   457→   ============================================================ */
+   458→   458→function SectionTitle({
+   459→   459→  icon: Icon,
+   460→   460→  title,
+   461→   461→  action,
+   462→   462→}: {
+   463→   463→  icon: typeof Crown;
+   464→   464→  title: string;
+   465→   465→  action?: { label: string; onClick: () => void };
+   466→   466→}) {
+   467→   467→  return (
+   468→   468→    <div className="mb-3 flex items-center justify-between">
+   469→   469→      <div className="flex items-center gap-2.5">
+   470→   470→        <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
+   471→   471→          <Icon className="size-5" />
+   472→   472→        </span>
+   473→   473→        <h2 className="text-lg font-extrabold tracking-tight text-brand-dark">{title}</h2>
+   474→   474→      </div>
+   475→   475→      {action && (
+   476→   476→        <button
+   477→   477→          onClick={action.onClick}
+   478→   478→          className="group flex items-center gap-0.5 text-sm font-semibold text-brand hover:underline"
+   479→   479→        >
+   480→   480→          {action.label}
+   481→   481→          <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+   482→   482→        </button>
+   483→   483→      )}
+   484→   484→    </div>
+   485→   485→  );
+   486→   486→}
+   487→   487→
+   488→   488→/* ============================================================
+   489→   489→   ProfileStat — statistique du profil
+   490→   490→   ============================================================ */
+   491→   491→function ProfileStat({
+   492→   492→  icon: Icon,
+   493→   493→  value,
+   494→   494→  label,
+   495→   495→}: {
+   496→   496→  icon: typeof Pill;
+   497→   497→  value: number;
+   498→   498→  label: string;
+   499→   499→}) {
+   500→   500→  return (
+   501→   501→    <div className="flex flex-col items-center justify-center px-3 py-4 text-center">
+   502→   502→      <span className="flex size-9 items-center justify-center rounded-lg bg-brand-light text-brand">
+   503→   503→        <Icon className="size-4.5" />
+   504→   504→      </span>
+   505→   505→      <p className="mt-1.5 text-xl font-extrabold tabular-nums text-brand-dark">{value}</p>
+   506→   506→      <p className="text-[10px] leading-tight text-muted-foreground">{label}</p>
+   507→   507→    </div>
+   508→   508→  );
+   509→   509→}
+   510→   510→
+   511→   511→/* ============================================================
+   512→   512→   SubInfo — info d'abonnement
+   513→   513→   ============================================================ */
+   514→   514→function SubInfo({
+   515→   515→  label,
+   516→   516→  value,
+   517→   517→  success = false,
+   518→   518→}: {
+   519→   519→  label: string;
+   520→   520→  value: string;
+   521→   521→  success?: boolean;
+   522→   522→}) {
+   523→   523→  return (
+   524→   524→    <div className="px-4 py-3 text-center">
+   525→   525→      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+   526→   526→        {label}
+   527→   527→      </p>
+   528→   528→      <p className={cn("mt-0.5 text-sm font-bold", success ? "text-success" : "text-foreground")}>
+   529→   529→        {value}
+   530→   530→      </p>
+   531→   531→    </div>
+   532→   532→  );
+   533→   533→}
+   534→   534→
+   535→   535→/* ============================================================
+   536→   536→   NotifRow — ligne de notification
+   537→   537→   ============================================================ */
+   538→   538→function NotifRow({
+   539→   539→  notif,
+   540→   540→  onClick,
+   541→   541→}: {
+   542→   542→  notif: AppNotification;
+   543→   543→  onClick: () => void;
+   544→   544→}) {
+   545→   545→  const toneMap = {
+   546→   546→    info: "bg-info-light text-info",
+   547→   547→    success: "bg-success-light text-success",
+   548→   548→    warning: "bg-warning-light text-warning-foreground",
+   549→   549→    alert: "bg-danger-light text-danger",
+   550→   550→    promotion: "bg-amber-100 text-amber-700",
+   551→   551→  } as const;
+   552→   552→  const tone = toneMap[notif.type] || toneMap.info;
+   553→   553→  return (
+   554→   554→    <button
+   555→   555→      onClick={onClick}
+   556→   556→      className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all hover:border-brand/30 hover:shadow-card"
+   557→   557→    >
+   558→   558→      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", tone)}>
+   559→   559→        <Bell className="size-4" />
+   560→   560→      </span>
+   561→   561→      <div className="min-w-0 flex-1">
+   562→   562→        <p className="truncate text-sm font-semibold text-foreground">{notif.title}</p>
+   563→   563→        <p className="truncate text-xs text-muted-foreground">{notif.message}</p>
+   564→   564→      </div>
+   565→   565→      {!notif.read && <span className="size-2 shrink-0 rounded-full bg-brand" />}
+   566→   566→    </button>
+   567→   567→  );
+   568→   568→}
+   569→   569→
+   570→   570→/* ============================================================
+   571→   571→   HistoryRow — ligne d'historique
+   572→   572→   ============================================================ */
+   573→   573→function HistoryRow({ item }: { item: HistoryItem }) {
+   574→   574→  const { navigate } = useNav();
+   575→   575→  return (
+   576→   576→    <div className="flex items-center gap-3 p-3.5">
+   577→   577→      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
+   578→   578→        <Pill className="size-4.5" />
+   579→   579→      </span>
+   580→   580→      <div className="min-w-0 flex-1">
+   581→   581→        <p className="truncate text-sm font-semibold text-foreground">{item.label}</p>
+   582→   582→        <p className="text-xs text-muted-foreground">
+   583→   583→          {item.meta ? `${item.meta} · ` : ""}{formatDate(item.createdAt)}
+   584→   584→        </p>
+   585→   585→      </div>
+   586→   586→      <Badge className="border-0 bg-success-light text-success">
+   587→   587→        <CheckCircle2 className="size-2.5" /> Disponible
+   588→   588→      </Badge>
+   589→   589→      <Button
+   590→   590→        size="sm"
+   591→   591→        variant="ghost"
+   592→   592→        className="text-brand hover:bg-brand-light"
+   593→   593→        onClick={() =>
+   594→   594→          item.slug
+   595→   595→            ? navigate("medication-detail", { slug: item.slug })
+   596→   596→            : navigate("medications", { query: item.query ?? undefined })
+   597→   597→        }
+   598→   598→      >
+   599→   599→        <Search className="size-3.5" /> Rechercher
+   600→   600→      </Button>
+   601→   601→    </div>
+   602→   602→  );
+   603→   603→}
+   604→   604→
+   605→   605→/* ============================================================
+   606→   606→   FavPharmacyCard — carte pharmacie favorite
+   607→   607→   ============================================================ */
+   608→   608→function FavPharmacyCard({ fav }: { fav: FavoriteItem }) {
+   609→   609→  const { navigate } = useNav();
+   610→   610→  const meta = fav.meta ? JSON.parse(fav.meta) : null;
+   611→   611→  return (
+   612→   612→    <Card className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+   613→   613→      <div className="flex items-start gap-3">
+   614→   614→        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
+   615→   615→          <MapPin className="size-5" />
+   616→   616→        </span>
+   617→   617→        <div className="min-w-0 flex-1">
+   618→   618→          <h3 className="truncate text-sm font-bold text-foreground">{fav.label}</h3>
+   619→   619→          <p className="text-xs text-muted-foreground">{meta?.commune || fav.meta || "Abidjan"}</p>
+   620→   620→          <div className="mt-1.5 flex flex-wrap gap-1">
+   621→   621→            <span className="inline-flex items-center gap-0.5 rounded-full bg-success-light px-1.5 py-0.5 text-[9px] font-bold text-success">
+   622→   622→              <span className="size-1.5 rounded-full bg-success animate-pulse" /> Ouvert
+   623→   623→            </span>
+   624→   624→          </div>
+   625→   625→        </div>
+   626→   626→      </div>
+   627→   627→      <Button
+   628→   628→        size="sm"
+   629→   629→        variant="outline"
+   630→   630→        className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   631→   631→        onClick={() => navigate("pharmacy-detail", { slug: fav.slug })}
+   632→   632→      >
+   633→   633→        Voir la pharmacie <ChevronRight className="size-3.5" />
+   634→   634→      </Button>
+   635→   635→    </Card>
+   636→   636→  );
+   637→   637→}
+   638→   638→
+   639→   639→/* ============================================================
+   640→   640→   Fictive data components (when user has no real data yet)
+   641→   641→   ============================================================ */
+   642→   642→function FictiveHistory() {
+   643→   643→  const { navigate } = useNav();
+   644→   644→  const items = [
+   645→   645→    { name: "Paracétamol", dosage: "500 mg", date: "Aujourd'hui", available: true },
+   646→   646→    { name: "Amoxicilline", dosage: "500 mg", date: "Hier", available: true },
+   647→   647→    { name: "Vitamine C", dosage: "1000 mg", date: "12 juin 2026", available: true },
+   648→   648→    { name: "Smecta", dosage: "3 g", date: "10 juin 2026", available: false },
+   649→   649→  ];
+   650→   650→  return (
+   651→   651→    <Card className="divide-y divide-border/50 border-border/70 py-0">
+   652→   652→      {items.map((it, i) => (
+   653→   653→        <div key={i} className="flex items-center gap-3 p-3.5">
+   654→   654→          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
+   655→   655→            <Pill className="size-4.5" />
+   656→   656→          </span>
+   657→   657→          <div className="min-w-0 flex-1">
+   658→   658→            <p className="truncate text-sm font-semibold text-foreground">
+   659→   659→              {it.name} <span className="font-normal text-muted-foreground">· {it.dosage}</span>
+   660→   660→            </p>
+   661→   661→            <p className="text-xs text-muted-foreground">{it.date}</p>
+   662→   662→          </div>
+   663→   663→          <Badge className={cn("border-0", it.available ? "bg-success-light text-success" : "bg-danger-light text-danger")}>
+   664→   664→            {it.available ? "Disponible" : "Rupture"}
+   665→   665→          </Badge>
+   666→   666→          <Button
+   667→   667→            size="sm"
+   668→   668→            variant="ghost"
+   669→   669→            className="text-brand hover:bg-brand-light"
+   670→   670→            onClick={() => navigate("medications", { query: it.name })}
+   671→   671→          >
+   672→   672→            <Search className="size-3.5" /> Rechercher
+   673→   673→          </Button>
+   674→   674→        </div>
+   675→   675→      ))}
+   676→   676→    </Card>
+   677→   677→  );
+   678→   678→}
+   679→   679→
+   680→   680→function FictivePrescriptions() {
+   681→   681→  const { navigate } = useNav();
+   682→   682→  const items = [
+   683→   683→    { id: "rx1", name: "Ordonnance rhume", medCount: 3, totalCost: 2150, date: "2026-06-14" },
+   684→   684→    { id: "rx2", name: "Traitement paludisme", medCount: 2, totalCost: 4000, date: "2026-06-08" },
+   685→   685→  ];
+   686→   686→  return (
+   687→   687→    <div className="grid gap-3 sm:grid-cols-2">
+   688→   688→      {items.map((rx) => (
+   689→   689→        <Card key={rx.id} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+   690→   690→          <div className="flex items-start justify-between gap-2">
+   691→   691→            <div className="flex items-center gap-2.5">
+   692→   692→              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+   693→   693→                <ClipboardList className="size-5" />
+   694→   694→              </span>
+   695→   695→              <div>
+   696→   696→                <h3 className="text-sm font-bold text-foreground">{rx.name}</h3>
+   697→   697→                <p className="text-xs text-muted-foreground">
+   698→   698→                  {rx.medCount} médicaments · {formatDate(rx.date)}
+   699→   699→                </p>
+   700→   700→              </div>
+   701→   701→            </div>
+   702→   702→            <Price amount={rx.totalCost} size="sm" variant="brand" />
+   703→   703→          </div>
+   704→   704→          <Button
+   705→   705→            size="sm"
+   706→   706→            variant="outline"
+   707→   707→            className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   708→   708→            onClick={() => navigate("prescription")}
+   709→   709→          >
+   710→   710→            <Eye className="size-3.5" /> Voir le détail
+   711→   711→          </Button>
+   712→   712→        </Card>
+   713→   713→      ))}
+   714→   714→    </div>
+   715→   715→  );
+   716→   716→}
+   717→   717→
+   718→   718→function FictiveFavorites() {
+   719→   719→  const { navigate } = useNav();
+   720→   720→  const items = [
+   721→   721→    { name: "Pharmacie de la Riviera", commune: "Cocody", quartier: "Riviera Palmeraie", dist: 2.8, open: true, duty: true },
+   722→   722→    { name: "Pharmacie du Plateau", commune: "Plateau", quartier: "Avenue Chardy", dist: 2.6, open: false, duty: false },
+   723→   723→  ];
+   724→   724→  return (
+   725→   725→    <div className="grid gap-3 sm:grid-cols-2">
+   726→   726→      {items.map((p, i) => (
+   727→   727→        <Card key={i} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+   728→   728→          <div className="flex items-start gap-3">
+   729→   729→            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
+   730→   730→              <MapPin className="size-5" />
+   731→   731→            </span>
+   732→   732→            <div className="min-w-0 flex-1">
+   733→   733→              <h3 className="truncate text-sm font-bold text-foreground">{p.name}</h3>
+   734→   734→              <p className="text-xs text-muted-foreground">
+   735→   735→                {p.quartier}, {p.commune} · {p.dist} km
+   736→   736→              </p>
+   737→   737→              <div className="mt-1.5 flex flex-wrap gap-1">
+   738→   738→                <span className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold", p.open ? "bg-success-light text-success" : "bg-neutral-light text-neutral-foreground")}>
+   739→   739→                  <span className={cn("size-1.5 rounded-full", p.open ? "bg-success animate-pulse" : "bg-muted-foreground/50")} />
+   740→   740→                  {p.open ? "Ouvert" : "Fermé"}
+   741→   741→                </span>
+   742→   742→                {p.duty && (
+   743→   743→                  <span className="inline-flex items-center gap-0.5 rounded-full bg-warning-light px-1.5 py-0.5 text-[9px] font-bold text-warning-foreground">
+   744→   744→                    <Timer className="size-2.5" /> De garde
+   745→   745→                  </span>
+   746→   746→                )}
+   747→   747→              </div>
+   748→   748→            </div>
+   749→   749→          </div>
+   750→   750→          <Button
+   751→   751→            size="sm"
+   752→   752→            variant="outline"
+   753→   753→            className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   754→   754→            onClick={() => navigate("pharmacies")}
+   755→   755→          >
+   756→   756→            Voir la pharmacie <ChevronRight className="size-3.5" />
+   757→   757→          </Button>
+   758→   758→        </Card>
+   759→   759→      ))}
+   760→   760→    </div>
+   761→   761→  );
+   762→   762→}
+   763→   763→

@@ -1,0 +1,783 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo, useEffect } from "react";
+     4→import {
+     5→  ChevronLeft,
+     6→  ChevronRight,
+     7→  CreditCard,
+     8→  Smartphone,
+     9→  Lock,
+    10→  ShieldCheck,
+    11→  Loader2,
+    12→  CheckCircle2,
+    13→  Crown,
+    14→  XCircle,
+    15→  AlertCircle,
+    16→  Clock,
+    17→  Zap,
+    18→  Receipt,
+    19→  Copy,
+    20→  ArrowRight,
+    21→} from "lucide-react";
+    22→import { toast } from "sonner";
+    23→import { Button } from "@/components/ui/button";
+    24→import { Card } from "@/components/ui/card";
+    25→import { Badge } from "@/components/ui/badge";
+    26→import { Input } from "@/components/ui/input";
+    27→import { Label } from "@/components/ui/label";
+    28→import { Separator } from "@/components/ui/separator";
+    29→import {
+    30→  Dialog,
+    31→  DialogContent,
+    32→  DialogHeader,
+    33→  DialogTitle,
+    34→} from "@/components/ui/dialog";
+    35→import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
+    36→import { useNav } from "@/store/nav";
+    37→import { useAuth } from "@/store/auth";
+    38→import { formatFCFA, formatDate } from "@/lib/format";
+    39→import { cn } from "@/lib/utils";
+    40→
+    41→type Provider = "wave" | "orange" | "mtn" | "moov";
+    42→type PaymentState = "idle" | "pending" | "success" | "failed" | "cancelled";
+    43→
+    44→const PROVIDERS: {
+    45→  id: Provider;
+    46→  label: string;
+    47→  short: string;
+    48→  bgClass: string;
+    49→  textClass: string;
+    50→  desc: string;
+    51→}[] = [
+    52→  {
+    53→    id: "wave",
+    54→    label: "Wave",
+    55→    short: "W",
+    56→    bgClass: "bg-sky-500",
+    57→    textClass: "text-white",
+    58→    desc: "Transfert instantané, sans frais",
+    59→  },
+    60→  {
+    61→    id: "orange",
+    62→    label: "Orange Money",
+    63→    short: "OM",
+    64→    bgClass: "bg-orange-500",
+    65→    textClass: "text-white",
+    66→    desc: "Orange Money, partout en CI",
+    67→  },
+    68→  {
+    69→    id: "mtn",
+    70→    label: "MTN Money",
+    71→    short: "MTN",
+    72→    bgClass: "bg-yellow-400",
+    73→    textClass: "text-black",
+    74→    desc: "MTN MoMo, rapide et sûr",
+    75→  },
+    76→  {
+    77→    id: "moov",
+    78→    label: "Moov Money",
+    79→    short: "Moov",
+    80→    bgClass: "bg-blue-600",
+    81→    textClass: "text-white",
+    82→    desc: "Moov Money, facile et fiable",
+    83→  },
+    84→];
+    85→
+    86→const PRICE = 500;
+    87→
+    88→// Fictive payment history
+    89→const PAYMENT_HISTORY = [
+    90→  {
+    91→    date: "2026-06-16",
+    92→    formule: "Premium mensuel",
+    93→    montant: 500,
+    94→    moyen: "Orange Money",
+    95→    statut: "success" as const,
+    96→    reference: "SPL-202606161435",
+    97→  },
+    98→  {
+    99→    date: "2026-05-16",
+   100→    formule: "Premium mensuel",
+   101→    montant: 500,
+   102→    moyen: "Wave",
+   103→    statut: "success" as const,
+   104→    reference: "SPL-202605160912",
+   105→  },
+   106→  {
+   107→    date: "2026-04-16",
+   108→    formule: "Premium mensuel",
+   109→    montant: 500,
+   110→    moyen: "MTN Money",
+   111→    statut: "success" as const,
+   112→    reference: "SPL-202604161820",
+   113→  },
+   114→  {
+   115→    date: "2026-03-16",
+   116→    formule: "Premium mensuel",
+   117→    montant: 500,
+   118→    moyen: "Moov Money",
+   119→    statut: "failed" as const,
+   120→    reference: "SPL-202603161104",
+   121→  },
+   122→];
+   123→
+   124→export function PaymentView() {
+   125→  const { navigate } = useNav();
+   126→  const { user, premium, setPremium, fetchMe } = useAuth();
+   127→
+   128→  const [provider, setProvider] = useState<Provider>("orange");
+   129→  const [phone, setPhone] = useState("");
+   130→  const [holderName, setHolderName] = useState(user?.name ?? "");
+   131→  const [state, setState] = useState<PaymentState>("idle");
+   132→  const [showSuccess, setShowSuccess] = useState(false);
+   133→  const [transactionRef, setTransactionRef] = useState("");
+   134→  const [paymentDate, setPaymentDate] = useState("");
+   135→  const [expiryDate, setExpiryDate] = useState("");
+   136→
+   137→  const formattedPhone = useMemo(() => {
+   138→    const digits = phone.replace(/\D/g, "").slice(0, 10);
+   139→    return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+   140→  }, [phone]);
+   141→
+   142→  // Not connected
+   143→  if (!user) {
+   144→    return (
+   145→      <div className="mx-auto flex min-h-[60vh] w-full max-w-md items-center px-4 py-12">
+   146→        <Card className="w-full border-border/70 p-8 text-center shadow-premium">
+   147→          <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand-light text-brand">
+   148→            <Lock className="size-7" />
+   149→          </span>
+   150→          <h1 className="mt-5 text-xl font-extrabold text-foreground sm:text-2xl">
+   151→            Connectez-vous pour continuer
+   152→          </h1>
+   153→          <p className="mt-2 text-sm text-muted-foreground">
+   154→            Vous devez être connecté pour souscrire à l&apos;abonnement Premium.
+   155→          </p>
+   156→          <Button
+   157→            className="mt-6 w-full bg-brand-gradient text-white hover:opacity-90"
+   158→            size="lg"
+   159→            onClick={() => navigate("auth", { authMode: "login" })}
+   160→          >
+   161→            Se connecter
+   162→          </Button>
+   163→        </Card>
+   164→      </div>
+   165→    );
+   166→  }
+   167→
+   168→  const handlePay = async () => {
+   169→    // Validation
+   170→    const digits = phone.replace(/\D/g, "");
+   171→    if (digits.length !== 10) {
+   172→      toast.error("Numéro de téléphone invalide", {
+   173→        description: "Saisissez un numéro ivoirien à 10 chiffres (07 XX XX XX XX).",
+   174→      });
+   175→      return;
+   176→    }
+   177→    if (holderName.trim().length < 3) {
+   178→      toast.error("Nom du titulaire manquant", {
+   179→        description: "Saisissez le nom du titulaire du compte.",
+   180→      });
+   181→      return;
+   182→    }
+   183→
+   184→    setState("pending");
+   185→    try {
+   186→      const res = await fetch("/api/subscription", {
+   187→        method: "POST",
+   188→        headers: { "Content-Type": "application/json" },
+   189→        body: JSON.stringify({
+   190→          method: "mobile_money",
+   191→          provider,
+   192→        }),
+   193→      });
+   194→
+   195→      if (!res.ok) {
+   196→        const data = await res.json().catch(() => null);
+   197→        throw new Error(data?.error ?? "Échec du paiement");
+   198→      }
+   199→
+   200→      const result = await res.json();
+   201→      const ref = `SPL-${Date.now()}`;
+   202→      const now = new Date();
+   203→      const exp = new Date();
+   204→      exp.setMonth(exp.getMonth() + 1);
+   205→
+   206→      setTransactionRef(ref);
+   207→      setPaymentDate(now.toISOString());
+   208→      setExpiryDate(exp.toISOString());
+   209→      setPremium(true);
+   210→      await fetchMe();
+   211→      setState("success");
+   212→      setShowSuccess(true);
+   213→      toast.success("Paiement réussi ! Abonnement Premium activé", {
+   214→        description: "Bienvenue dans l'expérience Premium SABLIN PHARMA.",
+   215→      });
+   216→      void result;
+   217→    } catch (err) {
+   218→      setState("failed");
+   219→      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+   220→      toast.error("Paiement échoué", { description: msg });
+   221→    }
+   222→  };
+   223→
+   224→  const handleCancel = () => {
+   225→    setState("cancelled");
+   226→    toast.info("Transaction annulée", {
+   227→      description: "Vous pouvez réessayer à tout moment.",
+   228→    });
+   229→  };
+   230→
+   231→  const resetState = () => {
+   232→    setState("idle");
+   233→    setPhone("");
+   234→  };
+   235→
+   236→  return (
+   237→    <div className="flex flex-col">
+   238→      {/* ============ HEADER ============ */}
+   239→      <section className="relative overflow-hidden bg-amber-50">
+   240→        <div className="absolute -right-16 -top-16 size-72 rounded-full bg-amber-300/20 blur-3xl" />
+   241→        <div className="relative mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+   242→          <button
+   243→            onClick={() => navigate("subscription")}
+   244→            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
+   245→          >
+   246→            <ChevronLeft className="size-4" />
+   247→            Abonnement
+   248→          </button>
+   249→
+   250→          <div className="mt-5">
+   251→            <Badge className="inline-flex items-center gap-1.5 border-0 bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-premium">
+   252→              <Crown className="size-3.5" />
+   253→              Premium
+   254→            </Badge>
+   255→            <h1 className="mt-3 text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl">
+   256→              Paiement de l&apos;abonnement Premium
+   257→            </h1>
+   258→            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
+   259→              Activez votre accès aux fonctionnalités avancées : recherche illimitée,
+   260→              estimation d&apos;ordonnance, pharmacies de garde, favoris, historique et
+   261→              alertes. Simple, rapide et sécurisé.
+   262→            </p>
+   263→          </div>
+   264→        </div>
+   265→      </section>
+   266→
+   267→      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+   268→        {/* ============ PAYMENT STATE BANNERS ============ */}
+   269→        {state === "pending" && (
+   270→          <StateBanner
+   271→            icon={Loader2}
+   272→            iconClass="animate-spin text-brand"
+   273→            title="Paiement en attente"
+   274→            message="Veuillez patienter pendant le traitement de votre paiement..."
+   275→            tone="info"
+   276→          />
+   277→        )}
+   278→        {state === "failed" && (
+   279→          <StateBanner
+   280→            icon={XCircle}
+   281→            iconClass="text-danger"
+   282→            title="Paiement échoué"
+   283→            message="Le paiement n'a pas pu aboutir. Vérifiez votre solde et réessayez."
+   284→            tone="danger"
+   285→            action={{ label: "Réessayer", onClick: resetState }}
+   286→          />
+   287→        )}
+   288→        {state === "cancelled" && (
+   289→          <StateBanner
+   290→            icon={AlertCircle}
+   291→            iconClass="text-warning-foreground"
+   292→            title="Transaction annulée"
+   293→            message="Vous avez annulé la transaction. Vous pouvez réessayer quand vous voulez."
+   294→            tone="warning"
+   295→            action={{ label: "Reprendre", onClick: resetState }}
+   296→          />
+   297→        )}
+   298→
+   299→        <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_380px] lg:gap-8">
+   300→          {/* LEFT — Payment form */}
+   301→          <div className="space-y-6">
+   302→            {/* Moyens de paiement */}
+   303→            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+   304→              <div className="mb-4 flex items-center gap-2">
+   305→                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   306→                  <Smartphone className="size-4" />
+   307→                </span>
+   308→                <h2 className="text-base font-bold text-foreground">
+   309→                  Choisissez votre moyen de paiement
+   310→                </h2>
+   311→              </div>
+   312→
+   313→              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+   314→                {PROVIDERS.map((p) => {
+   315→                  const active = provider === p.id;
+   316→                  return (
+   317→                    <button
+   318→                      key={p.id}
+   319→                      type="button"
+   320→                      onClick={() => setProvider(p.id)}
+   321→                      className={cn(
+   322→                        "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-all",
+   323→                        active
+   324→                          ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+   325→                          : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
+   326→                      )}
+   327→                      aria-pressed={active}
+   328→                    >
+   329→                      <span
+   330→                        className={cn(
+   331→                          "flex size-11 items-center justify-center rounded-xl text-xs font-extrabold shadow-sm",
+   332→                          p.bgClass,
+   333→                          p.textClass
+   334→                        )}
+   335→                      >
+   336→                        {p.short}
+   337→                      </span>
+   338→                      <span className="text-[11px] font-bold leading-tight text-foreground">
+   339→                        {p.label}
+   340→                      </span>
+   341→                      {active && (
+   342→                        <CheckCircle2 className="size-3.5 text-brand" />
+   343→                      )}
+   344→                    </button>
+   345→                  );
+   346→                })}
+   347→              </div>
+   348→            </Card>
+   349→
+   350→            {/* Formulaire de paiement */}
+   351→            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+   352→              <div className="mb-4 flex items-center gap-2">
+   353→                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   354→                  <CreditCard className="size-4" />
+   355→                </span>
+   356→                <h2 className="text-base font-bold text-foreground">
+   357→                  Informations de paiement
+   358→                </h2>
+   359→              </div>
+   360→
+   361→              <div className="space-y-4">
+   362→                {/* Opérateur sélectionné (read-only display) */}
+   363→                <div className="space-y-1.5">
+   364→                  <Label>Opérateur sélectionné</Label>
+   365→                  <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+   366→                    <span
+   367→                      className={cn(
+   368→                        "flex size-7 items-center justify-center rounded-lg text-[10px] font-extrabold",
+   369→                        PROVIDERS.find((p) => p.id === provider)?.bgClass,
+   370→                        PROVIDERS.find((p) => p.id === provider)?.textClass
+   371→                      )}
+   372→                    >
+   373→                      {PROVIDERS.find((p) => p.id === provider)?.short}
+   374→                    </span>
+   375→                    <span className="text-sm font-semibold text-foreground">
+   376→                      {PROVIDERS.find((p) => p.id === provider)?.label}
+   377→                    </span>
+   378→                    <span className="ml-auto text-xs text-muted-foreground">
+   379→                      {PROVIDERS.find((p) => p.id === provider)?.desc}
+   380→                    </span>
+   381→                  </div>
+   382→                </div>
+   383→
+   384→                {/* Numéro de téléphone */}
+   385→                <div className="space-y-1.5">
+   386→                  <Label htmlFor="phone">
+   387→                    Numéro de téléphone Mobile Money <span className="text-destructive">*</span>
+   388→                  </Label>
+   389→                  <div className="relative">
+   390→                    <Smartphone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+   391→                    <Input
+   392→                      id="phone"
+   393→                      inputMode="tel"
+   394→                      placeholder="07 00 00 00 00"
+   395→                      value={formattedPhone}
+   396→                      onChange={(e) => setPhone(e.target.value)}
+   397→                      className="h-11 pl-9 text-base tracking-wide"
+   398→                      maxLength={19}
+   399→                      disabled={state === "pending"}
+   400→                    />
+   401→                  </div>
+   402→                  <p className="text-xs text-muted-foreground">
+   403→                    Saisissez le numéro ivoirien lié à votre compte{" "}
+   404→                    {PROVIDERS.find((p) => p.id === provider)?.label}.
+   405→                  </p>
+   406→                </div>
+   407→
+   408→                {/* Nom du titulaire */}
+   409→                <div className="space-y-1.5">
+   410→                  <Label htmlFor="holder">
+   411→                    Nom du titulaire <span className="text-destructive">*</span>
+   412→                  </Label>
+   413→                  <Input
+   414→                    id="holder"
+   415→                    placeholder="Nom complet du titulaire"
+   416→                    value={holderName}
+   417→                    onChange={(e) => setHolderName(e.target.value)}
+   418→                    className="h-11"
+   419→                    disabled={state === "pending"}
+   420→                  />
+   421→                </div>
+   422→
+   423→                {/* Montant (read-only) */}
+   424→                <div className="space-y-1.5">
+   425→                  <Label>Montant à payer</Label>
+   426→                  <div className="flex items-center justify-between rounded-lg border border-brand/20 bg-brand-light/30 px-3 py-2.5">
+   427→                    <span className="text-sm text-muted-foreground">Abonnement Premium · 1 mois</span>
+   428→                    <Price amount={PRICE} size="md" variant="brand" />
+   429→                  </div>
+   430→                </div>
+   431→
+   432→                {/* Bouton Payer maintenant */}
+   433→                <Button
+   434→                  className="h-12 w-full bg-brand-gradient text-base font-semibold text-white shadow-premium hover:opacity-90"
+   435→                  onClick={handlePay}
+   436→                  disabled={state === "pending"}
+   437→                >
+   438→                  {state === "pending" ? (
+   439→                    <>
+   440→                      <Loader2 className="size-4 animate-spin" />
+   441→                      Traitement en cours…
+   442→                    </>
+   443→                  ) : (
+   444→                    <>
+   445→                      <Lock className="size-4" />
+   446→                      Payer maintenant {formatFCFA(PRICE)}
+   447→                    </>
+   448→                  )}
+   449→                </Button>
+   450→
+   451→                <Button
+   452→                  variant="ghost"
+   453→                  className="w-full text-muted-foreground"
+   454→                  onClick={handleCancel}
+   455→                  disabled={state === "pending"}
+   456→                >
+   457→                  Annuler
+   458→                </Button>
+   459→              </div>
+   460→            </Card>
+   461→
+   462→            {/* Bloc sécurité */}
+   463→            <Card className="border-brand/20 bg-brand-light/20 p-5">
+   464→              <div className="flex items-center gap-2">
+   465→                <ShieldCheck className="size-5 text-brand" />
+   466→                <h3 className="text-sm font-bold text-foreground">
+   467→                  Paiement sécurisé et protégé
+   468→                </h3>
+   469→              </div>
+   470→              <ul className="mt-3 space-y-2">
+   471→                <SecurityItem text="Paiement sécurisé — toutes les transactions sont chiffrées." />
+   472→                <SecurityItem text="Vos informations sont protégées et ne sont jamais partagées." />
+   473→                <SecurityItem text="Activation automatique après paiement confirmé." />
+   474→              </ul>
+   475→              <p className="mt-3 rounded-lg bg-background/60 px-3 py-2 text-[11px] text-muted-foreground">
+   476→                Environnement de démonstration — aucun débit réel n&apos;est effectué.
+   477→              </p>
+   478→            </Card>
+   479→          </div>
+   480→
+   481→          {/* RIGHT — Récapitulatif (sticky) */}
+   482→          <div className="lg:sticky lg:top-24 lg:self-start">
+   483→            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+   484→              <div className="flex items-center gap-2">
+   485→                <Receipt className="size-4 text-brand" />
+   486→                <h2 className="text-base font-bold text-foreground">
+   487→                  Récapitulatif
+   488→                </h2>
+   489→              </div>
+   490→
+   491→              <div className="mt-4 flex items-start gap-3 rounded-xl bg-brand-light/40 p-4">
+   492→                <span className="flex size-10 items-center justify-center rounded-xl bg-amber-500 text-white">
+   493→                  <Crown className="size-5" />
+   494→                </span>
+   495→                <div className="flex-1">
+   496→                  <p className="text-sm font-bold text-foreground">Abonnement Premium</p>
+   497→                  <p className="text-xs text-muted-foreground">
+   498→                    Formule mensuelle · Activation immédiate
+   499→                  </p>
+   500→                </div>
+   501→                <Badge className="border-0 bg-success text-white">
+   502→                  <CheckCircle2 className="size-3" /> À payer
+   503→                </Badge>
+   504→              </div>
+   505→
+   506→              <div className="mt-4 space-y-2 text-sm">
+   507→                <div className="flex justify-between">
+   508→                  <span className="text-muted-foreground">Formule</span>
+   509→                  <span className="font-semibold text-foreground">Premium</span>
+   510→                </div>
+   511→                <div className="flex justify-between">
+   512→                  <span className="text-muted-foreground">Montant</span>
+   513→                  <span className="font-semibold text-foreground">{formatFCFA(PRICE)}</span>
+   514→                </div>
+   515→                <div className="flex justify-between">
+   516→                  <span className="text-muted-foreground">Durée</span>
+   517→                  <span className="font-semibold text-foreground">1 mois</span>
+   518→                </div>
+   519→                <div className="flex justify-between">
+   520→                  <span className="text-muted-foreground">Frais</span>
+   521→                  <span className="font-semibold text-foreground">0 FCFA</span>
+   522→                </div>
+   523→                <div className="flex justify-between">
+   524→                  <span className="text-muted-foreground">Statut</span>
+   525→                  <span className="font-semibold text-foreground">En attente</span>
+   526→                </div>
+   527→              </div>
+   528→
+   529→              <Separator className="my-4" />
+   530→
+   531→              <div className="flex items-baseline justify-between">
+   532→                <span className="text-base font-bold text-foreground">Total à payer</span>
+   533→                <Price amount={PRICE} size="lg" variant="brand" />
+   534→              </div>
+   535→
+   536→              <Button
+   537→                className="mt-4 w-full bg-brand-gradient text-white hover:opacity-90"
+   538→                size="lg"
+   539→                onClick={handlePay}
+   540→                disabled={state === "pending"}
+   541→              >
+   542→                {state === "pending" ? (
+   543→                  <>
+   544→                    <Loader2 className="size-4 animate-spin" /> Traitement…
+   545→                  </>
+   546→                ) : (
+   547→                  <>
+   548→                    <Lock className="size-4" /> Confirmer le paiement
+   549→                  </>
+   550→                )}
+   551→              </Button>
+   552→
+   553→              <Button
+   554→                variant="ghost"
+   555→                className="mt-2 w-full text-muted-foreground"
+   556→                onClick={() => navigate("subscription")}
+   557→                disabled={state === "pending"}
+   558→              >
+   559→                <ChevronLeft className="size-4" /> Modifier l&apos;offre
+   560→              </Button>
+   561→            </Card>
+   562→          </div>
+   563→        </div>
+   564→
+   565→        {/* ============ HISTORIQUE DES PAIEMENTS ============ */}
+   566→        <section className="mt-12">
+   567→          <div className="mb-4 flex items-center gap-2.5">
+   568→            <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
+   569→              <Receipt className="size-5" />
+   570→            </span>
+   571→            <div>
+   572→              <Eyebrow>Transparence</Eyebrow>
+   573→              <Heading level="h2">Historique des paiements</Heading>
+   574→            </div>
+   575→          </div>
+   576→
+   577→          <Card className="overflow-hidden border-border/70 py-0 shadow-card">
+   578→            <div className="overflow-x-auto scroll-thin">
+   579→              <table className="w-full min-w-[640px] text-left text-sm">
+   580→                <thead className="border-b border-border/60 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+   581→                  <tr>
+   582→                    <th className="px-5 py-3.5 font-semibold">Date</th>
+   583→                    <th className="px-5 py-3.5 font-semibold">Formule</th>
+   584→                    <th className="px-5 py-3.5 font-semibold">Montant</th>
+   585→                    <th className="px-5 py-3.5 font-semibold">Moyen</th>
+   586→                    <th className="px-5 py-3.5 font-semibold">Statut</th>
+   587→                    <th className="px-5 py-3.5 font-semibold">Référence</th>
+   588→                  </tr>
+   589→                </thead>
+   590→                <tbody className="divide-y divide-border/50">
+   591→                  {PAYMENT_HISTORY.map((row, i) => (
+   592→                    <tr key={i} className="transition-colors hover:bg-accent/30">
+   593→                      <td className="px-5 py-3.5 text-muted-foreground">
+   594→                        {formatDate(row.date)}
+   595→                      </td>
+   596→                      <td className="px-5 py-3.5 font-semibold text-foreground">
+   597→                        {row.formule}
+   598→                      </td>
+   599→                      <td className="px-5 py-3.5 font-bold text-brand-dark">
+   600→                        {formatFCFA(row.montant)}
+   601→                      </td>
+   602→                      <td className="px-5 py-3.5 text-muted-foreground">{row.moyen}</td>
+   603→                      <td className="px-5 py-3.5">
+   604→                        {row.statut === "success" ? (
+   605→                          <span className="inline-flex items-center gap-0.5 rounded-full bg-success-light px-2 py-0.5 text-[10px] font-bold text-success">
+   606→                            <CheckCircle2 className="size-2.5" /> Réussi
+   607→                          </span>
+   608→                        ) : (
+   609→                          <span className="inline-flex items-center gap-0.5 rounded-full bg-danger-light px-2 py-0.5 text-[10px] font-bold text-danger">
+   610→                            <XCircle className="size-2.5" /> Échoué
+   611→                          </span>
+   612→                        )}
+   613→                      </td>
+   614→                      <td className="px-5 py-3.5">
+   615→                        <button
+   616→                          onClick={() => {
+   617→                            navigator.clipboard?.writeText(row.reference);
+   618→                            toast.success("Référence copiée");
+   619→                          }}
+   620→                          className="inline-flex items-center gap-1 font-mono text-xs text-brand hover:underline"
+   621→                        >
+   622→                          {row.reference}
+   623→                          <Copy className="size-3" />
+   624→                        </button>
+   625→                      </td>
+   626→                    </tr>
+   627→                  ))}
+   628→                </tbody>
+   629→              </table>
+   630→            </div>
+   631→          </Card>
+   632→        </section>
+   633→      </div>
+   634→
+   635→      {/* ============ MODALE DE CONFIRMATION ============ */}
+   636→      <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+   637→        <DialogContent className="max-w-md border-brand/30 p-0">
+   638→          <DialogHeader className="sr-only">
+   639→            <DialogTitle>Paiement confirmé</DialogTitle>
+   640→          </DialogHeader>
+   641→          <div className="overflow-hidden rounded-xl">
+   642→            {/* Header succès */}
+   643→            <div className="relative flex flex-col items-center bg-brand-gradient px-6 py-8 text-center text-white">
+   644→              <div className="absolute inset-0 bg-dotted-white opacity-15" />
+   645→              <span className="relative flex size-16 items-center justify-center rounded-full bg-white/15 ring-8 ring-white/10 backdrop-blur-sm animate-scale-in">
+   646→                <CheckCircle2 className="size-9 text-white" />
+   647→              </span>
+   648→              <h2 className="relative mt-4 text-xl font-extrabold">
+   649→                Paiement confirmé !
+   650→              </h2>
+   651→              <p className="relative mt-1 text-sm text-white/85">
+   652→                Abonnement Premium activé avec succès
+   653→              </p>
+   654→            </div>
+   655→
+   656→            {/* Détails */}
+   657→            <div className="space-y-3 p-6">
+   658→              <div className="grid grid-cols-2 gap-3">
+   659→                <DetailItem label="Montant payé" value={formatFCFA(PRICE)} />
+   660→                <DetailItem label="Date de paiement" value={paymentDate ? formatDate(paymentDate) : "—"} />
+   661→                <DetailItem label="Date d'expiration" value={expiryDate ? formatDate(expiryDate) : "—"} />
+   662→                <DetailItem label="Moyen de paiement" value={PROVIDERS.find((p) => p.id === provider)?.label ?? "—"} />
+   663→              </div>
+   664→
+   665→              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+   666→                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+   667→                  Référence de transaction
+   668→                </p>
+   669→                <div className="mt-0.5 flex items-center justify-between">
+   670→                  <span className="font-mono text-sm font-bold text-foreground">
+   671→                    {transactionRef}
+   672→                  </span>
+   673→                  <button
+   674→                    onClick={() => {
+   675→                      navigator.clipboard?.writeText(transactionRef);
+   676→                      toast.success("Référence copiée");
+   677→                    }}
+   678→                    className="text-brand hover:underline"
+   679→                  >
+   680→                    <Copy className="size-3.5" />
+   681→                  </button>
+   682→                </div>
+   683→              </div>
+   684→
+   685→              <Button
+   686→                className="w-full bg-brand-gradient text-white hover:opacity-90"
+   687→                size="lg"
+   688→                onClick={() => {
+   689→                  setShowSuccess(false);
+   690→                  navigate("profile");
+   691→                }}
+   692→              >
+   693→                Accéder à mon compte <ArrowRight className="size-4" />
+   694→              </Button>
+   695→              <Button
+   696→                variant="ghost"
+   697→                className="w-full text-muted-foreground"
+   698→                onClick={() => {
+   699→                  setShowSuccess(false);
+   700→                  navigate("home");
+   701→                }}
+   702→              >
+   703→                Retour à l&apos;accueil
+   704→              </Button>
+   705→            </div>
+   706→          </div>
+   707→        </DialogContent>
+   708→      </Dialog>
+   709→    </div>
+   710→  );
+   711→}
+   712→
+   713→/* ============================================================
+   714→   StateBanner — bannière d'état de paiement
+   715→   ============================================================ */
+   716→function StateBanner({
+   717→  icon: Icon,
+   718→  iconClass,
+   719→  title,
+   720→  message,
+   721→  tone,
+   722→  action,
+   723→}: {
+   724→  icon: typeof Loader2;
+   725→  iconClass: string;
+   726→  title: string;
+   727→  message: string;
+   728→  tone: "info" | "danger" | "warning" | "success";
+   729→  action?: { label: string; onClick: () => void };
+   730→}) {
+   731→  const tones = {
+   732→    info: "border-brand/30 bg-brand-light/30 text-brand-dark",
+   733→    danger: "border-danger/30 bg-danger-light text-danger",
+   734→    warning: "border-warning/30 bg-warning-light text-warning-foreground",
+   735→    success: "border-success/30 bg-success-light text-success",
+   736→  };
+   737→  return (
+   738→    <div className={cn("flex items-center gap-3 rounded-xl border p-4", tones[tone])}>
+   739→      <Icon className={cn("size-6 shrink-0", iconClass)} />
+   740→      <div className="flex-1">
+   741→        <p className="text-sm font-bold">{title}</p>
+   742→        <p className="text-xs opacity-90">{message}</p>
+   743→      </div>
+   744→      {action && (
+   745→        <Button
+   746→          size="sm"
+   747→          variant="outline"
+   748→          className="border-current"
+   749→          onClick={action.onClick}
+   750→        >
+   751→          {action.label}
+   752→        </Button>
+   753→      )}
+   754→    </div>
+   755→  );
+   756→}
+   757→
+   758→/* ============================================================
+   759→   SecurityItem — élément de la liste sécurité
+   760→   ============================================================ */
+   761→function SecurityItem({ text }: { text: string }) {
+   762→  return (
+   763→    <li className="flex items-start gap-2 text-xs text-foreground/80">
+   764→      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-brand" />
+   765→      <span>{text}</span>
+   766→    </li>
+   767→  );
+   768→}
+   769→
+   770→/* ============================================================
+   771→   DetailItem — détail dans la modale de confirmation
+   772→   ============================================================ */
+   773→function DetailItem({ label, value }: { label: string; value: string }) {
+   774→  return (
+   775→    <div className="rounded-lg border border-border/50 bg-background px-3 py-2">
+   776→      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+   777→        {label}
+   778→      </p>
+   779→      <p className="mt-0.5 text-sm font-semibold text-foreground">{value}</p>
+   780→    </div>
+   781→  );
+   782→}
+   783→

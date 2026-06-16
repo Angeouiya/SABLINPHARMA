@@ -26,6 +26,8 @@ import { HistoryView } from "@/components/views/history-view";
 import { FavoritesView } from "@/components/views/favorites-view";
 import { SettingsView } from "@/components/views/settings-view";
 import { DesignSystemView } from "@/components/views/design-system-view";
+import { WalletView } from "@/components/views/wallet-view";
+import { useCredits } from "@/store/credits";
 
 export default function Home() {
   const { view } = useNav();
@@ -34,6 +36,7 @@ export default function Home() {
   const fetchNotifs = useNotifications((s) => s.fetch);
   const fetchFavs = useFavorites((s) => s.fetch);
   const fetchHistory = useHistory((s) => s.fetch);
+  const fetchCredits = useCredits((s) => s.fetch);
 
   useEffect(() => {
     fetchMe();
@@ -45,8 +48,9 @@ export default function Home() {
       fetchNotifs();
       fetchFavs();
       fetchHistory();
+      fetchCredits();
     }
-  }, [user, fetchNotifs, fetchFavs, fetchHistory]);
+  }, [user, fetchNotifs, fetchFavs, fetchHistory, fetchCredits]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -69,6 +73,7 @@ export default function Home() {
         {view === "favorites" && <FavoritesView />}
         {view === "settings" && <SettingsView />}
         {view === "design-system" && <DesignSystemView />}
+        {view === "wallet" && <WalletView />}
       </main>
       <Footer />
       <BottomNav />

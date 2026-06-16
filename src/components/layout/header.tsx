@@ -13,6 +13,7 @@ import {
   User as UserIcon,
   CreditCard,
   CheckCheck,
+  Coins,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ import {
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
 import { NotificationDropdown } from "@/components/shared/notification-dropdown";
+import { CreditBadge } from "@/components/shared/credit-badge";
 import { useNotifications } from "@/store/notifications";
 import { cn } from "@/lib/utils";
 import type { View } from "@/lib/types";
@@ -112,6 +114,11 @@ export function Header() {
           {/* Notifications dropdown */}
           <NotificationDropdown />
 
+          {/* Credit balance badge */}
+          <button onClick={() => go("wallet")} className="hidden sm:block">
+            <CreditBadge />
+          </button>
+
           {/* Subscription button */}
           {premium ? (
             <Button
@@ -188,6 +195,9 @@ export function Header() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => go("subscription")}>
                   <CreditCard className="size-4" /> Abonnement
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => go("wallet")}>
+                  <Coins className="size-4" /> Mon portefeuille
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => go("settings")}>
                   <Settings className="size-4" /> Paramètres

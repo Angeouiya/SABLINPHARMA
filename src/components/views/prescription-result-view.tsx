@@ -35,9 +35,13 @@ import { Separator } from "@/components/ui/separator";
 import { FullLoader } from "@/components/shared/loader";
 import { AlertMessage } from "@/components/shared/alert-message";
 import { EmptyState } from "@/components/shared/empty-state";
+import { LockedView } from "@/components/shared/locked-view";
+import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
+import { CreditCost } from "@/components/shared/credit-cost";
 import { Heading, Eyebrow, Muted, Price, PriceRange } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
+import { useCredits, CREDIT_COSTS } from "@/store/credits";
 import { formatFCFA, distanceKm, isOpenNow } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { EstimateResult } from "@/lib/types";
@@ -193,21 +197,68 @@ const SORT_OPTIONS: { key: SortKey; label: string; icon: typeof Filter }[] = [
   { key: "duty", label: "De garde", icon: Timer },
 ];
 
+// ===== Actions avancées payantes (crédits) =====
+type PaidAction = "bestPharmacy" | "compare" | "confirm";
+
+const PAID_ACTION_CONFIG: Record<
+  PaidAction,
+  { title: string; cost: number; description: string; benefits: string[] }
+> = {
+  bestPharmacy: {
+    title: "Voir la meilleure pharmacie",
+    cost: CREDIT_COSTS.bestPharmacy,
+    description:
+      "Cette action coûte 1 crédit. Accédez à la pharmacie optimale selon la disponibilité et la proximité.",
+    benefits: [
+      "Pharmacie optimale recommandée",
+      "Disponibilité complète vérifiée",
+      "Coordonnées, horaires et itinéraire",
+    ],
+  },
+  compare: {
+    title: "Comparer les prix",
+    cost: CREDIT_COSTS.comparePharmacies,
+    description:
+      "Cette action coûte 1 crédit. Affichez le tableau comparatif détaillé des pharmacies (prix, distance, horaires).",
+    benefits: [
+      "Tableau comparatif détaillé",
+      "Prix total par pharmacie",
+      "Distance et horaires side-by-side",
+    ],
+  },
+  confirm: {
+    title: "Confirmation pharmacie",
+    cost: CREDIT_COSTS.confirmBeforeVisit,
+    description:
+      "Cette action coûte 3 crédits. Demandez à la pharmacie de vérifier le stock avant votre déplacement.",
+    benefits: [
+      "Vérification du stock par la pharmacie",
+      "Confirmation avant déplacement",
+      "Gain de temps garanti",
+    ],
+  },
+};
+
 export function PrescriptionResultView() {
   const { params, navigate } = useNav();
   const { user, premium } = useAuth();
+  const { hasPass } = useCredits();
 
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
+  // Action avancée en attente de confirmation (débit de crédits)
+  const [paidAction, setPaidAction] = useState<PaidAction | null>(null);
 
   const estimateItems = params.estimateItems;
 
   useEffect(() => {
     const items = estimateItems ?? [];
     if (!items.length) {
-      navigate("prescription");
+      // Pas d'items : on affichera le LockedView côté rendu (pas de navigation auto)
+      setLoading(false);
+      setEstimate(null);
       return;
     }
     let cancelled = false;
@@ -239,7 +290,7 @@ export function PrescriptionResultView() {
     return () => {
       cancelled = true;
     };
-  }, [estimateItems, navigate]);
+  }, [estimateItems]);
 
   // Build pharmacy list with availability based on estimate
   const pharmaciesWithAvailability = useMemo(() => {
@@ -351,6 +402,46 @@ export function PrescriptionResultView() {
       description: "Retrouvez-la dans la section Historique.",
     });
   };
+
+  // ===== Actions avancées payantes =====
+  // Si l'utilisateur a un Pass Ordonnance actif, l'action est gratuite (pas de dialog).
+  // Sinon, on ouvre un CreditConfirmDialog pour débiter le coût de l'action.
+  const performPaidAction = (action: PaidAction) => {
+    if (action === "bestPharmacy" && bestOption) {
+      navigate("pharmacy-detail", { slug: bestOption.slug });
+      toast.success("Accès à la meilleure pharmacie.");
+    } else if (action === "compare") {
+      const el = document.getElementById("pharmacies-complete");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      toast.success("Comparaison des pharmacies affichée.");
+    } else if (action === "confirm") {
+      toast.success("Demande de confirmation envoyée à la pharmacie.", {
+        description: "Vous recevrez une réponse sous 24h.",
+      });
+    }
+    setPaidAction(null);
+  };
+
+  const handlePaidAction = (action: PaidAction) => {
+    if (hasPass) {
+      performPaidAction(action);
+    } else {
+      setPaidAction(action);
+    }
+  };
+
+  // ===== LockedView : aucune donnée d'estimation transmise =====
+  if (!estimateItems || estimateItems.length === 0) {
+    return (
+      <LockedView
+        title="Résultat indisponible"
+        message="Veuillez utiliser 2 crédits ou un Pass Ordonnance pour lancer l'estimation complète."
+        cost={2}
+        backLabel="Retour à l'ordonnance"
+        backView="prescription"
+      />
+    );
+  }
 
   // ===== Loading =====
   if (loading) {
@@ -581,10 +672,13 @@ export function PrescriptionResultView() {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       size="sm"
-                      className="bg-brand-gradient text-white hover:opacity-90"
-                      onClick={() => navigate("pharmacy-detail", { slug: bestOption.slug })}
+                      className="bg-brand text-white hover:bg-brand-dark"
+                      onClick={() => handlePaidAction("bestPharmacy")}
                     >
-                      Voir la meilleure pharmacie <ChevronRight className="size-3.5" />
+                      <Award className="size-3.5" />
+                      {hasPass ? "Meilleure pharmacie" : "Meilleure pharmacie — 1 crédit"}
+                      <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.bestPharmacy} className="ml-1" />
+                      <ChevronRight className="size-3.5" />
                     </Button>
                     <Button size="sm" variant="outline" asChild>
                       <a href={`tel:${bestOption.phone.replace(/\s/g, "")}`}>
@@ -607,7 +701,7 @@ export function PrescriptionResultView() {
           )}
 
           {/* Pharmacies ayant TOUTE l'ordonnance */}
-          <section>
+          <section id="pharmacies-complete">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <Eyebrow>Disponibilité complète</Eyebrow>
@@ -718,12 +812,65 @@ export function PrescriptionResultView() {
 
             {bestOption && (
               <Button
-                className="mt-4 w-full bg-brand-gradient text-white hover:opacity-90"
-                onClick={() => navigate("pharmacy-detail", { slug: bestOption.slug })}
+                className="mt-4 w-full bg-brand text-white hover:bg-brand-dark"
+                onClick={() => handlePaidAction("bestPharmacy")}
               >
-                <Award className="size-4" /> Voir la meilleure pharmacie
+                <Award className="size-4" />
+                {hasPass ? "Meilleure pharmacie" : "Meilleure pharmacie — 1 crédit"}
+                <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.bestPharmacy} className="ml-1.5" />
               </Button>
             )}
+
+            {/* Message Pass Ordonnance */}
+            {hasPass && (
+              <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
+                <span className="inline-flex items-center gap-1 font-bold text-amber-700">
+                  <Crown className="size-3" /> Pass Ordonnance actif — actions gratuites
+                </span>
+              </p>
+            )}
+          </Card>
+
+          {/* Actions avancées payantes */}
+          <Card className="border-border/70 p-4">
+            <div className="flex items-center gap-2">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+                <Zap className="size-4" />
+              </span>
+              <h3 className="text-base font-bold text-foreground">Actions avancées</h3>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {hasPass
+                ? "Toutes les actions avancées sont gratuites avec votre Pass Ordonnance."
+                : "Chaque action avancée utilise des crédits. Achetez un Pass Ordonnance pour un usage illimité."}
+            </p>
+
+            <div className="mt-3 space-y-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full justify-between border-brand/30 hover:bg-brand-light/40 hover:text-brand-dark"
+                onClick={() => handlePaidAction("compare")}
+              >
+                <span className="flex items-center gap-1.5">
+                  <TrendingDown className="size-3.5" />
+                  {hasPass ? "Comparer les prix" : "Comparer les prix — 1 crédit"}
+                </span>
+                <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.comparePharmacies} />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full justify-between border-brand/30 hover:bg-brand-light/40 hover:text-brand-dark"
+                onClick={() => handlePaidAction("confirm")}
+              >
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="size-3.5" />
+                  {hasPass ? "Confirmation pharmacie" : "Confirmation pharmacie — 3 crédits"}
+                </span>
+                <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.confirmBeforeVisit} />
+              </Button>
+            </div>
           </Card>
 
           {/* Action buttons */}
@@ -797,6 +944,21 @@ export function PrescriptionResultView() {
           professionnel de santé.
         </AlertMessage>
       </div>
+
+      {/* ============ DIALOGUE ACTION AVANCÉE PAYANTE ============ */}
+      <CreditConfirmDialog
+        open={paidAction !== null}
+        onOpenChange={(o) => {
+          if (!o) setPaidAction(null);
+        }}
+        title={paidAction ? PAID_ACTION_CONFIG[paidAction].title : ""}
+        cost={paidAction ? PAID_ACTION_CONFIG[paidAction].cost : 0}
+        description={paidAction ? PAID_ACTION_CONFIG[paidAction].description : ""}
+        benefits={paidAction ? PAID_ACTION_CONFIG[paidAction].benefits : []}
+        onConfirm={() => {
+          if (paidAction) performPaidAction(paidAction);
+        }}
+      />
     </div>
   );
 }

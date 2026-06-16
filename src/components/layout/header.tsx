@@ -14,6 +14,8 @@ import {
   CreditCard,
   CheckCheck,
   Coins,
+  Wallet,
+  Plus,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -114,10 +116,20 @@ export function Header() {
           {/* Notifications dropdown */}
           <NotificationDropdown />
 
-          {/* Credit balance badge */}
-          <button onClick={() => go("wallet")} className="hidden sm:block">
-            <CreditBadge />
-          </button>
+          {/* Credit balance badge + Recharger (desktop) */}
+          <div className="hidden items-center gap-1.5 sm:flex">
+            <button onClick={() => go("wallet")}>
+              <CreditBadge />
+            </button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 border-brand/30 px-2.5 text-xs font-semibold text-brand-dark hover:bg-brand-light"
+              onClick={() => go("wallet")}
+            >
+              <Plus className="size-3.5" /> Recharger
+            </Button>
+          </div>
 
           {/* Subscription button */}
           {premium ? (
@@ -247,6 +259,25 @@ export function Header() {
             </SheetTitle>
           </SheetHeader>
           <div className="mt-6 flex flex-col gap-1">
+            {/* Solde crédits + Recharger (mobile) */}
+            {user && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                <button
+                  onClick={() => go("wallet")}
+                  className="flex items-center gap-2"
+                >
+                  <CreditBadge />
+                </button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1 border-brand/30 px-2.5 text-xs font-semibold text-brand-dark hover:bg-brand-light"
+                  onClick={() => go("wallet")}
+                >
+                  <Plus className="size-3.5" /> Recharger
+                </Button>
+              </div>
+            )}
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.view}
@@ -292,6 +323,15 @@ export function Header() {
                     {unread}
                   </span>
                 )}
+              </span>
+              <ChevronRight className="size-4 opacity-50" />
+            </button>
+            <button
+              onClick={() => go("wallet")}
+              className="flex items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
+            >
+              <span className="flex items-center gap-2">
+                <Wallet className="size-4" /> Portefeuille
               </span>
               <ChevronRight className="size-4 opacity-50" />
             </button>

@@ -494,6 +494,60 @@ export function ProfileView() {
             </div>
           </section>
 
+          {/* ============ RESTRICTIONS DE MON COMPTE ============ */}
+          <section>
+            <SectionTitle icon={Lock} title="Restrictions de mon compte" />
+            <Card className="border-border/70 p-5">
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                  <span>
+                    Sans crédit, vous pouvez rechercher des informations simples.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                  <span>
+                    Sans crédit, vous ne pouvez pas utiliser le module Ordonnance.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                  <span>
+                    Sans crédit, vous ne pouvez pas voir les pharmacies qui possèdent réellement un médicament.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                  <span>
+                    Sans crédit, vous ne pouvez pas comparer les prix.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                  <span>
+                    Sans crédit, vous ne pouvez pas demander de confirmation avant déplacement.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3 rounded-xl bg-success-light/40 p-3 text-sm font-bold text-foreground">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+                  <div className="flex-1">
+                    <p>
+                      Rechargez vos crédits ou achetez un Pass Ordonnance pour débloquer ces services.
+                    </p>
+                    <Button
+                      size="sm"
+                      className="mt-2 bg-brand text-white hover:bg-brand-dark"
+                      onClick={() => navigate("wallet")}
+                    >
+                      <Wallet className="size-4" /> Recharger
+                    </Button>
+                  </div>
+                </li>
+              </ul>
+            </Card>
+          </section>
+
           {/* ============ NOTIFICATIONS PERSONNALISÉES ============ */}
           {notifications.length > 0 && (
             <section>

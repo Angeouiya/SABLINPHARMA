@@ -305,9 +305,7 @@ export function HomeView() {
 
           <div className="mt-8">
             <AlertMessage variant="info">
-              Les recherches simples sont gratuites. Les services avancés
-              fonctionnent avec des crédits à partir de 200 FCFA. Aucun abonnement
-              obligatoire.
+              Les recherches simples sont accessibles. Les services avancés comme l&rsquo;ordonnance, les disponibilités réelles, la comparaison et les confirmations nécessitent des crédits.
             </AlertMessage>
           </div>
         </div>

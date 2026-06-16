@@ -47,6 +47,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Heading, Eyebrow, Muted, Price, PriceRange } from "@/components/ui/typography";
 import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
 import { CreditCost } from "@/components/shared/credit-cost";
+import { LockedView } from "@/components/shared/locked-view";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
 import { useCredits, CREDIT_COSTS } from "@/store/credits";
@@ -128,8 +129,9 @@ const STATUS_CONFIG = {
 export function PrescriptionView() {
   const { navigate } = useNav();
   const { user, premium } = useAuth();
-  const { hasPass } = useCredits();
+  const { credits, hasPass } = useCredits();
   const [showCreditDialog, setShowCreditDialog] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -218,8 +220,7 @@ export function PrescriptionView() {
     setShowSuggestions(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const performAdd = () => {
     if (!formName.trim()) {
       toast.error("Veuillez saisir le nom du médicament.");
       return;
@@ -271,6 +272,16 @@ export function PrescriptionView() {
     resetForm();
     setShowForm(false);
     setEstimate(null);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // L'édition reste gratuite ; un ajout est payant (1 crédit) sauf si Pass Ordonnance actif.
+    if (!editingSlug && !hasPass) {
+      setShowAddDialog(true);
+      return;
+    }
+    performAdd();
   };
 
   const removeItem = (slug: string) => {
@@ -396,6 +407,19 @@ export function PrescriptionView() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* ============ ACCÈS VERROUILLÉ ============ */}
+      {credits === 0 && !hasPass && (
+        <LockedView
+          title="Le service Ordonnance nécessite des crédits ou un Pass Ordonnance actif"
+          message="L'ajout de médicaments et l'estimation d'ordonnance sont des services avancés qui nécessitent des crédits."
+          cost={1}
+          backLabel="Retour à l'accueil"
+          backView="home"
+        />
+      )}
+
+      {credits !== 0 || hasPass ? (
+        <>
       {/* Back link */}
       <button
         onClick={() => navigate("home")}
@@ -635,9 +659,19 @@ export function PrescriptionView() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button type="submit" className="bg-brand-gradient text-white hover:opacity-90">
+                  <Button type="submit" className="bg-brand text-white hover:bg-brand-dark">
                     <Plus className="size-4" />
-                    {editingSlug ? "Modifier" : "Ajouter à l'ordonnance"}
+                    {editingSlug
+                      ? "Modifier"
+                      : hasPass
+                      ? "Ajouter à l'ordonnance"
+                      : "Ajouter à l'ordonnance — 1 crédit"}
+                    {!editingSlug && (
+                      <CreditCost
+                        cost={hasPass ? 0 : 1}
+                        className="ml-1.5"
+                      />
+                    )}
                   </Button>
                   <Button
                     type="button"
@@ -890,7 +924,8 @@ export function PrescriptionView() {
                 </>
               ) : (
                 <>
-                  <Calculator className="size-4" /> Estimer le coût
+                  <Calculator className="size-4" />
+                  {hasPass ? "Estimer le coût" : "Estimer le coût — 2 crédits"}
                   <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.estimatePrescription} className="ml-1.5" />
                 </>
               )}
@@ -900,12 +935,13 @@ export function PrescriptionView() {
             <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
               {hasPass ? (
                 <span className="inline-flex items-center gap-1 font-bold text-amber-700">
-                  <Crown className="size-3" /> Pass Ordonnance actif — estimation gratuite
+                  <Crown className="size-3" /> Pass Ordonnance actif — actions gratuites
                 </span>
               ) : (
                 <>
-                  L&apos;ajout des médicaments est gratuit. L&apos;estimation complète coûte{" "}
-                  <span className="font-bold text-brand-dark">2 crédits</span>.
+                  L&apos;ajout d&apos;un médicament coûte{" "}
+                  <span className="font-bold text-brand-dark">1 crédit</span>. L&apos;estimation
+                  complète coûte <span className="font-bold text-brand-dark">2 crédits</span>.
                 </>
               )}
             </p>
@@ -1037,6 +1073,23 @@ export function PrescriptionView() {
         ]}
         onConfirm={() => handleEstimate()}
       />
+
+      {/* ============ DIALOGUE AJOUT DE MÉDICAMENT (1 CRÉDIT) ============ */}
+      <CreditConfirmDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        title="Ajouter ce médicament"
+        cost={1}
+        description="Cette action coûte 1 crédit. Elle vous permet d'ajouter ce médicament à votre ordonnance."
+        benefits={[
+          "Ajouter le médicament à votre liste",
+          "Modifier la quantité et la durée",
+          "Supprimer gratuitement à tout moment",
+        ]}
+        onConfirm={performAdd}
+      />
+        </>
+      ) : null}
     </div>
   );
 }

@@ -1152,3 +1152,234 @@ Stage Summary:
 - Prévention débordement horizontal (overflow-x hidden, max-width 100% médias)
 - Titres avec word-wrap pour éviter les coupures
 - 0 overflow sur tous les viewports et toutes les pages
+
+---
+Task ID: 303-a
+Agent: subagent (303-a)
+Task: Mise à jour de 5 fichiers pour la pédagogie des crédits SABLIN PHARMA (header, bottom-nav, profile-view, wallet-view, home-view)
+
+Work Log:
+- Lecture du worklog partagé et des composants partagés (CreditBadge, LockedView, CreditCost/PassBadge, store credits)
+- FICHIER 1 — src/components/layout/header.tsx :
+  * Imports ajoutés : Wallet, Plus (lucide-react)
+  * CreditBadge désormais affiché dans le menu Sheet mobile (encadré avec bordure + bouton Recharger)
+  * Bouton "Recharger" (outline, sm:inline-flex) ajouté à côté du CreditBadge dans le header desktop
+  * Lien "Portefeuille" (icône Wallet) ajouté dans le Sheet mobile entre "Notifications" et "Paramètres"
+- FICHIER 2 — src/components/layout/bottom-nav.tsx :
+  * Item "Profil" remplacé par "Portefeuille" (vue wallet, icône Wallet)
+  * 5 items : Accueil, Médicaments, Ordonnance, Pharmacies, Portefeuille
+  * Profil reste accessible via le menu compte du header (DropdownMenu + Sheet)
+- FICHIER 3 — src/components/views/profile-view.tsx :
+  * Nouvelle section "Restrictions de mon compte" ajoutée APRÈS "Mes accès SABLIN PHARMA"
+  * SectionTitle avec icône Lock, Card avec liste de 6 messages :
+    - 5 messages "Sans crédit..." avec icône Lock rouge (text-danger)
+    - 1 message final "Rechargez vos crédits..." en gras avec CheckCircle2 vert + bouton Recharger → wallet
+- FICHIER 4 — src/components/views/wallet-view.tsx :
+  * Imports ajoutés : Lock, Crown (lucide-react)
+  * Nouvelle section "Services bloqués sans crédits" ajoutée APRÈS le tableau des tarifs
+  * SectionTitle avec icône Lock, Card avec grille de 8 services (Lock rouge) :
+    Module Ordonnance, Ajout de médicament à une ordonnance, Estimation complète, Meilleure pharmacie, Comparaison des prix, Disponibilité réelle par pharmacie, Confirmation avant déplacement, Alertes de disponibilité
+  * Bandeau en bas avec message "Rechargez vos crédits à partir de 200 FCFA ou achetez un Pass Ordonnance à 300 FCFA..." + boutons "Recharger" (scroll packs) et "Acheter un Pass" (navigate payment passOrdonnance)
+- FICHIER 5 — src/components/views/home-view.tsx :
+  * AlertMessage existant dans "Comment fonctionne SABLIN PHARMA ?" remplacé par le nouveau message pédagogique :
+    "Les recherches simples sont accessibles. Les services avancés comme l'ordonnance, les disponibilités réelles, la comparaison et les confirmations nécessitent des crédits."
+- Composant partagé CreditBadge modifié : si solde = 0, badge affiché en rouge (bg-danger-light text-danger) au lieu de (bg-brand-light text-brand-dark)
+- Contraintes respectées :
+  * Aucune couleur dégradée ajoutée (uniquement couleurs pleines : bg-brand, bg-brand-light, bg-danger-light, bg-success-light, bg-muted/30, bg-amber-50)
+  * Titres en text-foreground
+  * Texte toujours lisible (text-foreground, text-foreground/85, text-brand-dark, text-danger, text-success)
+  * Tout en français
+- Lint : 0 erreur, 0 warning
+- Dev server : compilation OK, pas d'erreur runtime
+
+Stage Summary:
+- Pédagogie des crédits renforcée sur 5 fichiers clés
+- CreditBadge visuel dynamique (rouge si solde 0, vert brand sinon)
+- Accès au Portefeuille mis en avant : bottom-nav mobile, header desktop (badge + Recharger), Sheet mobile (badge + Recharger + lien Portefeuille)
+- Profil : nouvelle section "Restrictions de mon compte" qui liste clairement ce qui est bloqué sans crédit + appel à l'action
+- Portefeuille : nouvelle section "Services bloqués sans crédits" avec les 8 services payants + double CTA (Recharger / Acheter Pass)
+- Accueil : message pédagogique actualisé dans "Comment fonctionne SABLIN PHARMA ?"
+
+---
+Task ID: 302-a
+Agent: 302-a (credit-gating views)
+
+Task: Amélioration du système de crédits sur 2 vues (medication-detail-view + pharmacy-detail-view)
+
+Work Log:
+- Lecture du worklog + stores crédits (useCredits, CREDIT_COSTS, hasPass) + composants partagés (LockedView, CreditConfirmDialog, CreditCost)
+- FICHIER 1 — src/components/views/medication-detail-view.tsx :
+  * Import ajouté : Lock (lucide-react) ; useCredits étendu pour récupérer hasPass
+  * Nouveaux states : showPrescriptionDialog, showPricesDialog, pricesUnlocked (reset au changement de médicament)
+  * Actions fiche médicament : nouveau bouton "Ajouter à mon ordonnance" + CreditCost cost={1} (cost={0} si hasPass). Au clic : si hasPass → toast + navigate("prescription") directement ; sinon ouvre CreditConfirmDialog (title="Ajouter à mon ordonnance", cost=1, description="Ce médicament sera ajouté à votre ordonnance pour estimation.", benefits=["Médicament ajouté à votre liste","Vous pouvez lancer l'estimation ensuite"], onConfirm → toast + navigate("prescription"))
+  * Bouton primaire "Estimer mon ordonnance" : bg-brand-gradient remplacé par bg-brand (couleur pleine, contrainte respectée)
+  * Après déverrouillage des pharmacies : bannière "Voir les prix détaillés par pharmacie" + bouton "Voir les prix détaillés" + CreditCost cost={1}, masquée si hasPass ou pricesUnlocked. CreditConfirmDialog dédié (cost=1, onConfirm → setPricesUnlocked(true))
+  * PharmacyMedCard : nouveau prop pricesUnlocked (boolean). Cellule "Prix indicatif" affiche le prix si pricesUnlocked, sinon "Masqué" avec icône Lock
+  * Badge "Gratuit" (CreditCost cost={0}) déjà présent sur les infos générales (nom, DCI, dosage, forme, catégorie, description, prix indicatif général) — conservé
+  * 3 CreditConfirmDialog au total (pharmacies + ordonnance + prix détaillés)
+- FICHIER 2 — src/components/views/pharmacy-detail-view.tsx :
+  * Imports ajoutés : Coins, Lock (lucide-react) ; CreditConfirmDialog, CreditCost (composants partagés) ; useCredits, CREDIT_COSTS (store)
+  * Nouveaux states : availabilityUnlocked, pricesUnlocked, showAvailabilityDialog, showPricesDialog, showCompareDialog, showConfirmDialog (reset availability/prices au changement de pharmacie) ; hasPass récupéré du store
+  * Bouton primaire "Appeler" : bg-brand-gradient remplacé par bg-brand (couleur pleine)
+  * Section médicaments : 2 bannières de déverrouillage côte à côte (sm:grid-cols-2) :
+    - "Voir la disponibilité" + CreditCost cost={1} (CREDIT_COSTS.alertAvailability) → CreditConfirmDialog (title="Disponibilité des médicaments", description="Voir quels médicaments sont en stock dans cette pharmacie.", benefits=["Stock exact par médicament","Disponibilité en temps réel"], onConfirm → setAvailabilityUnlocked(true))
+    - "Voir les prix" + CreditCost cost={1} (CREDIT_COSTS.seePrices) → CreditConfirmDialog (title="Prix détaillés des médicaments", benefits=["Prix exact par médicament","Comparaison rapide","Budget maîtrisé"], onConfirm → setPricesUnlocked(true))
+    - Bannières masquées si hasPass (accès direct gratuit)
+  * Liste médicaments : chaque item affiche prix (Price) si hasPass||pricesUnlocked sinon badge "Prix masqué" (Lock) ; MedStatusBadge si hasPass||availabilityUnlocked sinon badge "Masqué" (Lock)
+  * Carte "Actions rapides" : 2 nouveaux boutons full-width :
+    - "Comparer avec d'autres pharmacies" + CreditCost cost={1} (CREDIT_COSTS.comparePharmacies) → si hasPass toast+navigate, sinon CreditConfirmDialog (benefits=["Tableau comparatif détaillé","Meilleur rapport prix/distance","Choix éclairé"], onConfirm → toast+navigate("pharmacies"))
+    - "Demander une confirmation" + CreditCost cost={3} (CREDIT_COSTS.confirmBeforeVisit) → si hasPass toast direct, sinon CreditConfirmDialog (title="Confirmation avant déplacement", description="La pharmacie confirmera le stock avant votre déplacement.", benefits=["Éviter un déplacement inutile","Confirmation par téléphone","Gain de temps garanti"], onConfirm → toast)
+  * 4 CreditConfirmDialog au total (disponibilité + prix + comparaison + confirmation)
+  * Infos basiques restent GRATUITES : nom, commune, quartier, téléphone, horaires, statut ouvert/fermé, garde (déjà affichés sans gate)
+- Contraintes respectées :
+  * AUCUNE couleur dégradée ajoutée (uniquement bg-brand, bg-brand-dark, bg-brand-light, bg-muted — couleurs pleines)
+  * bg-brand-gradient remplacé par bg-brand sur les boutons modifiés
+  * Titres en text-foreground / text-brand-dark
+  * Texte toujours lisible (text-foreground, text-muted-foreground, text-white sur fond vert)
+  * Tout en français
+- Lint : 0 erreur, 0 warning
+- Dev server : compilation OK (✓ Compiled in 510ms), pas d'erreur runtime
+
+Stage Summary:
+- medication-detail-view : 3 actions crédits (voir pharmacies 1 crédit, ajouter ordonnance 1 crédit, voir prix détaillés 1 crédit) + infos générales gratuites (badge Gratuit)
+- pharmacy-detail-view : 4 actions crédits (disponibilité 1 crédit, prix 1 crédit, comparer 1 crédit, confirmation déplacement 3 crédits) + infos basiques gratuites
+- Pass Ordonnance (hasPass) : déverrouille GRATUITEMENT toutes les actions crédits des 2 vues
+- Lock visuel (icône Lock + "Masqué") quand une info crédit est verrouillée
+- CreditConfirmDialog utilisé pour toutes les actions payantes (débit automatique + toast de confirmation + redirection wallet si solde insuffisant)
+
+---
+Task ID: 301-a
+Agent: prescription-credits-refactor (views Ordonnance)
+Task: Verrouillage par crédits/Pass des vues Ordonnance (prescription-view + prescription-result-view)
+
+Work Log:
+- Lecture du worklog + 4 fichiers partagés (useCredits/CREDIT_COSTS, LockedView, CreditConfirmDialog, CreditCost) avant intervention
+- Source de vérité : useCredits expose `credits` (number) et `hasPass` (boolean) ; CREDIT_COSTS.bestPharmacy=1, comparePharmacies=1, confirmBeforeVisit=3, estimatePrescription=2
+
+FICHIER 1 — src/components/views/prescription-view.tsx (Edit ciblé)
+- Import ajouté : LockedView depuis @/components/shared/locked-view
+- useCredits : déstructuration étendue à { credits, hasPass } (auparavant seulement hasPass)
+- Nouveau state : showAddDialog (modale ajout médicament)
+- Refactor handleSubmit : extraction de performAdd() (logique d'ajout effective) + handleSubmit intercepte la soumission
+  * Si editingSlug (modification) ou hasPass → performAdd() direct (gratuit)
+  * Sinon → setShowAddDialog(true) → CreditConfirmDialog cost=1 → onConfirm=performAdd
+- Nouveau bloc en tête de return : {credits === 0 && !hasPass && <LockedView title="Le service Ordonnance nécessite des crédits ou un Pass Ordonnance actif" message="L'ajout de médicaments et l'estimation d'ordonnance sont des services avancés qui nécessitent des crédits." cost={1} backLabel="Retour à l'accueil" backView="home" />}
+- Tout le reste du rendu encapsulé dans {credits !== 0 || hasPass ? (<> ... </>) : null}
+- Bouton submit "Ajouter à l'ordonnance" :
+  * Label dynamique : "Ajouter à l'ordonnance" (Pass actif ou édition) / "Ajouter à l'ordonnance — 1 crédit" (!hasPass, ajout)
+  * Badge CreditCost ajouté (cost = hasPass ? 0 : 1) sur ajout seulement (pas sur "Modifier")
+  * Classe solid color : bg-brand text-white hover:bg-brand-dark (pas de dégradé)
+- Bouton "Estimer le coût" :
+  * Label dynamique : "Estimer le coût" (Pass actif) / "Estimer le coût — 2 crédits" (!hasPass)
+  * Badge CreditCost conservé (cost = hasPass ? 0 : CREDIT_COSTS.estimatePrescription)
+- Message informatif sous le bouton Estimer :
+  * hasPass → "Pass Ordonnance actif — actions gratuites" (text-amber-700, icône Crown)
+  * !hasPass → "L'ajout d'un médicament coûte 1 crédit. L'estimation complète coûte 2 crédits."
+- Nouveau CreditConfirmDialog ajouté en fin de composant :
+  * title="Ajouter ce médicament" cost={1}
+  * description="Cette action coûte 1 crédit. Elle vous permet d'ajouter ce médicament à votre ordonnance."
+  * benefits=["Ajouter le médicament à votre liste", "Modifier la quantité et la durée", "Supprimer gratuitement à tout moment"]
+  * onConfirm=performAdd
+- L'édition d'un médicament existant (editingSlug) reste gratuite (pas de dialog) — seuls les nouveaux ajouts sont payants
+
+FICHIER 2 — src/components/views/prescription-result-view.tsx (Edit ciblé)
+- Imports ajoutés : LockedView, CreditConfirmDialog, CreditCost, useCredits + CREDIT_COSTS
+- useCredits : { hasPass } ajouté au composant principal
+- Nouveau type local PaidAction = "bestPharmacy" | "compare" | "confirm"
+- Nouvelle constante PAID_ACTION_CONFIG : table de configuration des 3 actions payantes (title, cost depuis CREDIT_COSTS, description, benefits)
+- Nouveau state : paidAction (PaidAction | null) — un seul dialog partagé pour les 3 actions
+- Nouvelles fonctions :
+  * performPaidAction(action) : bestPharmacy → navigate pharmacy-detail / compare → scroll vers #pharmacies-complete + toast / confirm → toast de confirmation
+  * handlePaidAction(action) : if hasPass → performPaidAction direct / sinon → setPaidAction(action) (ouvre dialog)
+- useEffect modifié : si !items.length, ne navigue plus vers "prescription" — à la place setLoading(false) + setEstimate(null) (le rendu gère l'affichage via LockedView)
+- Nouveau early-return (après tous les hooks) : if (!estimateItems || estimateItems.length === 0) → <LockedView title="Résultat indisponible" message="Veuillez utiliser 2 crédits ou un Pass Ordonnance pour lancer l'estimation complète." cost={2} backLabel="Retour à l'ordonnance" backView="prescription" />
+- id="pharmacies-complete" ajouté à la section "Pharmacies ayant toute l'ordonnance" (cible du scroll pour l'action "Comparer les prix")
+- 2 boutons "Voir la meilleure pharmacie" (carte best option + carte résumé) refactorisés :
+  * onClick → handlePaidAction("bestPharmacy") au lieu de navigate direct
+  * Label : "Meilleure pharmacie" (hasPass) / "Meilleure pharmacie — 1 crédit" (!hasPass)
+  * Badge CreditCost (cost = hasPass ? 0 : CREDIT_COSTS.bestPharmacy)
+  * Classe solid color bg-brand text-white hover:bg-brand-dark
+- Message "Pass Ordonnance actif — actions gratuites" ajouté sous le bouton Meilleure pharmacie du résumé (uniquement si hasPass)
+- Nouvelle carte "Actions avancées" insérée entre le résumé et la carte "Action buttons" :
+  * Header avec icône Zap (bg-brand-light)
+  * Description contextuelle (gratuit si Pass, sinon pédagogique)
+  * Bouton "Comparer les prix — 1 crédit" (CreditCost) → handlePaidAction("compare")
+  * Bouton "Confirmation pharmacie — 3 crédits" (CreditCost) → handlePaidAction("confirm")
+  * Labels dynamiques : sans "— N crédits" si hasPass
+- Nouveau CreditConfirmDialog partagé en fin de composant :
+  * open={paidAction !== null}
+  * onOpenChange reset paidAction à null si fermeture
+  * title/cost/description/benefits alimentés dynamiquement depuis PAID_ACTION_CONFIG[paidAction]
+  * onConfirm → performPaidAction(paidAction)
+
+CONTRAINTES RESPECTÉES
+- AUCUNE couleur dégradée ajoutée : toutes les nouvelles classes utilisent bg-brand text-white hover:bg-brand-dark, bg-brand-light, text-brand, text-brand-dark (couleurs pleines)
+- .bg-brand-gradient existant conservé tel quel : vérifié dans globals.css, la classe porte un nom trompeur mais rend en réalité une couleur pleine (background-color: var(--brand), commentaire "Brand solid colors (NO gradients)")
+- Titres en text-foreground (h1/h2/h3 du formulaire, "Actions avancées", "Résumé de l'ordonnance")
+- Texte toujours lisible : blanc sur fond brand, text-foreground sur fond clair, text-muted-foreground pour le secondaire
+
+Vérifications :
+- bun run lint : 0 erreur, 0 warning
+- tsc --noEmit : aucune nouvelle erreur sur les 2 fichiers modifiés (erreurs préexistantes sur autres fichiers non touchés)
+- dev.log surveillé : compilation OK, aucune erreur liée aux modifications
+- Pas de tests écrits (conforme aux règles)
+- Hooks rules respectées : tous les useState/useEffect/useMemo appelés avant tout return conditionnel
+
+Stage Summary:
+- prescription-view.tsx : accès Ordonnance verrouillé si credits===0 && !hasPass (LockedView) ; ajout médicament = 1 crédit via CreditConfirmDialog (gratuit si Pass ou édition) ; estimation = 2 crédits (déjà en place) ; labels "— 1 crédit" / "— 2 crédits" affichés si !hasPass ; message "Pass Ordonnance actif — actions gratuites" si hasPass
+- prescription-result-view.tsx : LockedView "Résultat indisponible" cost=2 si !estimateItems ou items vides ; 3 actions avancées payantes (Meilleure pharmacie 1 crédit / Comparer les prix 1 crédit / Confirmation pharmacie 3 crédits) avec CreditCost visible et dialog de confirmation ; gratuites si hasPass ; 1 seul CreditConfirmDialog partagé avec contenu dynamique
+- Couleurs pleines uniquement, contrastes préservés, texte lisible partout
+- UX cohérente : pédagogie des coûts visible sur chaque bouton, comportement attendu prévisible (Pass = gratuit, credits = dialog de confirmation puis débit)
+
+---
+Task ID: 32
+Agent: main (orchestrator)
+Task: Harmonisation règles d'accès strictes basées sur les crédits
+
+Work Log:
+- Création composant LockedView (@/components/shared/locked-view.tsx) : page verrouillée professionnelle avec icône cadenas, titre, message, coût nécessaire, solde actuel, boutons "Recharger maintenant" + "Acheter un Pass Ordonnance — 300 FCFA", message "Aucun crédit ne sera débité sans confirmation"
+- Mise à jour CreditConfirmDialog : ajout bouton "Acheter un Pass Ordonnance — 300 FCFA" quand solde insuffisant, texte "Solde insuffisant" en rouge, boutons Confirmer/Annuler en flex-row
+- Module Ordonnance verrouillé (prescription-view.tsx) :
+  * Si credits===0 && !hasPass → LockedView "Le service Ordonnance nécessite des crédits ou un Pass Ordonnance actif"
+  * Ajout médicament = 1 crédit (CreditConfirmDialog, sauf si hasPass)
+  * Estimation = 2 crédits (CreditConfirmDialog, sauf si hasPass)
+  * Boutons avec coûts visibles : "Ajouter à l'ordonnance — 1 crédit", "Estimer le coût — 2 crédits"
+  * Pass actif : actions gratuites, message "Pass Ordonnance actif — actions gratuites"
+- Résultat ordonnance verrouillé (prescription-result-view.tsx) :
+  * Si !estimateItems → LockedView "Résultat indisponible. Veuillez utiliser 2 crédits ou un Pass Ordonnance"
+  * Actions avancées payantes : Meilleure pharmacie 1 crédit, Comparer les prix 1 crédit, Confirmation pharmacie 3 crédits
+  * Pass actif : actions gratuites
+- Détail médicament (medication-detail-view.tsx) :
+  * Infos générales gratuites (badge "Gratuit")
+  * Voir pharmacies disponibles = 1 crédit (déjà existant)
+  * Voir prix détaillés par pharmacie = 1 crédit (nouveau, state pricesUnlocked)
+  * Bouton "Ajouter à mon ordonnance — 1 crédit" (CreditConfirmDialog, sauf si hasPass)
+- Détail pharmacie (pharmacy-detail-view.tsx) :
+  * Infos basiques gratuites (nom, commune, quartier, téléphone, horaires, statut, garde)
+  * Voir disponibilité = 1 crédit (state availabilityUnlocked)
+  * Voir prix = 1 crédit (state pricesUnlocked)
+  * Comparer avec autres pharmacies = 1 crédit
+  * Demander confirmation = 3 crédits
+- Header : badge crédits visible desktop + mobile (Sheet), bouton "Recharger" rapide, badge rouge si 0 crédit, "Portefeuille" dans menu mobile
+- BottomNav : "Profil" remplacé par "Portefeuille" (icône Wallet), 5 items : Accueil, Médicaments, Ordonnance, Pharmacies, Portefeuille
+- Profil : section "Restrictions de mon compte" (5 messages "Sans crédit..." + bouton Recharger)
+- Wallet : section "Services bloqués sans crédits" (8 services listés avec icône Lock)
+- Accueil : message pédagogique "Les recherches simples sont accessibles. Les services avancés nécessitent des crédits."
+- Régénération Prisma client (CreditTransaction, PassOrdonnance)
+- Vérification Agent Browser :
+  * Utilisateur avec 0 crédit → page Ordonnance verrouillée (LockedView avec boutons Recharger + Pass) — VLM confirme "Page verrouillée avec message, boutons Recharger et Pass présents"
+  * Mobile : page verrouillée lisible et adaptée
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Règles d'accès strictes basées sur les crédits implémentées sur toute la plateforme
+- Module Ordonnance bloqué si 0 crédit et 0 Pass (LockedView professionnelle)
+- Ajout médicament = 1 crédit, Estimation = 2 crédits, Meilleure pharmacie = 1, Comparaison = 1, Confirmation = 3
+- Pass Ordonnance (300 FCFA) = toutes actions gratuites pour une session
+- Détail médicament : pharmacies 1 crédit, prix 1 crédit, ajouter ordonnance 1 crédit
+- Détail pharmacie : disponibilité 1 crédit, prix 1 crédit, comparaison 1 crédit, confirmation 3 crédits
+- Modale confirmation obligatoire avant toute action payante (coût, solde, solde après, bénéfices)
+- Solde insuffisant → modale avec boutons Recharger + Pass + Annuler
+- Navigation : Portefeuille dans bottom-nav, header avec badge crédits + Recharger
+- Profil : section restrictions, Wallet : services bloqués
+- Couleurs pleines, pas de dégradé, contrastes vérifiés

@@ -26,6 +26,8 @@ import {
   Info,
   ChevronRight,
   MapPinned,
+  Coins,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,8 +39,11 @@ import { FavoriteButton } from "@/components/shared/favorite-button";
 import { AlertMessage } from "@/components/shared/alert-message";
 import { EmptyState } from "@/components/shared/empty-state";
 import { GoogleMap } from "@/components/shared/google-map";
+import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
+import { CreditCost } from "@/components/shared/credit-cost";
 import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
+import { useCredits, CREDIT_COSTS } from "@/store/credits";
 import { distanceKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -93,6 +98,13 @@ export function PharmacyDetailView() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [medQuery, setMedQuery] = useState("");
+  const [availabilityUnlocked, setAvailabilityUnlocked] = useState(false);
+  const [pricesUnlocked, setPricesUnlocked] = useState(false);
+  const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
+  const [showPricesDialog, setShowPricesDialog] = useState(false);
+  const [showCompareDialog, setShowCompareDialog] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const { hasPass } = useCredits();
 
   useEffect(() => {
     if (!params.slug) {
@@ -102,6 +114,8 @@ export function PharmacyDetailView() {
     let active = true;
     setLoading(true);
     setNotFound(false);
+    setAvailabilityUnlocked(false);
+    setPricesUnlocked(false);
     (async () => {
       try {
         const r = await fetch(`/api/pharmacies/${params.slug}`);
@@ -395,7 +409,7 @@ export function PharmacyDetailView() {
           <Card className="border-border/70 p-4 shadow-premium">
             <h3 className="mb-3 text-sm font-bold text-foreground">Actions rapides</h3>
             <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" className="bg-brand-gradient text-white hover:opacity-90" asChild>
+              <Button size="sm" className="bg-brand text-white hover:bg-brand-dark" asChild>
                 <a href={phoneHref}>
                   <Phone className="size-4" /> Appeler
                 </a>
@@ -435,6 +449,42 @@ export function PharmacyDetailView() {
               }}
             >
               <Pill className="size-4" /> Voir médicaments disponibles
+            </Button>
+
+            {/* Comparer avec d'autres pharmacies — 1 crédit */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+              onClick={() => {
+                if (hasPass) {
+                  toast.success("Comparaison lancée");
+                  navigate("pharmacies");
+                } else {
+                  setShowCompareDialog(true);
+                }
+              }}
+            >
+              <MapPinned className="size-4" /> Comparer avec d'autres pharmacies
+              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.comparePharmacies} className="ml-1" />
+            </Button>
+
+            {/* Demander une confirmation avant déplacement — 3 crédits */}
+            <Button
+              size="sm"
+              className="mt-2 w-full bg-brand text-white hover:bg-brand-dark"
+              onClick={() => {
+                if (hasPass) {
+                  toast.success("Demande de confirmation envoyée", {
+                    description: "La pharmacie vous rappellera pour confirmer le stock.",
+                  });
+                } else {
+                  setShowConfirmDialog(true);
+                }
+              }}
+            >
+              <Phone className="size-4" /> Demander une confirmation
+              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.confirmBeforeVisit} className="ml-1" />
             </Button>
           </Card>
 
@@ -484,6 +534,66 @@ export function PharmacyDetailView() {
             </button>
           )}
         </div>
+
+        {/* Bannières de déverrouillage créditées : disponibilité + prix */}
+        {(!hasPass || !availabilityUnlocked || !pricesUnlocked) && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {!hasPass && !availabilityUnlocked && (
+              <Card className="border-brand/20 p-4">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-3">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+                      <Package className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-extrabold text-foreground">
+                        Voir la disponibilité
+                      </h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Stock exact par médicament dans cette pharmacie.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-brand text-white hover:bg-brand-dark"
+                    onClick={() => setShowAvailabilityDialog(true)}
+                  >
+                    <Coins className="size-4" /> Voir la disponibilité
+                    <CreditCost cost={CREDIT_COSTS.alertAvailability} className="ml-1" />
+                  </Button>
+                </div>
+              </Card>
+            )}
+            {!hasPass && !pricesUnlocked && (
+              <Card className="border-brand/20 p-4">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-3">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+                      <Coins className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-extrabold text-foreground">
+                        Voir les prix
+                      </h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Prix indicatif précis pour chaque médicament.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="bg-brand text-white hover:bg-brand-dark"
+                    onClick={() => setShowPricesDialog(true)}
+                  >
+                    <Coins className="size-4" /> Voir les prix
+                    <CreditCost cost={CREDIT_COSTS.seePrices} className="ml-1" />
+                  </Button>
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* Medication list */}
         <div className="mt-4 space-y-2.5">
@@ -535,8 +645,20 @@ export function PharmacyDetailView() {
                       </div>
                     </button>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      <Price amount={m.price} size="sm" variant="brand" />
-                      <MedStatusBadge status={status} />
+                      {(hasPass || pricesUnlocked) ? (
+                        <Price amount={m.price} size="sm" variant="brand" />
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                          <Lock className="size-2.5" /> Prix masqué
+                        </span>
+                      )}
+                      {(hasPass || availabilityUnlocked) ? (
+                        <MedStatusBadge status={status} />
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+                          <Lock className="size-2.5" /> Masqué
+                        </span>
+                      )}
                     </div>
                     <Button
                       size="sm"
@@ -596,6 +718,66 @@ export function PharmacyDetailView() {
           d&apos;information — aucune vente en ligne.
         </AlertMessage>
       </section>
+
+      {/* ============ DIALOGUES CRÉDITS ============ */}
+      <CreditConfirmDialog
+        open={showAvailabilityDialog}
+        onOpenChange={setShowAvailabilityDialog}
+        title="Disponibilité des médicaments"
+        cost={CREDIT_COSTS.alertAvailability}
+        description="Voir quels médicaments sont en stock dans cette pharmacie."
+        benefits={[
+          "Stock exact par médicament",
+          "Disponibilité en temps réel",
+        ]}
+        onConfirm={() => setAvailabilityUnlocked(true)}
+      />
+      <CreditConfirmDialog
+        open={showPricesDialog}
+        onOpenChange={setShowPricesDialog}
+        title="Prix détaillés des médicaments"
+        cost={CREDIT_COSTS.seePrices}
+        description="Voir le prix indicatif de chaque médicament dans cette pharmacie."
+        benefits={[
+          "Prix exact par médicament",
+          "Comparaison rapide",
+          "Budget maîtrisé",
+        ]}
+        onConfirm={() => setPricesUnlocked(true)}
+      />
+      <CreditConfirmDialog
+        open={showCompareDialog}
+        onOpenChange={setShowCompareDialog}
+        title="Comparer avec d'autres pharmacies"
+        cost={CREDIT_COSTS.comparePharmacies}
+        description="Comparez cette pharmacie avec d'autres pharmacies à Abidjan."
+        benefits={[
+          "Tableau comparatif détaillé",
+          "Meilleur rapport prix/distance",
+          "Choix éclairé",
+        ]}
+        onConfirm={() => {
+          toast.success("Comparaison débloquée");
+          navigate("pharmacies");
+        }}
+      />
+      <CreditConfirmDialog
+        open={showConfirmDialog}
+        onOpenChange={setShowConfirmDialog}
+        title="Confirmation avant déplacement"
+        cost={CREDIT_COSTS.confirmBeforeVisit}
+        description="La pharmacie confirmera le stock avant votre déplacement."
+        benefits={[
+          "Éviter un déplacement inutile",
+          "Confirmation par téléphone",
+          "Gain de temps garanti",
+        ]}
+        onConfirm={() => {
+          toast.success("Demande de confirmation envoyée", {
+            description: "La pharmacie vous rappellera pour confirmer le stock.",
+          });
+        }}
+      />
     </div>
   );
 }

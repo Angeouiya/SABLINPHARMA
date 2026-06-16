@@ -11,10 +11,15 @@ export function CreditBadge({ className }: { className?: string }) {
 
   if (!user) return null;
 
+  const isEmpty = credits <= 0;
+
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full bg-brand-light px-2.5 py-1 text-xs font-bold text-brand-dark",
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold",
+        isEmpty
+          ? "bg-danger-light text-danger"
+          : "bg-brand-light text-brand-dark",
         className
       )}
     >

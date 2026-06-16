@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Coins, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Coins, CheckCircle2, AlertCircle, Loader2, Crown } from "lucide-react";
 import { useCredits } from "@/store/credits";
 import { useNav } from "@/store/nav";
 import { cn } from "@/lib/utils";
@@ -112,34 +112,51 @@ export function CreditConfirmDialog({
           </ul>
 
           {/* Actions */}
-          <div className="mt-5 flex gap-2">
+          <div className="mt-5 flex flex-col gap-2">
             {insufficient ? (
-              <Button
-                className="flex-1 bg-brand text-white hover:bg-brand-dark"
-                onClick={handleConfirm}
-              >
-                Recharger maintenant
-              </Button>
+              <>
+                <div className="text-center text-sm font-bold text-danger">
+                  Solde insuffisant
+                </div>
+                <Button
+                  className="h-11 w-full bg-brand text-white hover:bg-brand-dark"
+                  onClick={handleConfirm}
+                >
+                  Recharger maintenant
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-11 w-full border-amber-500/40 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate("payment", { passOrdonnance: true });
+                  }}
+                >
+                  Acheter un Pass Ordonnance — 300 FCFA
+                </Button>
+              </>
             ) : (
-              <Button
-                className="flex-1 bg-brand text-white hover:bg-brand-dark"
-                onClick={handleConfirm}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" /> Traitement…
-                  </>
-                ) : (
-                  <>
-                    <Coins className="size-4" /> Confirmer — {cost} crédit{cost > 1 ? "s" : ""}
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-brand text-white hover:bg-brand-dark"
+                  onClick={handleConfirm}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" /> Traitement…
+                    </>
+                  ) : (
+                    <>
+                      <Coins className="size-4" /> Confirmer — {cost} crédit{cost > 1 ? "s" : ""}
+                    </>
+                  )}
+                </Button>
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Annuler
+                </Button>
+              </div>
             )}
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Annuler
-            </Button>
           </div>
 
           <p className="mt-3 text-center text-xs text-muted-foreground">

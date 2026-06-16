@@ -12,6 +12,8 @@ import {
   Info,
   ClipboardList,
   Plus,
+  Lock,
+  Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -426,6 +428,59 @@ export function WalletView() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </Card>
+      </section>
+
+      {/* ============ SERVICES BLOQUÉS SANS CRÉDITS ============ */}
+      <section className="mt-10">
+        <SectionTitle icon={Lock} title="Services bloqués sans crédits" />
+        <Muted className="mb-4">
+          Ces services nécessitent des crédits ou le Pass Ordonnance pour fonctionner.
+        </Muted>
+        <Card className="border-border/70 p-5">
+          <ul className="grid gap-2.5 sm:grid-cols-2">
+            {[
+              "Module Ordonnance",
+              "Ajout de médicament à une ordonnance",
+              "Estimation complète",
+              "Meilleure pharmacie",
+              "Comparaison des prix",
+              "Disponibilité réelle par pharmacie",
+              "Confirmation avant déplacement",
+              "Alertes de disponibilité",
+            ].map((s) => (
+              <li
+                key={s}
+                className="flex items-start gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5 text-sm font-medium text-foreground/85"
+              >
+                <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-5 flex flex-col gap-3 rounded-xl border border-brand/20 bg-brand-light/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-semibold text-brand-dark">
+              Rechargez vos crédits à partir de 200 FCFA ou achetez un Pass Ordonnance à 300 FCFA pour débloquer ces services.
+            </p>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button
+                size="sm"
+                className="bg-brand text-white hover:bg-brand-dark"
+                onClick={() => scrollTo(packsRef)}
+              >
+                <Plus className="size-4" /> Recharger
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-500/40 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                onClick={() => navigate("payment", { passOrdonnance: true })}
+              >
+                <Crown className="size-4" /> Acheter un Pass
+              </Button>
+            </div>
           </div>
         </Card>
       </section>

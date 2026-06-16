@@ -1,0 +1,1047 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState, useMemo } from "react";
+     4→import {
+     5→  ChevronLeft,
+     6→  ChevronRight,
+     7→  CheckCircle2,
+     8→  Crown,
+     9→  Share2,
+    10→  MapPin,
+    11→  Pill,
+    12→  AlertTriangle,
+    13→  Navigation,
+    14→  Phone,
+    15→  Plus,
+    16→  Clock,
+    17→  Timer,
+    18→  Save,
+    19→  Pencil,
+    20→  RotateCcw,
+    21→  ClipboardList,
+    22→  TrendingDown,
+    23→  Zap,
+    24→  Store,
+    25→  XCircle,
+    26→  Info,
+    27→  Award,
+    28→  Filter,
+    29→} from "lucide-react";
+    30→import { toast } from "sonner";
+    31→import { Button } from "@/components/ui/button";
+    32→import { Card } from "@/components/ui/card";
+    33→import { Badge } from "@/components/ui/badge";
+    34→import { Separator } from "@/components/ui/separator";
+    35→import { FullLoader } from "@/components/shared/loader";
+    36→import { AlertMessage } from "@/components/shared/alert-message";
+    37→import { EmptyState } from "@/components/shared/empty-state";
+    38→import { Heading, Eyebrow, Muted, Price, PriceRange } from "@/components/ui/typography";
+    39→import { useNav } from "@/store/nav";
+    40→import { useAuth } from "@/store/auth";
+    41→import { formatFCFA, distanceKm, isOpenNow } from "@/lib/format";
+    42→import { cn } from "@/lib/utils";
+    43→import type { EstimateResult } from "@/lib/types";
+    44→
+    45→const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
+    46→
+    47→// Fictive pharmacies for the result sections (realistic Abidjan data)
+    48→interface ResultPharmacy {
+    49→  id: string;
+    50→  name: string;
+    51→  slug: string;
+    52→  commune: string;
+    53→  quartier: string;
+    54→  phone: string;
+    55→  hoursWeekday: string;
+    56→  isOpen247: boolean;
+    57→  isOnDuty: boolean;
+    58→  latitude: number;
+    59→  longitude: number;
+    60→  rating: number;
+    61→  totalEstimate: number;
+    62→  availableCount: number;
+    63→  totalCount: number;
+    64→  availableMeds: string[];
+    65→  missingMeds: string[];
+    66→}
+    67→
+    68→const RESULT_PHARMACIES: ResultPharmacy[] = [
+    69→  {
+    70→    id: "p1",
+    71→    name: "Pharmacie des Deux Plateaux",
+    72→    slug: "pharmacie-des-deux-plateaux",
+    73→    commune: "Cocody",
+    74→    quartier: "Rue du Café, Vallon",
+    75→    phone: "+225 27 22 48 90 10",
+    76→    hoursWeekday: "07h30 - 21h00",
+    77→    isOpen247: true,
+    78→    isOnDuty: true,
+    79→    latitude: 5.375,
+    80→    longitude: -3.995,
+    81→    rating: 4.9,
+    82→    totalEstimate: 0,
+    83→    availableCount: 0,
+    84→    totalCount: 0,
+    85→    availableMeds: [],
+    86→    missingMeds: [],
+    87→  },
+    88→  {
+    89→    id: "p2",
+    90→    name: "Pharmacie de la Riviera",
+    91→    slug: "pharmacie-de-la-riviera",
+    92→    commune: "Cocody",
+    93→    quartier: "Rue des Jardins, Riviera Palmeraie",
+    94→    phone: "+225 27 22 44 11 01",
+    95→    hoursWeekday: "07h30 - 20h30",
+    96→    isOpen247: false,
+    97→    isOnDuty: true,
+    98→    latitude: 5.3625,
+    99→    longitude: -3.9967,
+   100→    rating: 4.8,
+   101→    totalEstimate: 0,
+   102→    availableCount: 0,
+   103→    totalCount: 0,
+   104→    availableMeds: [],
+   105→    missingMeds: [],
+   106→  },
+   107→  {
+   108→    id: "p3",
+   109→    name: "Pharmacie de Marcory Zone 4",
+   110→    slug: "pharmacie-de-marcory-zone-4",
+   111→    commune: "Marcory",
+   112→    quartier: "Bd Valery Giscard d'Estaing",
+   113→    phone: "+225 27 21 35 78 90",
+   114→    hoursWeekday: "07h30 - 20h30",
+   115→    isOpen247: false,
+   116→    isOnDuty: true,
+   117→    latitude: 5.29,
+   118→    longitude: -4.02,
+   119→    rating: 4.5,
+   120→    totalEstimate: 0,
+   121→    availableCount: 0,
+   122→    totalCount: 0,
+   123→    availableMeds: [],
+   124→    missingMeds: [],
+   125→  },
+   126→  {
+   127→    id: "p4",
+   128→    name: "Pharmacie du Plateau",
+   129→    slug: "pharmacie-du-plateau",
+   130→    commune: "Plateau",
+   131→    quartier: "Avenue Chardy",
+   132→    phone: "+225 27 20 25 30 40",
+   133→    hoursWeekday: "07h30 - 20h00",
+   134→    isOpen247: false,
+   135→    isOnDuty: false,
+   136→    latitude: 5.3167,
+   137→    longitude: -4.0167,
+   138→    rating: 4.6,
+   139→    totalEstimate: 0,
+   140→    availableCount: 0,
+   141→    totalCount: 0,
+   142→    availableMeds: [],
+   143→    missingMeds: [],
+   144→  },
+   145→  {
+   146→    id: "p5",
+   147→    name: "Pharmacie de Yopougon",
+   148→    slug: "pharmacie-de-yopougon",
+   149→    commune: "Yopougon",
+   150→    quartier: "Marché de Yopougon, Avenue 13",
+   151→    phone: "+225 27 23 51 22 33",
+   152→    hoursWeekday: "07h30 - 20h00",
+   153→    isOpen247: false,
+   154→    isOnDuty: false,
+   155→    latitude: 5.34,
+   156→    longitude: -4.08,
+   157→    rating: 4.3,
+   158→    totalEstimate: 0,
+   159→    availableCount: 0,
+   160→    totalCount: 0,
+   161→    availableMeds: [],
+   162→    missingMeds: [],
+   163→  },
+   164→  {
+   165→    id: "p6",
+   166→    name: "Pharmacie d'Abobo",
+   167→    slug: "pharmacie-d-abobo",
+   168→    commune: "Abobo",
+   169→    quartier: "Centre Abobo, Rue Principale",
+   170→    phone: "+225 27 22 30 55 66",
+   171→    hoursWeekday: "08h00 - 20h00",
+   172→    isOpen247: true,
+   173→    isOnDuty: true,
+   174→    latitude: 5.42,
+   175→    longitude: -4.02,
+   176→    rating: 4.4,
+   177→    totalEstimate: 0,
+   178→    availableCount: 0,
+   179→    totalCount: 0,
+   180→    availableMeds: [],
+   181→    missingMeds: [],
+   182→  },
+   183→];
+   184→
+   185→type SortKey = "recommended" | "nearest" | "cheapest" | "complete" | "open" | "duty";
+   186→
+   187→const SORT_OPTIONS: { key: SortKey; label: string; icon: typeof Filter }[] = [
+   188→  { key: "recommended", label: "Recommandée", icon: Award },
+   189→  { key: "nearest", label: "Plus proche", icon: Navigation },
+   190→  { key: "cheapest", label: "Prix le plus bas", icon: TrendingDown },
+   191→  { key: "complete", label: "Ordonnance complète", icon: CheckCircle2 },
+   192→  { key: "open", label: "Ouverte maintenant", icon: Clock },
+   193→  { key: "duty", label: "De garde", icon: Timer },
+   194→];
+   195→
+   196→export function PrescriptionResultView() {
+   197→  const { params, navigate } = useNav();
+   198→  const { user, premium } = useAuth();
+   199→
+   200→  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+   201→  const [loading, setLoading] = useState(true);
+   202→  const [error, setError] = useState<string | null>(null);
+   203→  const [sortKey, setSortKey] = useState<SortKey>("recommended");
+   204→
+   205→  const estimateItems = params.estimateItems;
+   206→
+   207→  useEffect(() => {
+   208→    const items = estimateItems ?? [];
+   209→    if (!items.length) {
+   210→      navigate("prescription");
+   211→      return;
+   212→    }
+   213→    let cancelled = false;
+   214→    (async () => {
+   215→      setLoading(true);
+   216→      setError(null);
+   217→      try {
+   218→        const res = await fetch("/api/prescription/estimate", {
+   219→          method: "POST",
+   220→          headers: { "Content-Type": "application/json" },
+   221→          body: JSON.stringify({ items }),
+   222→        });
+   223→        if (!res.ok) {
+   224→          const data = await res.json().catch(() => null);
+   225→          throw new Error(data?.error ?? "Échec de l'estimation.");
+   226→        }
+   227→        const data: EstimateResult = await res.json();
+   228→        if (!cancelled) setEstimate(data);
+   229→      } catch (e) {
+   230→        if (!cancelled) {
+   231→          setError(
+   232→            e instanceof Error ? e.message : "Erreur lors de l'estimation."
+   233→          );
+   234→        }
+   235→      } finally {
+   236→        if (!cancelled) setLoading(false);
+   237→      }
+   238→    })();
+   239→    return () => {
+   240→      cancelled = true;
+   241→    };
+   242→  }, [estimateItems, navigate]);
+   243→
+   244→  // Build pharmacy list with availability based on estimate
+   245→  const pharmaciesWithAvailability = useMemo(() => {
+   246→    if (!estimate) return [];
+   247→    const total = estimate.lines.length;
+   248→    return RESULT_PHARMACIES.map((p, idx) => {
+   249→      // Deterministic availability: first pharmacies have all meds
+   250→      const availableCount = idx < 3 ? total : Math.max(1, total - (idx % 2 === 0 ? 1 : 2));
+   251→      const availableMeds = estimate.lines
+   252→        .slice(0, availableCount)
+   253→        .map((l) => l.medication.name);
+   254→      const missingMeds = estimate.lines
+   255→        .slice(availableCount)
+   256→        .map((l) => l.medication.name);
+   257→      const totalEstimate =
+   258→        estimate.lines
+   259→          .slice(0, availableCount)
+   260→          .reduce((s, l) => s + l.lineMin, 0) +
+   261→        (idx < 3 ? 0 : estimate.lines.slice(availableCount).reduce((s, l) => s + l.lineMin, 0) * 0);
+   262→      const dist = distanceKm(
+   263→        ABIDJAN_CENTER.lat,
+   264→        ABIDJAN_CENTER.lon,
+   265→        p.latitude,
+   266→        p.longitude
+   267→      );
+   268→      const openNow = isOpenNow({
+   269→        hoursWeekday: p.hoursWeekday,
+   270→        hoursSaturday: p.hoursWeekday,
+   271→        hoursSunday: "Fermé",
+   272→        isOpen247: p.isOpen247,
+   273→      });
+   274→      return {
+   275→        ...p,
+   276→        availableCount,
+   277→        totalCount: total,
+   278→        availableMeds,
+   279→        missingMeds,
+   280→        totalEstimate: totalEstimate || estimate.totalMin,
+   281→        distance: dist,
+   282→        openNow,
+   283→      };
+   284→    });
+   285→  }, [estimate]);
+   286→
+   287→  const fullPharmacies = pharmaciesWithAvailability.filter(
+   288→    (p) => p.availableCount === p.totalCount
+   289→  );
+   290→  const partialPharmacies = pharmaciesWithAvailability.filter(
+   291→    (p) => p.availableCount < p.totalCount
+   292→  );
+   293→
+   294→  // Best option
+   295→  const bestOption = useMemo(() => {
+   296→    if (pharmaciesWithAvailability.length === 0) return null;
+   297→    const sorted = [...pharmaciesWithAvailability].sort((a, b) => {
+   298→      // Complete availability first
+   299→      if (a.availableCount === a.totalCount && b.availableCount !== b.totalCount) return -1;
+   300→      if (b.availableCount === b.totalCount && a.availableCount !== a.totalCount) return 1;
+   301→      // Then open
+   302→      if (a.openNow && !b.openNow) return -1;
+   303→      if (b.openNow && !a.openNow) return 1;
+   304→      // Then nearest
+   305→      return a.distance - b.distance;
+   306→    });
+   307→    return sorted[0];
+   308→  }, [pharmaciesWithAvailability]);
+   309→
+   310→  // Sorted pharmacies based on filter
+   311→  const sortedFull = useMemo(() => {
+   312→    const arr = [...fullPharmacies];
+   313→    switch (sortKey) {
+   314→      case "nearest":
+   315→        return arr.sort((a, b) => a.distance - b.distance);
+   316→      case "cheapest":
+   317→        return arr.sort((a, b) => a.totalEstimate - b.totalEstimate);
+   318→      case "open":
+   319→        return arr.sort((a, b) => (b.openNow ? 1 : 0) - (a.openNow ? 1 : 0));
+   320→      case "duty":
+   321→        return arr.sort((a, b) => (b.isOnDuty ? 1 : 0) - (a.isOnDuty ? 1 : 0));
+   322→      default:
+   323→        return arr;
+   324→    }
+   325→  }, [fullPharmacies, sortKey]);
+   326→
+   327→  const handleShare = async () => {
+   328→    if (!estimate) return;
+   329→    const text = `Mon estimation d'ordonnance SABLIN PHARMA : ${formatFCFA(
+   330→      estimate.totalMin
+   331→    )} — ${formatFCFA(estimate.totalMax)} (${estimate.lines.length} médicaments).`;
+   332→    try {
+   333→      if (navigator.share) {
+   334→        await navigator.share({ title: "Estimation SABLIN PHARMA", text });
+   335→      } else if (navigator.clipboard) {
+   336→        await navigator.clipboard.writeText(text);
+   337→        toast.success("Résultat copié dans le presse-papiers.");
+   338→      }
+   339→    } catch {
+   340→      /* cancelled */
+   341→    }
+   342→  };
+   343→
+   344→  const handleSave = () => {
+   345→    if (!user) {
+   346→      toast.info("Connectez-vous pour enregistrer votre ordonnance.");
+   347→      navigate("auth", { authMode: "login" });
+   348→      return;
+   349→    }
+   350→    toast.success("Ordonnance enregistrée dans votre profil.", {
+   351→      description: "Retrouvez-la dans la section Historique.",
+   352→    });
+   353→  };
+   354→
+   355→  // ===== Loading =====
+   356→  if (loading) {
+   357→    return (
+   358→      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+   359→        <button
+   360→          onClick={() => navigate("prescription")}
+   361→          className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+   362→        >
+   363→          <ChevronLeft className="size-4" /> Ordonnance
+   364→        </button>
+   365→        <FullLoader label="Calcul de votre estimation en cours..." />
+   366→      </div>
+   367→    );
+   368→  }
+   369→
+   370→  // ===== Error =====
+   371→  if (error || !estimate) {
+   372→    return (
+   373→      <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
+   374→        <button
+   375→          onClick={() => navigate("prescription")}
+   376→          className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+   377→        >
+   378→          <ChevronLeft className="size-4" /> Ordonnance
+   379→        </button>
+   380→        <AlertMessage variant="error" title="Estimation indisponible">
+   381→          {error ?? "Nous n'avons pas pu calculer votre estimation."}
+   382→        </AlertMessage>
+   383→        <Button
+   384→          className="mt-4 bg-brand-gradient text-white"
+   385→          onClick={() => navigate("prescription")}
+   386→        >
+   387→          <ChevronLeft className="size-4" /> Retour à l&apos;ordonnance
+   388→        </Button>
+   389→      </div>
+   390→    );
+   391→  }
+   392→
+   393→  const totalUnits = estimate.lines.reduce((s, l) => s + l.quantity, 0);
+   394→  const availableMeds = estimate.lines.filter((l) => l.pharmacyCount > 0).length;
+   395→  const toConfirmMeds = estimate.lines.filter((l) => l.pharmacyCount === 0).length;
+   396→  const outStockMeds = estimate.lines.filter(
+   397→    (l) => l.pharmacyCount === 0
+   398→  ).length;
+   399→
+   400→  return (
+   401→    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+   402→      {/* Back link */}
+   403→      <button
+   404→        onClick={() => navigate("prescription")}
+   405→        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+   406→      >
+   407→        <ChevronLeft className="size-4" /> Ordonnance
+   408→      </button>
+   409→
+   410→      {/* ============ GRAND RÉSUMÉ ============ */}
+   411→      <div className="flex items-start gap-4">
+   412→        <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-brand-light ring-8 ring-brand-light/30">
+   413→          <CheckCircle2 className="size-8 text-brand" />
+   414→        </span>
+   415→        <div>
+   416→          <Eyebrow>Estimation terminée</Eyebrow>
+   417→          <Heading level="h1">Résultat de votre ordonnance</Heading>
+   418→          <Muted className="mt-1 max-w-2xl">
+   419→            Voici le coût estimatif de votre ordonnance et les pharmacies capables de
+   420→            vous fournir vos médicaments à Abidjan.
+   421→          </Muted>
+   422→        </div>
+   423→      </div>
+   424→
+   425→      {/* Stats strip */}
+   426→      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+   427→        <SummaryStat
+   428→          icon={Pill}
+   429→          tone="brand"
+   430→          value={estimate.lines.length}
+   431→          label="Médicaments"
+   432→        />
+   433→        <SummaryStat
+   434→          icon={TrendingDown}
+   435→          tone="success"
+   436→          value={formatFCFA(estimate.totalMin)}
+   437→          label="Coût total min."
+   438→          isText
+   439→        />
+   440→        <SummaryStat
+   441→          icon={CheckCircle2}
+   442→          tone="success"
+   443→          value={availableMeds}
+   444→          label="Disponibles"
+   445→        />
+   446→        <SummaryStat
+   447→          icon={Info}
+   448→          tone="info"
+   449→          value={toConfirmMeds}
+   450→          label="À confirmer"
+   451→        />
+   452→        <SummaryStat
+   453→          icon={XCircle}
+   454→          tone="danger"
+   455→          value={outStockMeds}
+   456→          label="Rupture"
+   457→        />
+   458→      </div>
+   459→
+   460→      {/* ============ MAIN LAYOUT ============ */}
+   461→      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+   462→        {/* LEFT: detail + pharmacies */}
+   463→        <div className="space-y-8">
+   464→          {/* Médicaments list */}
+   465→          <section>
+   466→            <div className="mb-4 flex items-center justify-between">
+   467→              <div>
+   468→                <Eyebrow>Détail</Eyebrow>
+   469→                <Heading level="h2">Médicaments de l&apos;ordonnance</Heading>
+   470→              </div>
+   471→              <Badge variant="secondary" className="bg-brand-light text-brand-dark">
+   472→                {estimate.lines.length} produit{estimate.lines.length > 1 ? "s" : ""}
+   473→              </Badge>
+   474→            </div>
+   475→
+   476→            <div className="space-y-3">
+   477→              {estimate.lines.map((line, idx) => {
+   478→                const status: "available" | "to-confirm" | "out-of-stock" =
+   479→                  line.pharmacyCount > 5
+   480→                    ? "available"
+   481→                    : line.pharmacyCount > 0
+   482→                    ? "to-confirm"
+   483→                    : "out-of-stock";
+   484→                return (
+   485→                  <Card
+   486→                    key={`${line.medication.slug}-${idx}`}
+   487→                    className="border-border/70 p-4 shadow-card transition-all hover:border-brand/30 hover:shadow-premium"
+   488→                  >
+   489→                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+   490→                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+   491→                        <Pill className="size-5" />
+   492→                      </span>
+   493→                      <div className="min-w-0 flex-1">
+   494→                        <div className="flex flex-wrap items-center gap-2">
+   495→                          <h3 className="text-sm font-bold text-foreground">
+   496→                            {line.medication.name}
+   497→                          </h3>
+   498→                          {line.medication.requiresRx && (
+   499→                            <Badge className="border-0 bg-amber-500/90 px-1.5 py-0 text-[9px] font-bold text-white">
+   500→                              Rx
+   501→                            </Badge>
+   502→                          )}
+   503→                          <MedStatusBadge status={status} />
+   504→                        </div>
+   505→                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+   506→                          {line.medication.form} · {line.medication.dosage} · Qté {line.quantity}
+   507→                        </p>
+   508→                      </div>
+   509→                      <div className="shrink-0 text-right">
+   510→                        <PriceRange
+   511→                          min={line.lineMin}
+   512→                          max={line.lineMax}
+   513→                          size="sm"
+   514→                          variant="brand"
+   515→                        />
+   516→                        <p className="mt-0.5 flex items-center justify-end gap-0.5 text-[10px] text-muted-foreground">
+   517→                          <MapPin className="size-3" /> {line.pharmacyCount} pharmacies
+   518→                        </p>
+   519→                      </div>
+   520→                    </div>
+   521→                  </Card>
+   522→                );
+   523→              })}
+   524→            </div>
+   525→          </section>
+   526→
+   527→          {/* Meilleure option recommandée */}
+   528→          {bestOption && (
+   529→            <section>
+   530→              <Card className="overflow-hidden border-brand/30 py-0 shadow-premium-lg">
+   531→                <div className="flex items-center gap-3 bg-brand-gradient px-5 py-3.5 text-white">
+   532→                  <span className="flex size-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
+   533→                    <Award className="size-5" />
+   534→                  </span>
+   535→                  <div className="flex-1">
+   536→                    <h2 className="text-base font-extrabold">
+   537→                      Meilleure option recommandée
+   538→                    </h2>
+   539→                    <p className="text-xs text-white/85">
+   540→                      Disponibilité complète, proximité et prix optimisé
+   541→                    </p>
+   542→                  </div>
+   543→                </div>
+   544→                <div className="p-5">
+   545→                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+   546→                    <div className="flex items-start gap-3">
+   547→                      <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
+   548→                        <Plus className="size-6" strokeWidth={3} />
+   549→                      </span>
+   550→                      <div>
+   551→                        <h3 className="text-base font-bold text-foreground">
+   552→                          {bestOption.name}
+   553→                        </h3>
+   554→                        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+   555→                          <MapPin className="size-3" /> {bestOption.quartier}, {bestOption.commune} · {bestOption.distance} km
+   556→                        </p>
+   557→                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+   558→                          <span className="inline-flex items-center gap-0.5 rounded-full bg-success-light px-2 py-0.5 text-[10px] font-bold text-success">
+   559→                            <CheckCircle2 className="size-2.5" /> Ordonnance complète
+   560→                          </span>
+   561→                          {bestOption.openNow && (
+   562→                            <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-light px-2 py-0.5 text-[10px] font-bold text-brand-dark">
+   563→                              <span className="size-1.5 rounded-full bg-brand animate-pulse" /> Ouvert
+   564→                            </span>
+   565→                          )}
+   566→                          {bestOption.isOnDuty && (
+   567→                            <span className="inline-flex items-center gap-0.5 rounded-full bg-warning-light px-2 py-0.5 text-[10px] font-bold text-warning-foreground">
+   568→                              <Timer className="size-2.5" /> De garde
+   569→                            </span>
+   570→                          )}
+   571→                        </div>
+   572→                      </div>
+   573→                    </div>
+   574→                    <div className="text-right">
+   575→                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+   576→                        Total estimatif
+   577→                      </p>
+   578→                      <Price amount={bestOption.totalEstimate} size="lg" variant="brand" />
+   579→                    </div>
+   580→                  </div>
+   581→                  <div className="mt-4 flex flex-wrap gap-2">
+   582→                    <Button
+   583→                      size="sm"
+   584→                      className="bg-brand-gradient text-white hover:opacity-90"
+   585→                      onClick={() => navigate("pharmacy-detail", { slug: bestOption.slug })}
+   586→                    >
+   587→                      Voir la meilleure pharmacie <ChevronRight className="size-3.5" />
+   588→                    </Button>
+   589→                    <Button size="sm" variant="outline" asChild>
+   590→                      <a href={`tel:${bestOption.phone.replace(/\s/g, "")}`}>
+   591→                        <Phone className="size-3.5" /> Appeler
+   592→                      </a>
+   593→                    </Button>
+   594→                    <Button size="sm" variant="outline" asChild>
+   595→                      <a
+   596→                        href={`https://www.google.com/maps?q=${bestOption.latitude},${bestOption.longitude}`}
+   597→                        target="_blank"
+   598→                        rel="noopener noreferrer"
+   599→                      >
+   600→                        <Navigation className="size-3.5" /> Itinéraire
+   601→                      </a>
+   602→                    </Button>
+   603→                  </div>
+   604→                </div>
+   605→              </Card>
+   606→            </section>
+   607→          )}
+   608→
+   609→          {/* Pharmacies ayant TOUTE l'ordonnance */}
+   610→          <section>
+   611→            <div className="mb-4 flex items-center justify-between">
+   612→              <div>
+   613→                <Eyebrow>Disponibilité complète</Eyebrow>
+   614→                <Heading level="h2">
+   615→                  Pharmacies ayant toute l&apos;ordonnance
+   616→                </Heading>
+   617→                <Muted className="mt-0.5">
+   618→                  {fullPharmacies.length} pharmacie{fullPharmacies.length > 1 ? "s" : ""} peuvent fournir tous vos médicaments
+   619→                </Muted>
+   620→              </div>
+   621→            </div>
+   622→
+   623→            {/* Sort filters */}
+   624→            <div className="mb-4 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+   625→              {SORT_OPTIONS.map((opt) => {
+   626→                const active = sortKey === opt.key;
+   627→                return (
+   628→                  <button
+   629→                    key={opt.key}
+   630→                    onClick={() => setSortKey(opt.key)}
+   631→                    className={cn(
+   632→                      "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+   633→                      active
+   634→                        ? "border-brand bg-brand text-white"
+   635→                        : "border-border bg-background text-foreground/70 hover:border-brand/40 hover:text-brand"
+   636→                    )}
+   637→                  >
+   638→                    <opt.icon className="size-3.5" /> {opt.label}
+   639→                  </button>
+   640→                );
+   641→              })}
+   642→            </div>
+   643→
+   644→            {sortedFull.length === 0 ? (
+   645→              <Card className="p-6 text-center text-sm text-muted-foreground">
+   646→                Aucune pharmacie ne dispose de tous les médicaments actuellement.
+   647→              </Card>
+   648→            ) : (
+   649→              <div className="grid gap-3 sm:grid-cols-2">
+   650→                {sortedFull.map((p) => (
+   651→                  <FullPharmacyCard key={p.id} pharma={p} />
+   652→                ))}
+   653→              </div>
+   654→            )}
+   655→          </section>
+   656→
+   657→          {/* Pharmacies ayant une PARTIE de l'ordonnance */}
+   658→          {partialPharmacies.length > 0 && (
+   659→            <section>
+   660→              <div className="mb-4">
+   661→                <Eyebrow>Disponibilité partielle</Eyebrow>
+   662→                <Heading level="h2">
+   663→                  Pharmacies ayant une partie de l&apos;ordonnance
+   664→                </Heading>
+   665→                <Muted className="mt-0.5">
+   666→                  Ces pharmacies disposent de certains médicaments uniquement
+   667→                </Muted>
+   668→              </div>
+   669→              <div className="grid gap-3 sm:grid-cols-2">
+   670→                {partialPharmacies.map((p) => (
+   671→                  <PartialPharmacyCard key={p.id} pharma={p} />
+   672→                ))}
+   673→              </div>
+   674→            </section>
+   675→          )}
+   676→        </div>
+   677→
+   678→        {/* RIGHT: Résumé + actions */}
+   679→        <div className="space-y-4">
+   680→          {/* Résumé de l'ordonnance */}
+   681→          <Card className="sticky top-24 border-border/70 p-5 shadow-premium">
+   682→            <div className="flex items-center gap-2">
+   683→              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   684→                <ClipboardList className="size-4" />
+   685→              </span>
+   686→              <h3 className="text-base font-bold text-foreground">
+   687→                Résumé de l&apos;ordonnance
+   688→              </h3>
+   689→            </div>
+   690→
+   691→            <div className="mt-4 space-y-2.5 text-sm">
+   692→              <Row label="Total estimatif" value={
+   693→                <PriceRange min={estimate.totalMin} max={estimate.totalMax} size="sm" variant="brand" />
+   694→              } />
+   695→              <Row label="Nombre de produits" value={String(estimate.lines.length)} />
+   696→              <Row
+   697→                label="Disponibilité globale"
+   698→                value={
+   699→                  availableMeds === estimate.lines.length ? "Complète" : "Partielle"
+   700→                }
+   701→              />
+   702→              {bestOption && (
+   703→                <Row label="Pharmacie recommandée" value={bestOption.name} small />
+   704→              )}
+   705→              {bestOption && (
+   706→                <Row label="Distance estimée" value={`${bestOption.distance} km`} />
+   707→              )}
+   708→            </div>
+   709→
+   710→            <Separator className="my-4" />
+   711→
+   712→            <div className="rounded-xl bg-brand-light/50 p-3 text-center">
+   713→              <p className="text-[10px] font-bold uppercase tracking-wide text-brand">
+   714→                Fourchette totale
+   715→              </p>
+   716→              <PriceRange min={estimate.totalMin} max={estimate.totalMax} size="xl" variant="brand" className="mt-1 block" />
+   717→            </div>
+   718→
+   719→            {bestOption && (
+   720→              <Button
+   721→                className="mt-4 w-full bg-brand-gradient text-white hover:opacity-90"
+   722→                onClick={() => navigate("pharmacy-detail", { slug: bestOption.slug })}
+   723→              >
+   724→                <Award className="size-4" /> Voir la meilleure pharmacie
+   725→              </Button>
+   726→            )}
+   727→          </Card>
+   728→
+   729→          {/* Action buttons */}
+   730→          <Card className="border-border/70 p-4">
+   731→            <div className="grid grid-cols-2 gap-2">
+   732→              <Button size="sm" variant="outline" onClick={handleSave}>
+   733→                <Save className="size-3.5" /> Enregistrer
+   734→              </Button>
+   735→              <Button size="sm" variant="outline" onClick={() => navigate("prescription")}>
+   736→                <Pencil className="size-3.5" /> Modifier
+   737→              </Button>
+   738→              <Button size="sm" variant="outline" onClick={() => navigate("prescription")}>
+   739→                <RotateCcw className="size-3.5" /> Nouvelle
+   740→              </Button>
+   741→              <Button size="sm" variant="outline" onClick={handleShare}>
+   742→                <Share2 className="size-3.5" /> Partager
+   743→              </Button>
+   744→            </div>
+   745→            <Button
+   746→              size="sm"
+   747→              variant="ghost"
+   748→              className="mt-2 w-full text-muted-foreground"
+   749→              onClick={() => navigate("history")}
+   750→            >
+   751→              <ClipboardList className="size-3.5" /> Voir mes ordonnances
+   752→            </Button>
+   753→          </Card>
+   754→
+   755→          {/* Premium upsell */}
+   756→          {!premium && (
+   757→            <Card className="overflow-hidden border-amber-500/30 py-0">
+   758→              <div className="bg-amber-50 p-4">
+   759→                <div className="flex items-center gap-2">
+   760→                  <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
+   761→                    <Crown className="size-5" />
+   762→                  </span>
+   763→                  <div>
+   764→                    <p className="text-sm font-bold text-foreground">Passez Premium</p>
+   765→                    <p className="text-[11px] text-muted-foreground">500 FCFA / mois</p>
+   766→                  </div>
+   767→                </div>
+   768→                <ul className="mt-3 space-y-1 text-xs text-foreground/80">
+   769→                  <li className="flex items-center gap-1.5">
+   770→                    <CheckCircle2 className="size-3.5 text-amber-500" /> Estimations illimitées
+   771→                  </li>
+   772→                  <li className="flex items-center gap-1.5">
+   773→                    <CheckCircle2 className="size-3.5 text-amber-500" /> Comparateur avancé
+   774→                  </li>
+   775→                  <li className="flex items-center gap-1.5">
+   776→                    <CheckCircle2 className="size-3.5 text-amber-500" /> Alertes de disponibilité
+   777→                  </li>
+   778→                </ul>
+   779→                <Button
+   780→                  size="sm"
+   781→                  className="mt-3 w-full bg-amber-500 text-white hover:bg-amber-600"
+   782→                  onClick={() => navigate("subscription")}
+   783→                >
+   784→                  <Crown className="size-3.5" /> S&apos;abonner
+   785→                </Button>
+   786→              </div>
+   787→            </Card>
+   788→          )}
+   789→        </div>
+   790→      </div>
+   791→
+   792→      {/* ============ MESSAGE DE PRUDENCE ============ */}
+   793→      <div className="mt-8">
+   794→        <AlertMessage variant="warning" icon={AlertTriangle}>
+   795→          Les prix et disponibilités sont indicatifs. Veuillez confirmer auprès de la
+   796→          pharmacie avant tout déplacement. Demandez toujours conseil à un pharmacien ou
+   797→          professionnel de santé.
+   798→        </AlertMessage>
+   799→      </div>
+   800→    </div>
+   801→  );
+   802→}
+   803→
+   804→/* ============================================================
+   805→   SummaryStat — statistique du grand résumé
+   806→   ============================================================ */
+   807→function SummaryStat({
+   808→  icon: Icon,
+   809→  tone,
+   810→  value,
+   811→  label,
+   812→  isText = false,
+   813→}: {
+   814→  icon: typeof Pill;
+   815→  tone: "brand" | "success" | "warning" | "danger" | "info" | "neutral";
+   816→  value: string | number;
+   817→  label: string;
+   818→  isText?: boolean;
+   819→}) {
+   820→  const tones = {
+   821→    brand: "bg-brand-light text-brand",
+   822→    success: "bg-success-light text-success",
+   823→    warning: "bg-warning-light text-warning-foreground",
+   824→    danger: "bg-danger-light text-danger",
+   825→    info: "bg-info-light text-info",
+   826→    neutral: "bg-neutral-light text-neutral-foreground",
+   827→  };
+   828→  return (
+   829→    <Card className="gap-0 border-border/60 py-3">
+   830→      <div className="flex items-center gap-2.5 px-3">
+   831→        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", tones[tone])}>
+   832→          <Icon className="size-4.5" />
+   833→        </span>
+   834→        <div className="min-w-0">
+   835→          <p className={cn("font-extrabold leading-tight text-brand-dark", isText ? "text-sm" : "text-lg")}>
+   836→            {value}
+   837→          </p>
+   838→          <p className="truncate text-[10px] leading-tight text-muted-foreground">{label}</p>
+   839→        </div>
+   840→      </div>
+   841→    </Card>
+   842→  );
+   843→}
+   844→
+   845→/* ============================================================
+   846→   Row — ligne label/value du résumé
+   847→   ============================================================ */
+   848→function Row({
+   849→  label,
+   850→  value,
+   851→  small = false,
+   852→}: {
+   853→  label: string;
+   854→  value: React.ReactNode;
+   855→  small?: boolean;
+   856→}) {
+   857→  return (
+   858→    <div className="flex items-center justify-between gap-2">
+   859→      <span className="text-muted-foreground">{label}</span>
+   860→      <span className={cn("font-semibold text-foreground text-right truncate", small && "text-xs")}>
+   861→        {value}
+   862→      </span>
+   863→    </div>
+   864→  );
+   865→}
+   866→
+   867→/* ============================================================
+   868→   MedStatusBadge — badge de statut médicament
+   869→   ============================================================ */
+   870→function MedStatusBadge({
+   871→  status,
+   872→}: {
+   873→  status: "available" | "to-confirm" | "out-of-stock";
+   874→}) {
+   875→  const config = {
+   876→    available: { label: "Disponible", icon: CheckCircle2, className: "bg-success-light text-success" },
+   877→    "to-confirm": { label: "À confirmer", icon: Info, className: "bg-info-light text-info" },
+   878→    "out-of-stock": { label: "Rupture", icon: XCircle, className: "bg-danger-light text-danger" },
+   879→  }[status];
+   880→  const Icon = config.icon;
+   881→  return (
+   882→    <span className={cn("inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold", config.className)}>
+   883→      <Icon className="size-2.5" /> {config.label}
+   884→    </span>
+   885→  );
+   886→}
+   887→
+   888→/* ============================================================
+   889→   FullPharmacyCard — pharmacie avec toute l'ordonnance
+   890→   ============================================================ */
+   891→function FullPharmacyCard({
+   892→  pharma,
+   893→}: {
+   894→  pharma: ResultPharmacy & { distance: number; openNow: boolean };
+   895→}) {
+   896→  const { navigate } = useNav();
+   897→  const mapsUrl = `https://www.google.com/maps?q=${pharma.latitude},${pharma.longitude}`;
+   898→  const phoneHref = `tel:${pharma.phone.replace(/\s/g, "")}`;
+   899→
+   900→  return (
+   901→    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
+   902→      <div className="flex items-center justify-between bg-brand-gradient px-4 py-2.5">
+   903→        <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
+   904→          <CheckCircle2 className="size-2.5" /> Ordonnance complète
+   905→        </span>
+   906→        <span className="inline-flex items-center gap-1 rounded-full bg-brand-dark px-1.5 py-0.5 text-[10px] font-bold text-white">
+   907→          <span className="size-1.5 rounded-full bg-amber-300" />
+   908→          {pharma.rating.toFixed(1)}
+   909→        </span>
+   910→      </div>
+   911→      <div className="space-y-3 p-4">
+   912→        <div>
+   913→          <h3 className="text-sm font-bold text-foreground">{pharma.name}</h3>
+   914→          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+   915→            <MapPin className="size-3" /> {pharma.quartier}, {pharma.commune}
+   916→          </p>
+   917→        </div>
+   918→        <div className="flex flex-wrap items-center gap-1.5">
+   919→          <span className={cn(
+   920→            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold",
+   921→            pharma.openNow ? "bg-success-light text-success" : "bg-neutral-light text-neutral-foreground"
+   922→          )}>
+   923→            <span className={cn("size-1.5 rounded-full", pharma.openNow ? "bg-success animate-pulse" : "bg-muted-foreground/50")} />
+   924→            {pharma.openNow ? "Ouvert" : "Fermé"}
+   925→          </span>
+   926→          {pharma.isOnDuty && (
+   927→            <span className="inline-flex items-center gap-0.5 rounded-full bg-warning-light px-2 py-0.5 text-[10px] font-bold text-warning-foreground">
+   928→              <Timer className="size-2.5" /> De garde
+   929→            </span>
+   930→          )}
+   931→          {pharma.isOpen247 && (
+   932→            <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-light px-2 py-0.5 text-[10px] font-bold text-brand-dark">
+   933→              <Clock className="size-2.5" /> 24/7
+   934→            </span>
+   935→          )}
+   936→          <span className="inline-flex items-center gap-0.5 rounded-full bg-info-light px-2 py-0.5 text-[10px] font-bold text-info">
+   937→            <Navigation className="size-2.5" /> {pharma.distance} km
+   938→          </span>
+   939→        </div>
+   940→        <div className="flex items-center justify-between border-t border-border/50 pt-2.5">
+   941→          <div>
+   942→            <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+   943→              Total estimatif
+   944→            </p>
+   945→            <Price amount={pharma.totalEstimate} size="md" variant="brand" />
+   946→          </div>
+   947→          <div className="text-right">
+   948→            <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+   949→              Médicaments
+   950→            </p>
+   951→            <p className="text-sm font-bold text-success">
+   952→              {pharma.availableCount}/{pharma.totalCount}
+   953→            </p>
+   954→          </div>
+   955→        </div>
+   956→        <div className="grid grid-cols-3 gap-1.5">
+   957→          <Button size="sm" className="bg-brand-gradient text-white hover:opacity-90" onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}>
+   958→            Voir
+   959→          </Button>
+   960→          <Button size="sm" variant="outline" asChild>
+   961→            <a href={phoneHref}><Phone className="size-3.5" /></a>
+   962→          </Button>
+   963→          <Button size="sm" variant="outline" asChild>
+   964→            <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+   965→              <Navigation className="size-3.5" />
+   966→            </a>
+   967→          </Button>
+   968→        </div>
+   969→      </div>
+   970→    </Card>
+   971→  );
+   972→}
+   973→
+   974→/* ============================================================
+   975→   PartialPharmacyCard — pharmacie avec partie de l'ordonnance
+   976→   ============================================================ */
+   977→function PartialPharmacyCard({
+   978→  pharma,
+   979→}: {
+   980→  pharma: ResultPharmacy & { distance: number; openNow: boolean };
+   981→}) {
+   982→  const { navigate } = useNav();
+   983→  const mapsUrl = `https://www.google.com/maps?q=${pharma.latitude},${pharma.longitude}`;
+   984→
+   985→  return (
+   986→    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
+   987→      <div className="flex items-center justify-between bg-muted px-4 py-2.5">
+   988→        <span className="inline-flex items-center gap-1 rounded-full bg-warning-light px-2 py-0.5 text-[10px] font-bold text-warning-foreground">
+   989→          <AlertTriangle className="size-2.5" /> Disponibilité partielle
+   990→        </span>
+   991→        <span className="text-[10px] font-bold text-muted-foreground">
+   992→          {pharma.availableCount}/{pharma.totalCount} médicaments
+   993→        </span>
+   994→      </div>
+   995→      <div className="space-y-3 p-4">
+   996→        <div>
+   997→          <h3 className="text-sm font-bold text-foreground">{pharma.name}</h3>
+   998→          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+   999→            <MapPin className="size-3" /> {pharma.quartier}, {pharma.commune} · {pharma.distance} km
+  1000→          </p>
+  1001→        </div>
+  1002→
+  1003→        {/* Available meds */}
+  1004→        <div>
+  1005→          <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-success">
+  1006→            <CheckCircle2 className="size-3" /> Disponibles ({pharma.availableMeds.length})
+  1007→          </p>
+  1008→          <div className="flex flex-wrap gap-1">
+  1009→            {pharma.availableMeds.map((m) => (
+  1010→              <span key={m} className="rounded-md bg-success-light px-1.5 py-0.5 text-[10px] font-medium text-success">
+  1011→                {m}
+  1012→              </span>
+  1013→            ))}
+  1014→          </div>
+  1015→        </div>
+  1016→
+  1017→        {/* Missing meds */}
+  1018→        {pharma.missingMeds.length > 0 && (
+  1019→          <div>
+  1020→            <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-danger">
+  1021→              <XCircle className="size-3" /> Manquants ({pharma.missingMeds.length})
+  1022→            </p>
+  1023→            <div className="flex flex-wrap gap-1">
+  1024→              {pharma.missingMeds.map((m) => (
+  1025→                <span key={m} className="rounded-md bg-danger-light px-1.5 py-0.5 text-[10px] font-medium text-danger line-through">
+  1026→                  {m}
+  1027→                </span>
+  1028→              ))}
+  1029→            </div>
+  1030→          </div>
+  1031→        )}
+  1032→
+  1033→        <div className="flex gap-2 border-t border-border/50 pt-2.5">
+  1034→          <Button size="sm" variant="outline" className="flex-1" onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}>
+  1035→            Voir détails
+  1036→          </Button>
+  1037→          <Button size="sm" variant="outline" asChild>
+  1038→            <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+  1039→              <Navigation className="size-3.5" /> Itinéraire
+  1040→            </a>
+  1041→          </Button>
+  1042→        </div>
+  1043→      </div>
+  1044→    </Card>
+  1045→  );
+  1046→}
+  1047→

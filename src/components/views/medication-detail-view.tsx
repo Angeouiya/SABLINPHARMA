@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Info,
   Coins,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -93,7 +94,10 @@ export function MedicationDetailView() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [showCreditDialog, setShowCreditDialog] = useState(false);
   const [pharmaciesUnlocked, setPharmaciesUnlocked] = useState(false);
-  const { credits } = useCredits();
+  const [showPrescriptionDialog, setShowPrescriptionDialog] = useState(false);
+  const [showPricesDialog, setShowPricesDialog] = useState(false);
+  const [pricesUnlocked, setPricesUnlocked] = useState(false);
+  const { credits, hasPass } = useCredits();
 
   // Fetch medication detail
   useEffect(() => {
@@ -105,6 +109,7 @@ export function MedicationDetailView() {
     setLoading(true);
     setNotFound(false);
     setPharmaciesUnlocked(false);
+    setPricesUnlocked(false);
     (async () => {
       try {
         const r = await fetch(`/api/medications/${params.slug}`);
@@ -404,10 +409,25 @@ export function MedicationDetailView() {
             {/* Actions */}
             <div className="mt-5 flex flex-wrap gap-2">
               <Button
-                className="bg-brand-gradient text-white hover:opacity-90"
+                className="bg-brand text-white hover:bg-brand-dark"
                 onClick={() => navigate("prescription")}
               >
                 <ClipboardList className="size-4" /> Estimer mon ordonnance
+              </Button>
+              <Button
+                variant="outline"
+                className="border-brand/30 text-brand-dark hover:bg-brand-light"
+                onClick={() => {
+                  if (hasPass) {
+                    toast.success("Médicament ajouté à l'ordonnance");
+                    navigate("prescription");
+                  } else {
+                    setShowPrescriptionDialog(true);
+                  }
+                }}
+              >
+                <ClipboardList className="size-4" /> Ajouter à mon ordonnance
+                <CreditCost cost={hasPass ? 0 : 1} className="ml-1" />
               </Button>
               <Button
                 variant="outline"
@@ -496,6 +516,34 @@ export function MedicationDetailView() {
           </Card>
         ) : (
           <>
+            {/* Voir les prix détaillés par pharmacie — 1 crédit (gratuit avec Pass Ordonnance) */}
+            {!hasPass && !pricesUnlocked && (
+              <Card className="mt-5 border-brand/20 p-5 shadow-card">
+                <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+                      <Coins className="size-5" />
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-foreground">
+                        Voir les prix détaillés par pharmacie
+                      </h3>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Prix indicatif précis pour chaque pharmacie ayant ce médicament.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    className="bg-brand text-white hover:bg-brand-dark"
+                    onClick={() => setShowPricesDialog(true)}
+                  >
+                    <Coins className="size-4" /> Voir les prix détaillés
+                    <CreditCost cost={1} className="ml-1" />
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             <div className="mt-5 grid gap-3 lg:grid-cols-2">
               {sortedPharmacies.map((p) => (
                 <PharmacyMedCard
@@ -503,6 +551,7 @@ export function MedicationDetailView() {
                   pharma={p}
                   medicationName={med.name}
                   medicationSlug={med.slug}
+                  pricesUnlocked={hasPass || pricesUnlocked}
                 />
               ))}
             </div>
@@ -535,6 +584,38 @@ export function MedicationDetailView() {
             "Distance et statut d'ouverture",
           ]}
           onConfirm={() => setPharmaciesUnlocked(true)}
+        />
+
+        {/* Ajouter à mon ordonnance — 1 crédit */}
+        <CreditConfirmDialog
+          open={showPrescriptionDialog}
+          onOpenChange={setShowPrescriptionDialog}
+          title="Ajouter à mon ordonnance"
+          cost={1}
+          description="Ce médicament sera ajouté à votre ordonnance pour estimation."
+          benefits={[
+            "Médicament ajouté à votre liste",
+            "Vous pouvez lancer l'estimation ensuite",
+          ]}
+          onConfirm={() => {
+            toast.success("Médicament ajouté à l'ordonnance");
+            navigate("prescription");
+          }}
+        />
+
+        {/* Voir les prix détaillés par pharmacie — 1 crédit */}
+        <CreditConfirmDialog
+          open={showPricesDialog}
+          onOpenChange={setShowPricesDialog}
+          title="Voir les prix détaillés par pharmacie"
+          cost={1}
+          description="Prix indicatif précis pour chaque pharmacie ayant ce médicament."
+          benefits={[
+            "Prix exact par pharmacie",
+            "Comparaison rapide des prix",
+            "Meilleure option tarifaire",
+          ]}
+          onConfirm={() => setPricesUnlocked(true)}
         />
       </section>
 
@@ -625,10 +706,12 @@ function PharmacyMedCard({
   pharma,
   medicationName,
   medicationSlug,
+  pricesUnlocked,
 }: {
   pharma: PharmacyWithMed;
   medicationName: string;
   medicationSlug: string;
+  pricesUnlocked: boolean;
 }) {
   const { navigate } = useNav();
   const dist = distanceKm(
@@ -707,9 +790,15 @@ function PharmacyMedCard({
             Prix indicatif
           </p>
           {pharma.inStock ? (
-            <p className="mt-0.5 text-sm font-extrabold text-brand-dark">
-              {pharma.price.toLocaleString("fr-FR")} F
-            </p>
+            pricesUnlocked ? (
+              <p className="mt-0.5 text-sm font-extrabold text-brand-dark">
+                {pharma.price.toLocaleString("fr-FR")} F
+              </p>
+            ) : (
+              <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                <Lock className="size-3" /> Masqué
+              </span>
+            )
           ) : (
             <p className="mt-0.5 text-sm font-bold text-muted-foreground">—</p>
           )}

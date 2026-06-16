@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, Pill, ClipboardList, MapPin, User } from "lucide-react";
+import { LayoutGrid, Pill, ClipboardList, MapPin, Wallet } from "lucide-react";
 import { useNav } from "@/store/nav";
 import { cn } from "@/lib/utils";
 import type { View } from "@/lib/types";
@@ -14,7 +14,7 @@ const ITEMS: {
   { label: "Médicaments", view: "medications", icon: Pill },
   { label: "Ordonnance", view: "prescription", icon: ClipboardList },
   { label: "Pharmacies", view: "pharmacies", icon: MapPin },
-  { label: "Profil", view: "profile", icon: User },
+  { label: "Portefeuille", view: "wallet", icon: Wallet },
 ];
 
 export function BottomNav() {

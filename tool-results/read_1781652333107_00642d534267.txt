@@ -1,0 +1,1071 @@
+     1→     1→     1→"use client";
+     2→     2→     2→
+     3→     3→     3→import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+     4→     4→     4→import {
+     5→     5→     5→  ChevronLeft,
+     6→     6→     6→  ClipboardList,
+     7→     7→     7→  Plus,
+     8→     8→     8→  Minus,
+     9→     9→     9→  Search,
+    10→    10→    10→  Trash2,
+    11→    11→    11→  Pencil,
+    12→    12→    12→  CheckCircle2,
+    13→    13→    13→  XCircle,
+    14→    14→    14→  HelpCircle,
+    15→    15→    15→  Crown,
+    16→    16→    16→  ShieldAlert,
+    17→    17→    17→  Pill,
+    18→    18→    18→  MapPin,
+    19→    19→    19→  X,
+    20→    20→    20→  Loader2,
+    21→    21→    21→  Calculator,
+    22→    22→    22→  Save,
+    23→    23→    23→  RotateCcw,
+    24→    24→    24→  ArrowRight,
+    25→    25→    25→  Info,
+    26→    26→    26→  AlertTriangle,
+    27→    27→    27→  Store,
+    28→    28→    28→} from "lucide-react";
+    29→    29→    29→import { toast } from "sonner";
+    30→    30→    30→import { Button } from "@/components/ui/button";
+    31→    31→    31→import { Card } from "@/components/ui/card";
+    32→    32→    32→import { Badge } from "@/components/ui/badge";
+    33→    33→    33→import { Input } from "@/components/ui/input";
+    34→    34→    34→import { Label } from "@/components/ui/label";
+    35→    35→    35→import { Textarea } from "@/components/ui/textarea";
+    36→    36→    36→import {
+    37→    37→    37→  Select,
+    38→    38→    38→  SelectTrigger,
+    39→    39→    39→  SelectValue,
+    40→    40→    40→  SelectContent,
+    41→    41→    41→  SelectItem,
+    42→    42→    42→} from "@/components/ui/select";
+    43→    43→    43→import { Skeleton } from "@/components/ui/skeleton";
+    44→    44→    44→import { CategoryIcon } from "@/components/category-icons";
+    45→    45→    45→import { AlertMessage } from "@/components/shared/alert-message";
+    46→    46→    46→import { EmptyState } from "@/components/shared/empty-state";
+    47→    47→    47→import { Heading, Eyebrow, Muted, Price, PriceRange } from "@/components/ui/typography";
+    48→    48→    48→import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
+    49→    49→    49→import { CreditCost } from "@/components/shared/credit-cost";
+    50→    50→    50→import { useNav } from "@/store/nav";
+    51→    51→    51→import { useAuth } from "@/store/auth";
+    52→    52→    52→import { useCredits, CREDIT_COSTS } from "@/store/credits";
+    53→    53→    53→import { formatFCFA } from "@/lib/format";
+    54→    54→    54→import { cn } from "@/lib/utils";
+    55→    55→    55→import type { Medication } from "@/lib/types";
+    56→    56→    56→
+    57→    57→    57→const FORMS = [
+    58→    58→    58→  "Comprimé",
+    59→    59→    59→  "Comprimé effervescent",
+    60→    60→    60→  "Gélule",
+    61→    61→    61→  "Sirop",
+    62→    62→    62→  "Sachet",
+    63→    63→    63→  "Pommade",
+    64→    64→    64→  "Crème",
+    65→    65→    65→  "Flacon",
+    66→    66→    66→  "Suppositoire",
+    67→    67→    67→  "Inhalateur",
+    68→    68→    68→  "Injectable",
+    69→    69→    69→];
+    70→    70→    70→
+    71→    71→    71→interface CartItem {
+    72→    72→    72→  slug: string;
+    73→    73→    73→  name: string;
+    74→    74→    74→  genericName: string;
+    75→    75→    75→  form: string;
+    76→    76→    76→  dosage: string;
+    77→    77→    77→  quantity: number;
+    78→    78→    78→  duration: string;
+    79→    79→    79→  note: string;
+    80→    80→    80→  avgPrice: number;
+    81→    81→    81→  pharmacyCount: number;
+    82→    82→    82→  requiresRx: boolean;
+    83→    83→    83→  category?: { iconName: string; color: string; name: string } | null;
+    84→    84→    84→}
+    85→    85→    85→
+    86→    86→    86→interface EstimateLine {
+    87→    87→    87→  medication: {
+    88→    88→    88→    id: string;
+    89→    89→    89→    name: string;
+    90→    90→    90→    slug: string;
+    91→    91→    91→    form: string;
+    92→    92→    92→    dosage: string;
+    93→    93→    93→    packSize: string;
+    94→    94→    94→    requiresRx: boolean;
+    95→    95→    95→  };
+    96→    96→    96→  quantity: number;
+    97→    97→    97→  unitMin: number;
+    98→    98→    98→  unitMax: number;
+    99→    99→    99→  lineMin: number;
+   100→   100→   100→  lineMax: number;
+   101→   101→   101→  pharmacyCount: number;
+   102→   102→   102→}
+   103→   103→   103→
+   104→   104→   104→interface EstimateResult {
+   105→   105→   105→  lines: EstimateLine[];
+   106→   106→   106→  totalMin: number;
+   107→   107→   107→  totalMax: number;
+   108→   108→   108→  availablePharmacies: number;
+   109→   109→   109→}
+   110→   110→   110→
+   111→   111→   111→// Deterministic status for cart items
+   112→   112→   112→function itemStatus(item: CartItem): "available" | "low-stock" | "to-confirm" | "out-of-stock" {
+   113→   113→   113→  if (item.pharmacyCount === 0) return "out-of-stock";
+   114→   114→   114→  const hash = item.slug.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+   115→   115→   115→  const pct = hash % 10;
+   116→   116→   116→  if (pct < 6) return "available";
+   117→   117→   117→  if (pct < 9) return "low-stock";
+   118→   118→   118→  return "to-confirm";
+   119→   119→   119→}
+   120→   120→   120→
+   121→   121→   121→const STATUS_CONFIG = {
+   122→   122→   122→  available: { label: "Disponible", icon: CheckCircle2, className: "bg-success-light text-success" },
+   123→   123→   123→  "low-stock": { label: "Stock faible", icon: AlertTriangle, className: "bg-warning-light text-warning-foreground" },
+   124→   124→   124→  "to-confirm": { label: "À confirmer", icon: HelpCircle, className: "bg-neutral-light text-neutral-foreground" },
+   125→   125→   125→  "out-of-stock": { label: "Rupture", icon: XCircle, className: "bg-danger-light text-danger" },
+   126→   126→   126→} as const;
+   127→   127→   127→
+   128→   128→   128→export function PrescriptionView() {
+   129→   129→   129→  const { navigate } = useNav();
+   130→   130→   130→  const { user, premium } = useAuth();
+   131→   131→   131→  const { hasPass } = useCredits();
+   132→   132→   132→  const [showCreditDialog, setShowCreditDialog] = useState(false);
+   133→   133→   133→
+   134→   134→   134→  // Form state
+   135→   135→   135→  const [showForm, setShowForm] = useState(false);
+   136→   136→   136→  const [query, setQuery] = useState("");
+   137→   137→   137→  const [suggestions, setSuggestions] = useState<Medication[]>([]);
+   138→   138→   138→  const [showSuggestions, setShowSuggestions] = useState(false);
+   139→   139→   139→  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+   140→   140→   140→  const searchBoxRef = useRef<HTMLDivElement>(null);
+   141→   141→   141→
+   142→   142→   142→  // Form fields
+   143→   143→   143→  const [formName, setFormName] = useState("");
+   144→   144→   144→  const [formDci, setFormDci] = useState("");
+   145→   145→   145→  const [formDosage, setFormDosage] = useState("");
+   146→   146→   146→  const [formForm, setFormForm] = useState("");
+   147→   147→   147→  const [formQty, setFormQty] = useState("1");
+   148→   148→   148→  const [formDuration, setFormDuration] = useState("");
+   149→   149→   149→  const [formNote, setFormNote] = useState("");
+   150→   150→   150→  const [editingSlug, setEditingSlug] = useState<string | null>(null);
+   151→   151→   151→  const [selectedMed, setSelectedMed] = useState<Medication | null>(null);
+   152→   152→   152→
+   153→   153→   153→  // Cart
+   154→   154→   154→  const [items, setItems] = useState<CartItem[]>([]);
+   155→   155→   155→  const [estimating, setEstimating] = useState(false);
+   156→   156→   156→  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+   157→   157→   157→
+   158→   158→   158→  // Debounced search for suggestions
+   159→   159→   159→  useEffect(() => {
+   160→   160→   160→    if (!query.trim()) {
+   161→   161→   161→      setSuggestions([]);
+   162→   162→   162→      setShowSuggestions(false);
+   163→   163→   163→      setLoadingSuggestions(false);
+   164→   164→   164→      return;
+   165→   165→   165→    }
+   166→   166→   166→    setLoadingSuggestions(true);
+   167→   167→   167→    const t = setTimeout(async () => {
+   168→   168→   168→      try {
+   169→   169→   169→        const url = `/api/medications?q=${encodeURIComponent(query.trim())}&limit=6`;
+   170→   170→   170→        const res = await fetch(url);
+   171→   171→   171→        if (!res.ok) throw new Error();
+   172→   172→   172→        const data: Medication[] = await res.json();
+   173→   173→   173→        setSuggestions(data);
+   174→   174→   174→        setShowSuggestions(true);
+   175→   175→   175→      } catch {
+   176→   176→   176→        setSuggestions([]);
+   177→   177→   177→      } finally {
+   178→   178→   178→        setLoadingSuggestions(false);
+   179→   179→   179→      }
+   180→   180→   180→    }, 250);
+   181→   181→   181→    return () => clearTimeout(t);
+   182→   182→   182→  }, [query]);
+   183→   183→   183→
+   184→   184→   184→  // Close suggestions on outside click
+   185→   185→   185→  useEffect(() => {
+   186→   186→   186→    function handleClick(e: MouseEvent) {
+   187→   187→   187→      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
+   188→   188→   188→        setShowSuggestions(false);
+   189→   189→   189→      }
+   190→   190→   190→    }
+   191→   191→   191→    document.addEventListener("mousedown", handleClick);
+   192→   192→   192→    return () => document.removeEventListener("mousedown", handleClick);
+   193→   193→   193→  }, []);
+   194→   194→   194→
+   195→   195→   195→  const resetForm = useCallback(() => {
+   196→   196→   196→    setFormName("");
+   197→   197→   197→    setFormDci("");
+   198→   198→   198→    setFormDosage("");
+   199→   199→   199→    setFormForm("");
+   200→   200→   200→    setFormQty("1");
+   201→   201→   201→    setFormDuration("");
+   202→   202→   202→    setFormNote("");
+   203→   203→   203→    setQuery("");
+   204→   204→   204→    setSuggestions([]);
+   205→   205→   205→    setShowSuggestions(false);
+   206→   206→   206→    setEditingSlug(null);
+   207→   207→   207→    setSelectedMed(null);
+   208→   208→   208→  }, []);
+   209→   209→   209→
+   210→   210→   210→  const pickSuggestion = (med: Medication) => {
+   211→   211→   211→    setSelectedMed(med);
+   212→   212→   212→    setFormName(med.name);
+   213→   213→   213→    setFormDci(med.genericName);
+   214→   214→   214→    setFormDosage(med.dosage);
+   215→   215→   215→    setFormForm(med.form);
+   216→   216→   216→    setQuery("");
+   217→   217→   217→    setSuggestions([]);
+   218→   218→   218→    setShowSuggestions(false);
+   219→   219→   219→  };
+   220→   220→   220→
+   221→   221→   221→  const handleSubmit = (e: React.FormEvent) => {
+   222→   222→   222→    e.preventDefault();
+   223→   223→   223→    if (!formName.trim()) {
+   224→   224→   224→      toast.error("Veuillez saisir le nom du médicament.");
+   225→   225→   225→      return;
+   226→   226→   226→    }
+   227→   227→   227→    const qty = Math.max(1, parseInt(formQty || "1", 10) || 1);
+   228→   228→   228→
+   229→   229→   229→    // Find matching med in suggestions for richer data
+   230→   230→   230→    const matched = selectedMed ?? suggestions.find(
+   231→   231→   231→      (s) => s.name.toLowerCase() === formName.toLowerCase()
+   232→   232→   232→    );
+   233→   233→   233→
+   234→   234→   234→    const item: CartItem = {
+   235→   235→   235→      slug: matched?.slug ?? `custom-${Date.now()}`,
+   236→   236→   236→      name: formName.trim(),
+   237→   237→   237→      genericName: formDci.trim() || matched?.genericName || "—",
+   238→   238→   238→      form: formForm || matched?.form || "Comprimé",
+   239→   239→   239→      dosage: formDosage.trim() || matched?.dosage || "—",
+   240→   240→   240→      quantity: qty,
+   241→   241→   241→      duration: formDuration.trim(),
+   242→   242→   242→      note: formNote.trim(),
+   243→   243→   243→      avgPrice: matched?.avgPrice ?? 0,
+   244→   244→   244→      pharmacyCount: matched?.pharmacyCount ?? 0,
+   245→   245→   245→      requiresRx: matched?.requiresRx ?? false,
+   246→   246→   246→      category: matched?.category
+   247→   247→   247→        ? {
+   248→   248→   248→            iconName: matched.category.iconName,
+   249→   249→   249→            color: matched.category.color,
+   250→   250→   250→            name: matched.category.name,
+   251→   251→   251→          }
+   252→   252→   252→        : null,
+   253→   253→   253→    };
+   254→   254→   254→
+   255→   255→   255→    if (editingSlug) {
+   256→   256→   256→      setItems((prev) =>
+   257→   257→   257→        prev.map((it) => (it.slug === editingSlug ? item : it))
+   258→   258→   258→      );
+   259→   259→   259→      toast.success("Médicament modifié.");
+   260→   260→   260→    } else {
+   261→   261→   261→      setItems((prev) => {
+   262→   262→   262→        if (prev.some((it) => it.name.toLowerCase() === item.name.toLowerCase())) {
+   263→   263→   263→          toast.info(`${item.name} est déjà dans votre ordonnance.`);
+   264→   264→   264→          return prev;
+   265→   265→   265→        }
+   266→   266→   266→        return [...prev, item];
+   267→   267→   267→      });
+   268→   268→   268→      toast.success(`${item.name} ajouté à l'ordonnance.`);
+   269→   269→   269→    }
+   270→   270→   270→
+   271→   271→   271→    resetForm();
+   272→   272→   272→    setShowForm(false);
+   273→   273→   273→    setEstimate(null);
+   274→   274→   274→  };
+   275→   275→   275→
+   276→   276→   276→  const removeItem = (slug: string) => {
+   277→   277→   277→    setItems((prev) => prev.filter((it) => it.slug !== slug));
+   278→   278→   278→    setEstimate(null);
+   279→   279→   279→    toast.success("Médicament retiré.");
+   280→   280→   280→  };
+   281→   281→   281→
+   282→   282→   282→  const editItem = (item: CartItem) => {
+   283→   283→   283→    setEditingSlug(item.slug);
+   284→   284→   284→    setFormName(item.name);
+   285→   285→   285→    setFormDci(item.genericName);
+   286→   286→   286→    setFormDosage(item.dosage);
+   287→   287→   287→    setFormForm(item.form);
+   288→   288→   288→    setFormQty(String(item.quantity));
+   289→   289→   289→    setFormDuration(item.duration);
+   290→   290→   290→    setFormNote(item.note);
+   291→   291→   291→    setShowForm(true);
+   292→   292→   292→    window.scrollTo({ top: 0, behavior: "smooth" });
+   293→   293→   293→  };
+   294→   294→   294→
+   295→   295→   295→  const updateQty = (slug: string, delta: number) => {
+   296→   296→   296→    setItems((prev) =>
+   297→   297→   297→      prev.map((it) =>
+   298→   298→   298→        it.slug === slug ? { ...it, quantity: Math.max(1, it.quantity + delta) } : it
+   299→   299→   299→      )
+   300→   300→   300→    );
+   301→   301→   301→    setEstimate(null);
+   302→   302→   302→  };
+   303→   303→   303→
+   304→   304→   304→  // Recalcul
+   305→   305→   305→  const stats = useMemo(() => {
+   306→   306→   306→    const total = items.length;
+   307→   307→   307→    const totalUnits = items.reduce((s, it) => s + it.quantity, 0);
+   308→   308→   308→    const totalCost = items.reduce((s, it) => s + it.avgPrice * it.quantity, 0);
+   309→   309→   309→    const available = items.filter((i) => itemStatus(i) === "available").length;
+   310→   310→   310→    const lowStock = items.filter((i) => itemStatus(i) === "low-stock").length;
+   311→   311→   311→    const toConfirm = items.filter((i) => itemStatus(i) === "to-confirm").length;
+   312→   312→   312→    const outStock = items.filter((i) => itemStatus(i) === "out-of-stock").length;
+   313→   313→   313→    return { total, totalUnits, totalCost, available, lowStock, toConfirm, outStock };
+   314→   314→   314→  }, [items]);
+   315→   315→   315→
+   316→   316→   316→  const handleEstimate = async () => {
+   317→   317→   317→    if (items.length === 0) {
+   318→   318→   318→      toast.error("Ajoutez au moins un médicament à votre ordonnance.");
+   319→   319→   319→      return;
+   320→   320→   320→    }
+   321→   321→   321→    // Only estimate items with a real slug (matched from DB)
+   322→   322→   322→    const estimable = items.filter((it) => !it.slug.startsWith("custom-"));
+   323→   323→   323→    if (estimable.length === 0) {
+   324→   324→   324→      toast.info("Aucun médicamenent référencé à estimer.");
+   325→   325→   325→      return;
+   326→   326→   326→    }
+   327→   327→   327→    setEstimating(true);
+   328→   328→   328→    setEstimate(null);
+   329→   329→   329→    try {
+   330→   330→   330→      const res = await fetch("/api/prescription/estimate", {
+   331→   331→   331→        method: "POST",
+   332→   332→   332→        headers: { "Content-Type": "application/json" },
+   333→   333→   333→        body: JSON.stringify({
+   334→   334→   334→          items: estimable.map((it) => ({ slug: it.slug, quantity: it.quantity })),
+   335→   335→   335→        }),
+   336→   336→   336→      });
+   337→   337→   337→      if (!res.ok) throw new Error();
+   338→   338→   338→      const data: EstimateResult = await res.json();
+   339→   339→   339→      setEstimate(data);
+   340→   340→   340→      toast.success("Estimation calculée avec succès.");
+   341→   341→   341→      // Navigate to the dedicated result view
+   342→   342→   342→      navigate("prescription-result", {
+   343→   343→   343→        estimateItems: estimable.map((it) => ({ slug: it.slug, quantity: it.quantity })),
+   344→   344→   344→      });
+   345→   345→   345→    } catch {
+   346→   346→   346→      toast.error("Erreur lors de l'estimation.");
+   347→   347→   347→    } finally {
+   348→   348→   348→      setEstimating(false);
+   349→   349→   349→    }
+   350→   350→   350→  };
+   351→   351→   351→
+   352→   352→   352→  const handleSave = () => {
+   353→   353→   353→    if (items.length === 0) {
+   354→   354→   354→      toast.error("Votre ordonnance est vide.");
+   355→   355→   355→      return;
+   356→   356→   356→    }
+   357→   357→   357→    if (!user) {
+   358→   358→   358→      toast.info("Connectez-vous pour enregistrer votre ordonnance.");
+   359→   359→   359→      navigate("auth", { authMode: "login" });
+   360→   360→   360→      return;
+   361→   361→   361→    }
+   362→   362→   362→    // Persist to localStorage as a simple save
+   363→   363→   363→    try {
+   364→   364→   364→      const saved = JSON.parse(localStorage.getItem("sablin-prescriptions") || "[]");
+   365→   365→   365→      saved.push({
+   366→   366→   366→        id: `rx-${Date.now()}`,
+   367→   367→   367→        date: new Date().toISOString(),
+   368→   368→   368→        items: items.map((it) => ({
+   369→   369→   369→          name: it.name,
+   370→   370→   370→          form: it.form,
+   371→   371→   371→          dosage: it.dosage,
+   372→   372→   372→          quantity: it.quantity,
+   373→   373→   373→          duration: it.duration,
+   374→   374→   374→        })),
+   375→   375→   375→        totalCost: stats.totalCost,
+   376→   376→   376→      });
+   377→   377→   377→      localStorage.setItem("sablin-prescriptions", JSON.stringify(saved));
+   378→   378→   378→      toast.success("Ordonnance enregistrée dans votre profil.", {
+   379→   379→   379→        description: "Retrouvez-la dans la section Historique.",
+   380→   380→   380→      });
+   381→   381→   381→    } catch {
+   382→   382→   382→      toast.error("Impossible d'enregistrer l'ordonnance.");
+   383→   383→   383→    }
+   384→   384→   384→  };
+   385→   385→   385→
+   386→   386→   386→  const handleNew = () => {
+   387→   387→   387→    if (items.length > 0) {
+   388→   388→   388→      if (!window.confirm("Voulez-vous vraiment recommencer ? Votre ordonnance actuelle sera effacée.")) return;
+   389→   389→   389→    }
+   390→   390→   390→    setItems([]);
+   391→   391→   391→    setEstimate(null);
+   392→   392→   392→    resetForm();
+   393→   393→   393→    setShowForm(false);
+   394→   394→   394→    toast.success("Nouvelle ordonnance prête.");
+   395→   395→   395→  };
+   396→   396→   396→
+   397→   397→   397→  return (
+   398→   398→   398→    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+   399→   399→   399→      {/* Back link */}
+   400→   400→   400→      <button
+   401→   401→   401→        onClick={() => navigate("home")}
+   402→   402→   402→        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+   403→   403→   403→      >
+   404→   404→   404→        <ChevronLeft className="size-4" /> Accueil
+   405→   405→   405→      </button>
+   406→   406→   406→
+   407→   407→   407→      {/* ============ INTRO ============ */}
+   408→   408→   408→      <Card className="overflow-hidden border-brand/20 py-0 shadow-premium">
+   409→   409→   409→        <div className="relative bg-brand-gradient">
+   410→   410→   410→          <div className="absolute inset-0 bg-dotted-white opacity-15" />
+   411→   411→   411→          <div className="absolute -right-12 -top-12 size-44 rounded-full bg-white/10 blur-3xl" />
+   412→   412→   412→          <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+   413→   413→   413→            <div className="flex items-start gap-4">
+   414→   414→   414→              <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
+   415→   415→   415→                <ClipboardList className="size-7 text-white" />
+   416→   416→   416→              </span>
+   417→   417→   417→              <div className="text-white">
+   418→   418→   418→                <h1 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
+   419→   419→   419→                  Estimez votre ordonnance
+   420→   420→   420→                </h1>
+   421→   421→   421→                <p className="mt-1.5 max-w-lg text-sm leading-relaxed text-white/85">
+   422→   422→   422→                  Ajoutez les médicaments prescrits, précisez les dosages et quantités, puis
+   423→   423→   423→                  obtenez une estimation claire du coût total avant de vous rendre en pharmacie.
+   424→   424→   424→                </p>
+   425→   425→   425→              </div>
+   426→   426→   426→            </div>
+   427→   427→   427→            <Button
+   428→   428→   428→              size="lg"
+   429→   429→   429→              className="shrink-0 bg-white text-brand-dark hover:bg-white/90"
+   430→   430→   430→              onClick={() => {
+   431→   431→   431→                if (showForm) {
+   432→   432→   432→                  resetForm();
+   433→   433→   433→                  setShowForm(false);
+   434→   434→   434→                } else {
+   435→   435→   435→                  setShowForm(true);
+   436→   436→   436→                  setTimeout(() => document.getElementById("rx-name")?.focus(), 100);
+   437→   437→   437→                }
+   438→   438→   438→              }}
+   439→   439→   439→            >
+   440→   440→   440→              {showForm ? (
+   441→   441→   441→                <>
+   442→   442→   442→                  <X className="size-4" /> Fermer
+   443→   443→   443→                </>
+   444→   444→   444→              ) : (
+   445→   445→   445→                <>
+   446→   446→   446→                  <Plus className="size-4" /> Ajouter un médicament
+   447→   447→   447→                </>
+   448→   448→   448→              )}
+   449→   449→   449→            </Button>
+   450→   450→   450→          </div>
+   451→   451→   451→        </div>
+   452→   452→   452→      </Card>
+   453→   453→   453→
+   454→   454→   454→      {/* ============ MAIN LAYOUT ============ */}
+   455→   455→   455→      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+   456→   456→   456→        {/* LEFT: Form + list */}
+   457→   457→   457→        <div className="space-y-6">
+   458→   458→   458→          {/* Form */}
+   459→   459→   459→          {showForm && (
+   460→   460→   460→            <Card className="border-border/70 p-5 shadow-premium animate-fade-up">
+   461→   461→   461→              <div className="mb-4 flex items-center gap-2">
+   462→   462→   462→                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   463→   463→   463→                  <Plus className="size-4" />
+   464→   464→   464→                </span>
+   465→   465→   465→                <h2 className="text-base font-bold text-foreground">
+   466→   466→   466→                  {editingSlug ? "Modifier le médicament" : "Ajouter un médicament"}
+   467→   467→   467→                </h2>
+   468→   468→   468→              </div>
+   469→   469→   469→
+   470→   470→   470→              <form onSubmit={handleSubmit} className="space-y-4">
+   471→   471→   471→                {/* Name with autocomplete */}
+   472→   472→   472→                <div ref={searchBoxRef} className="relative">
+   473→   473→   473→                  <Label htmlFor="rx-name">Nom du médicament *</Label>
+   474→   474→   474→                  <div className="relative mt-1.5">
+   475→   475→   475→                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+   476→   476→   476→                    <Input
+   477→   477→   477→                      id="rx-name"
+   478→   478→   478→                      value={query || formName}
+   479→   479→   479→                      onChange={(e) => {
+   480→   480→   480→                        setQuery(e.target.value);
+   481→   481→   481→                        setFormName(e.target.value);
+   482→   482→   482→                      }}
+   483→   483→   483→                      onFocus={() => query && setShowSuggestions(true)}
+   484→   484→   484→                      placeholder="Ex : Paracétamol, Amoxicilline, Doliprane…"
+   485→   485→   485→                      className="h-11 pl-10"
+   486→   486→   486→                      autoComplete="off"
+   487→   487→   487→                    />
+   488→   488→   488→                    {loadingSuggestions && (
+   489→   489→   489→                      <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-brand" />
+   490→   490→   490→                    )}
+   491→   491→   491→                  </div>
+   492→   492→   492→                  {showSuggestions && suggestions.length > 0 && (
+   493→   493→   493→                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-premium-lg">
+   494→   494→   494→                      <ul className="max-h-60 overflow-y-auto scroll-thin py-1">
+   495→   495→   495→                        {suggestions.map((s) => (
+   496→   496→   496→                          <li key={s.id}>
+   497→   497→   497→                            <button
+   498→   498→   498→                              type="button"
+   499→   499→   499→                              onClick={() => pickSuggestion(s)}
+   500→   500→   500→                              className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent"
+   501→   501→   501→                            >
+   502→   502→   502→                              <span
+   503→   503→   503→                                className="flex size-8 items-center justify-center rounded-lg"
+   504→   504→   504→                                style={{
+   505→   505→   505→                                  backgroundColor: s.category ? `${s.category.color}14` : undefined,
+   506→   506→   506→                                }}
+   507→   507→   507→                              >
+   508→   508→   508→                                {s.category ? (
+   509→   509→   509→                                  <CategoryIcon
+   510→   510→   510→                                    name={s.category.iconName}
+   511→   511→   511→                                    size={16}
+   512→   512→   512→                                    color={s.category.color}
+   513→   513→   513→                                  />
+   514→   514→   514→                                ) : (
+   515→   515→   515→                                  <Pill className="size-4 text-brand" />
+   516→   516→   516→                                )}
+   517→   517→   517→                              </span>
+   518→   518→   518→                              <span className="min-w-0 flex-1">
+   519→   519→   519→                                <span className="block truncate text-sm font-semibold">
+   520→   520→   520→                                  {s.name}
+   521→   521→   521→                                </span>
+   522→   522→   522→                                <span className="block truncate text-xs text-muted-foreground">
+   523→   523→   523→                                  {s.form} {s.dosage} · {formatFCFA(s.avgPrice)}
+   524→   524→   524→                                </span>
+   525→   525→   525→                              </span>
+   526→   526→   526→                            </button>
+   527→   527→   527→                          </li>
+   528→   528→   528→                        ))}
+   529→   529→   529→                      </ul>
+   530→   530→   530→                    </div>
+   531→   531→   531→                  )}
+   532→   532→   532→                </div>
+   533→   533→   533→
+   534→   534→   534→                {/* DCI + Dosage */}
+   535→   535→   535→                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   536→   536→   536→                  <div>
+   537→   537→   537→                    <Label htmlFor="rx-dci">DCI (principe actif)</Label>
+   538→   538→   538→                    <Input
+   539→   539→   539→                      id="rx-dci"
+   540→   540→   540→                      value={formDci}
+   541→   541→   541→                      onChange={(e) => setFormDci(e.target.value)}
+   542→   542→   542→                      placeholder="Ex : Paracétamol"
+   543→   543→   543→                      className="mt-1.5 h-11"
+   544→   544→   544→                    />
+   545→   545→   545→                  </div>
+   546→   546→   546→                  <div>
+   547→   547→   547→                    <Label htmlFor="rx-dosage">Dosage</Label>
+   548→   548→   548→                    <Input
+   549→   549→   549→                      id="rx-dosage"
+   550→   550→   550→                      value={formDosage}
+   551→   551→   551→                      onChange={(e) => setFormDosage(e.target.value)}
+   552→   552→   552→                      placeholder="Ex : 500 mg"
+   553→   553→   553→                      className="mt-1.5 h-11"
+   554→   554→   554→                    />
+   555→   555→   555→                  </div>
+   556→   556→   556→                </div>
+   557→   557→   557→
+   558→   558→   558→                {/* Form + Qty */}
+   559→   559→   559→                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   560→   560→   560→                  <div>
+   561→   561→   561→                    <Label htmlFor="rx-form">Forme</Label>
+   562→   562→   562→                    <Select value={formForm} onValueChange={setFormForm}>
+   563→   563→   563→                      <SelectTrigger id="rx-form" className="mt-1.5 h-11">
+   564→   564→   564→                        <SelectValue placeholder="Sélectionner" />
+   565→   565→   565→                      </SelectTrigger>
+   566→   566→   566→                      <SelectContent>
+   567→   567→   567→                        {FORMS.map((f) => (
+   568→   568→   568→                          <SelectItem key={f} value={f}>
+   569→   569→   569→                            {f}
+   570→   570→   570→                          </SelectItem>
+   571→   571→   571→                        ))}
+   572→   572→   572→                      </SelectContent>
+   573→   573→   573→                    </Select>
+   574→   574→   574→                  </div>
+   575→   575→   575→                  <div>
+   576→   576→   576→                    <Label htmlFor="rx-qty">Quantité *</Label>
+   577→   577→   577→                    <div className="mt-1.5 flex items-center gap-2">
+   578→   578→   578→                      <Button
+   579→   579→   579→                        type="button"
+   580→   580→   580→                        variant="outline"
+   581→   581→   581→                        size="icon"
+   582→   582→   582→                        className="size-11 shrink-0"
+   583→   583→   583→                        onClick={() =>
+   584→   584→   584→                          setFormQty((q) => String(Math.max(1, parseInt(q || "1", 10) - 1)))
+   585→   585→   585→                        }
+   586→   586→   586→                      >
+   587→   587→   587→                        <Minus className="size-4" />
+   588→   588→   588→                      </Button>
+   589→   589→   589→                      <Input
+   590→   590→   590→                        id="rx-qty"
+   591→   591→   591→                        type="number"
+   592→   592→   592→                        min="1"
+   593→   593→   593→                        value={formQty}
+   594→   594→   594→                        onChange={(e) => setFormQty(e.target.value)}
+   595→   595→   595→                        className="h-11 text-center"
+   596→   596→   596→                      />
+   597→   597→   597→                      <Button
+   598→   598→   598→                        type="button"
+   599→   599→   599→                        variant="outline"
+   600→   600→   600→                        size="icon"
+   601→   601→   601→                        className="size-11 shrink-0"
+   602→   602→   602→                        onClick={() =>
+   603→   603→   603→                          setFormQty((q) => String(parseInt(q || "1", 10) + 1))
+   604→   604→   604→                        }
+   605→   605→   605→                      >
+   606→   606→   606→                        <Plus className="size-4" />
+   607→   607→   607→                      </Button>
+   608→   608→   608→                    </div>
+   609→   609→   609→                  </div>
+   610→   610→   610→                </div>
+   611→   611→   611→
+   612→   612→   612→                {/* Duration */}
+   613→   613→   613→                <div>
+   614→   614→   614→                  <Label htmlFor="rx-duration">Durée du traitement</Label>
+   615→   615→   615→                  <Input
+   616→   616→   616→                    id="rx-duration"
+   617→   617→   617→                    value={formDuration}
+   618→   618→   618→                    onChange={(e) => setFormDuration(e.target.value)}
+   619→   619→   619→                    placeholder="Ex : 7 jours, 2 semaines…"
+   620→   620→   620→                    className="mt-1.5 h-11"
+   621→   621→   621→                  />
+   622→   622→   622→                </div>
+   623→   623→   623→
+   624→   624→   624→                {/* Note */}
+   625→   625→   625→                <div>
+   626→   626→   626→                  <Label htmlFor="rx-note">Remarque (optionnel)</Label>
+   627→   627→   627→                  <Textarea
+   628→   628→   628→                    id="rx-note"
+   629→   629→   629→                    value={formNote}
+   630→   630→   630→                    onChange={(e) => setFormNote(e.target.value)}
+   631→   631→   631→                    placeholder="Ex : À prendre après les repas, 2 comprimés matin et soir…"
+   632→   632→   632→                    className="mt-1.5 min-h-[70px]"
+   633→   633→   633→                    rows={2}
+   634→   634→   634→                  />
+   635→   635→   635→                </div>
+   636→   636→   636→
+   637→   637→   637→                <div className="flex flex-wrap gap-2">
+   638→   638→   638→                  <Button type="submit" className="bg-brand-gradient text-white hover:opacity-90">
+   639→   639→   639→                    <Plus className="size-4" />
+   640→   640→   640→                    {editingSlug ? "Modifier" : "Ajouter à l'ordonnance"}
+   641→   641→   641→                  </Button>
+   642→   642→   642→                  <Button
+   643→   643→   643→                    type="button"
+   644→   644→   644→                    variant="outline"
+   645→   645→   645→                    onClick={() => {
+   646→   646→   646→                      resetForm();
+   647→   647→   647→                      setShowForm(false);
+   648→   648→   648→                    }}
+   649→   649→   649→                  >
+   650→   650→   650→                    Annuler
+   651→   651→   651→                  </Button>
+   652→   652→   652→                </div>
+   653→   653→   653→              </form>
+   654→   654→   654→            </Card>
+   655→   655→   655→          )}
+   656→   656→   656→
+   657→   657→   657→          {/* Items list */}
+   658→   658→   658→          <section>
+   659→   659→   659→            <div className="mb-3 flex items-center justify-between">
+   660→   660→   660→              <div>
+   661→   661→   661→                <Eyebrow>Votre liste</Eyebrow>
+   662→   662→   662→                <Heading level="h3">
+   663→   663→   663→                  Médicaments de l&apos;ordonnance{" "}
+   664→   664→   664→                  {items.length > 0 && (
+   665→   665→   665→                    <span className="ml-1 text-base font-bold text-brand">({items.length})</span>
+   666→   666→   666→                  )}
+   667→   667→   667→                </Heading>
+   668→   668→   668→              </div>
+   669→   669→   669→              {items.length > 0 && (
+   670→   670→   670→                <Button size="sm" variant="ghost" onClick={handleNew} className="text-muted-foreground">
+   671→   671→   671→                  <RotateCcw className="size-3.5" /> Tout effacer
+   672→   672→   672→                </Button>
+   673→   673→   673→              )}
+   674→   674→   674→            </div>
+   675→   675→   675→
+   676→   676→   676→            {items.length === 0 ? (
+   677→   677→   677→              <EmptyState
+   678→   678→   678→                icon={ClipboardList}
+   679→   679→   679→                title="Aucun médicament ajouté"
+   680→   680→   680→                description="Cliquez sur « Ajouter un médicament » pour commencer à constituer votre ordonnance. Vous pourrez ensuite estimer le coût total."
+   681→   681→   681→                action={{
+   682→   682→   682→                  label: "Ajouter un médicament",
+   683→   683→   683→                  onClick: () => {
+   684→   684→   684→                    setShowForm(true);
+   685→   685→   685→                    setTimeout(() => document.getElementById("rx-name")?.focus(), 100);
+   686→   686→   686→                  },
+   687→   687→   687→                }}
+   688→   688→   688→              />
+   689→   689→   689→            ) : (
+   690→   690→   690→              <div className="space-y-2.5">
+   691→   691→   691→                {items.map((item, idx) => {
+   692→   692→   692→                  const status = itemStatus(item);
+   693→   693→   693→                  const sc = STATUS_CONFIG[status];
+   694→   694→   694→                  const StatusIcon = sc.icon;
+   695→   695→   695→                  return (
+   696→   696→   696→                    <Card
+   697→   697→   697→                      key={item.slug}
+   698→   698→   698→                      className="border-border/60 py-0 transition-all hover:border-brand/30 hover:shadow-premium"
+   699→   699→   699→                    >
+   700→   700→   700→                      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+   701→   701→   701→                        {/* Icon + index */}
+   702→   702→   702→                        <div className="flex items-center gap-3">
+   703→   703→   703→                          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-light text-xs font-bold text-brand">
+   704→   704→   704→                            {idx + 1}
+   705→   705→   705→                          </span>
+   706→   706→   706→                          <span
+   707→   707→   707→                            className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+   708→   708→   708→                            style={{
+   709→   709→   709→                              backgroundColor: item.category
+   710→   710→   710→                                ? `${item.category.color}14`
+   711→   711→   711→                                : "var(--brand-light)",
+   712→   712→   712→                            }}
+   713→   713→   713→                          >
+   714→   714→   714→                            {item.category ? (
+   715→   715→   715→                              <CategoryIcon
+   716→   716→   716→                                name={item.category.iconName}
+   717→   717→   717→                                size={20}
+   718→   718→   718→                                color={item.category.color}
+   719→   719→   719→                              />
+   720→   720→   720→                            ) : (
+   721→   721→   721→                              <Pill className="size-5 text-brand" />
+   722→   722→   722→                            )}
+   723→   723→   723→                          </span>
+   724→   724→   724→                        </div>
+   725→   725→   725→
+   726→   726→   726→                        {/* Info */}
+   727→   727→   727→                        <div className="min-w-0 flex-1">
+   728→   728→   728→                          <div className="flex flex-wrap items-center gap-2">
+   729→   729→   729→                            <h3 className="text-sm font-bold text-foreground">{item.name}</h3>
+   730→   730→   730→                            {item.requiresRx && (
+   731→   731→   731→                              <Badge
+   732→   732→   732→                                variant="outline"
+   733→   733→   733→                                className="border-amber-500/40 bg-amber-50 px-1.5 py-0 text-[9px] font-semibold text-amber-700"
+   734→   734→   734→                              >
+   735→   735→   735→                                <ShieldAlert className="size-2.5" /> Rx
+   736→   736→   736→                              </Badge>
+   737→   737→   737→                            )}
+   738→   738→   738→                            <span
+   739→   739→   739→                              className={cn(
+   740→   740→   740→                                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold",
+   741→   741→   741→                                sc.className
+   742→   742→   742→                              )}
+   743→   743→   743→                            >
+   744→   744→   744→                              <StatusIcon className="size-2.5" /> {sc.label}
+   745→   745→   745→                            </span>
+   746→   746→   746→                          </div>
+   747→   747→   747→                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+   748→   748→   748→                            {item.genericName} · {item.form} {item.dosage}
+   749→   749→   749→                            {item.duration && ` · ${item.duration}`}
+   750→   750→   750→                          </p>
+   751→   751→   751→                          {item.note && (
+   752→   752→   752→                            <p className="mt-0.5 truncate text-[11px] italic text-muted-foreground/80">
+   753→   753→   753→                              « {item.note} »
+   754→   754→   754→                            </p>
+   755→   755→   755→                          )}
+   756→   756→   756→                        </div>
+   757→   757→   757→
+   758→   758→   758→                        {/* Qty stepper */}
+   759→   759→   759→                        <div className="flex items-center gap-1.5 shrink-0">
+   760→   760→   760→                          <Button
+   761→   761→   761→                            size="icon"
+   762→   762→   762→                            variant="outline"
+   763→   763→   763→                            className="size-8"
+   764→   764→   764→                            onClick={() => updateQty(item.slug, -1)}
+   765→   765→   765→                          >
+   766→   766→   766→                            <Minus className="size-3" />
+   767→   767→   767→                          </Button>
+   768→   768→   768→                          <span className="w-8 text-center text-sm font-bold text-foreground">
+   769→   769→   769→                            {item.quantity}
+   770→   770→   770→                          </span>
+   771→   771→   771→                          <Button
+   772→   772→   772→                            size="icon"
+   773→   773→   773→                            variant="outline"
+   774→   774→   774→                            className="size-8"
+   775→   775→   775→                            onClick={() => updateQty(item.slug, 1)}
+   776→   776→   776→                          >
+   777→   777→   777→                            <Plus className="size-3" />
+   778→   778→   778→                          </Button>
+   779→   779→   779→                        </div>
+   780→   780→   780→
+   781→   781→   781→                        {/* Price */}
+   782→   782→   782→                        <div className="shrink-0 text-right">
+   783→   783→   783→                          {item.avgPrice > 0 ? (
+   784→   784→   784→                            <Price
+   785→   785→   785→                              amount={item.avgPrice * item.quantity}
+   786→   786→   786→                              size="md"
+   787→   787→   787→                              variant="brand"
+   788→   788→   788→                            />
+   789→   789→   789→                          ) : (
+   790→   790→   790→                            <span className="text-xs text-muted-foreground">Prix à confirmer</span>
+   791→   791→   791→                          )}
+   792→   792→   792→                          {item.avgPrice > 0 && (
+   793→   793→   793→                            <p className="text-[10px] text-muted-foreground">
+   794→   794→   794→                              {item.pharmacyCount} pharmacies
+   795→   795→   795→                            </p>
+   796→   796→   796→                          )}
+   797→   797→   797→                        </div>
+   798→   798→   798→
+   799→   799→   799→                        {/* Actions */}
+   800→   800→   800→                        <div className="flex shrink-0 gap-1">
+   801→   801→   801→                          <Button
+   802→   802→   802→                            size="icon"
+   803→   803→   803→                            variant="ghost"
+   804→   804→   804→                            className="size-8 text-muted-foreground hover:text-brand"
+   805→   805→   805→                            onClick={() => editItem(item)}
+   806→   806→   806→                            aria-label="Modifier"
+   807→   807→   807→                          >
+   808→   808→   808→                            <Pencil className="size-3.5" />
+   809→   809→   809→                          </Button>
+   810→   810→   810→                          <Button
+   811→   811→   811→                            size="icon"
+   812→   812→   812→                            variant="ghost"
+   813→   813→   813→                            className="size-8 text-muted-foreground hover:text-red-600"
+   814→   814→   814→                            onClick={() => removeItem(item.slug)}
+   815→   815→   815→                            aria-label="Supprimer"
+   816→   816→   816→                          >
+   817→   817→   817→                            <Trash2 className="size-3.5" />
+   818→   818→   818→                          </Button>
+   819→   819→   819→                        </div>
+   820→   820→   820→                      </div>
+   821→   821→   821→                    </Card>
+   822→   822→   822→                  );
+   823→   823→   823→                })}
+   824→   824→   824→              </div>
+   825→   825→   825→            )}
+   826→   826→   826→          </section>
+   827→   827→   827→        </div>
+   828→   828→   828→
+   829→   829→   829→        {/* RIGHT: Recap */}
+   830→   830→   830→        <div className="space-y-4">
+   831→   831→   831→          {/* Summary card (sticky) */}
+   832→   832→   832→          <Card className="sticky top-24 border-border/70 p-5 shadow-premium">
+   833→   833→   833→            <div className="flex items-center gap-2">
+   834→   834→   834→              <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   835→   835→   835→                <Calculator className="size-4" />
+   836→   836→   836→              </span>
+   837→   837→   837→              <h3 className="text-base font-bold text-foreground">Récapitulatif</h3>
+   838→   838→   838→            </div>
+   839→   839→   839→
+   840→   840→   840→            {/* Stats grid */}
+   841→   841→   841→            <div className="mt-4 grid grid-cols-2 gap-2">
+   842→   842→   842→              <StatBox label="Médicaments" value={stats.total} tone="brand" />
+   843→   843→   843→              <StatBox label="Unités" value={stats.totalUnits} tone="neutral" />
+   844→   844→   844→              <StatBox label="Disponibles" value={stats.available} tone="success" />
+   845→   845→   845→              <StatBox label="Stock faible" value={stats.lowStock} tone="warning" />
+   846→   846→   846→              <StatBox label="À confirmer" value={stats.toConfirm} tone="info" />
+   847→   847→   847→              <StatBox label="Rupture" value={stats.outStock} tone="danger" />
+   848→   848→   848→            </div>
+   849→   849→   849→
+   850→   850→   850→            {/* Total cost */}
+   851→   851→   851→            <div className="mt-4 rounded-xl bg-brand-light/50 p-4 text-center">
+   852→   852→   852→              <p className="text-[10px] font-bold uppercase tracking-wide text-brand">
+   853→   853→   853→                Coût estimatif total
+   854→   854→   854→              </p>
+   855→   855→   855→              {estimate ? (
+   856→   856→   856→                <PriceRange
+   857→   857→   857→                  min={estimate.totalMin}
+   858→   858→   858→                  max={estimate.totalMax}
+   859→   859→   859→                  size="xl"
+   860→   860→   860→                  variant="brand"
+   861→   861→   861→                  className="mt-1 block"
+   862→   862→   862→                />
+   863→   863→   863→              ) : stats.totalCost > 0 ? (
+   864→   864→   864→                <p className="mt-1 text-3xl font-extrabold text-brand-dark">
+   865→   865→   865→                  {formatFCFA(stats.totalCost)}
+   866→   866→   866→                </p>
+   867→   867→   867→              ) : (
+   868→   868→   868→                <p className="mt-1 text-2xl font-extrabold text-muted-foreground">— FCFA</p>
+   869→   869→   869→              )}
+   870→   870→   870→              <p className="mt-1 text-[11px] text-muted-foreground">
+   871→   871→   871→                Basé sur les prix indicatifs moyens
+   872→   872→   872→              </p>
+   873→   873→   873→            </div>
+   874→   874→   874→
+   875→   875→   875→            {/* Estimate button */}
+   876→   876→   876→            <Button
+   877→   877→   877→              className="mt-4 w-full bg-brand text-white hover:bg-brand-dark"
+   878→   878→   878→              onClick={() => {
+   879→   879→   879→                if (hasPass) {
+   880→   880→   880→                  handleEstimate();
+   881→   881→   881→                } else {
+   882→   882→   882→                  setShowCreditDialog(true);
+   883→   883→   883→                }
+   884→   884→   884→              }}
+   885→   885→   885→              disabled={estimating || items.length === 0}
+   886→   886→   886→            >
+   887→   887→   887→              {estimating ? (
+   888→   888→   888→                <>
+   889→   889→   889→                  <Loader2 className="size-4 animate-spin" /> Calcul…
+   890→   890→   890→                </>
+   891→   891→   891→              ) : (
+   892→   892→   892→                <>
+   893→   893→   893→                  <Calculator className="size-4" /> Estimer le coût
+   894→   894→   894→                  <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.estimatePrescription} className="ml-1.5" />
+   895→   895→   895→                </>
+   896→   896→   896→              )}
+   897→   897→   897→            </Button>
+   898→   898→   898→
+   899→   899→   899→            {/* Info message: free add / 2 credits estimate / Pass actif */}
+   900→   900→   900→            <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
+   901→   901→   901→              {hasPass ? (
+   902→   902→   902→                <span className="inline-flex items-center gap-1 font-bold text-amber-700">
+   903→   903→   903→                  <Crown className="size-3" /> Pass Ordonnance actif — estimation gratuite
+   904→   904→   904→                </span>
+   905→   905→   905→              ) : (
+   906→   906→   906→                <>
+   907→   907→   907→                  L&apos;ajout des médicaments est gratuit. L&apos;estimation complète coûte{" "}
+   908→   908→   908→                  <span className="font-bold text-brand-dark">2 crédits</span>.
+   909→   909→   909→                </>
+   910→   910→   910→              )}
+   911→   911→   911→            </p>
+   912→   912→   912→
+   913→   913→   913→            {/* Estimate result detail */}
+   914→   914→   914→            {estimate && (
+   915→   915→   915→              <div className="mt-3 space-y-1.5 rounded-lg border border-brand/20 bg-background p-3 animate-fade-up">
+   916→   916→   916→                <p className="text-xs font-bold text-foreground">Détail de l&apos;estimation</p>
+   917→   917→   917→                {estimate.lines.map((line, i) => (
+   918→   918→   918→                  <div key={i} className="flex items-center justify-between text-xs">
+   919→   919→   919→                    <span className="truncate text-muted-foreground">
+   920→   920→   920→                      {line.medication.name} ×{line.quantity}
+   921→   921→   921→                    </span>
+   922→   922→   922→                    <span className="font-semibold text-foreground">
+   923→   923→   923→                      {formatFCFA(line.lineMin)} — {formatFCFA(line.lineMax)}
+   924→   924→   924→                    </span>
+   925→   925→   925→                  </div>
+   926→   926→   926→                ))}
+   927→   927→   927→              </div>
+   928→   928→   928→            )}
+   929→   929→   929→
+   930→   930→   930→            {/* Save + New */}
+   931→   931→   931→            <div className="mt-3 grid grid-cols-2 gap-2">
+   932→   932→   932→              <Button size="sm" variant="outline" onClick={handleSave}>
+   933→   933→   933→                <Save className="size-3.5" /> Enregistrer
+   934→   934→   934→              </Button>
+   935→   935→   935→              <Button size="sm" variant="outline" onClick={handleNew}>
+   936→   936→   936→                <RotateCcw className="size-3.5" /> Nouvelle
+   937→   937→   937→              </Button>
+   938→   938→   938→            </div>
+   939→   939→   939→          </Card>
+   940→   940→   940→
+   941→   941→   941→          {/* Premium upsell */}
+   942→   942→   942→          {!premium && (
+   943→   943→   943→            <Card className="overflow-hidden border-amber-500/30 py-0">
+   944→   944→   944→              <div className="bg-amber-50 p-4">
+   945→   945→   945→                <div className="flex items-center gap-2">
+   946→   946→   946→                  <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
+   947→   947→   947→                    <Crown className="size-5" />
+   948→   948→   948→                  </span>
+   949→   949→   949→                  <div>
+   950→   950→   950→                    <p className="text-sm font-bold text-foreground">Passez Premium</p>
+   951→   951→   951→                    <p className="text-[11px] text-muted-foreground">500 FCFA / mois</p>
+   952→   952→   952→                  </div>
+   953→   953→   953→                </div>
+   954→   954→   954→                <ul className="mt-3 space-y-1 text-xs text-foreground/80">
+   955→   955→   955→                  <li className="flex items-center gap-1.5">
+   956→   956→   956→                    <CheckCircle2 className="size-3.5 text-amber-500" /> Estimations illimitées
+   957→   957→   957→                  </li>
+   958→   958→   958→                  <li className="flex items-center gap-1.5">
+   959→   959→   959→                    <CheckCircle2 className="size-3.5 text-amber-500" /> Ordonnances sauvegardées
+   960→   960→   960→                  </li>
+   961→   961→   961→                  <li className="flex items-center gap-1.5">
+   962→   962→   962→                    <CheckCircle2 className="size-3.5 text-amber-500" /> Alertes de disponibilité
+   963→   963→   963→                  </li>
+   964→   964→   964→                </ul>
+   965→   965→   965→                <Button
+   966→   966→   966→                  size="sm"
+   967→   967→   967→                  className="mt-3 w-full bg-amber-500 text-white hover:bg-amber-600"
+   968→   968→   968→                  onClick={() => navigate("subscription")}
+   969→   969→   969→                >
+   970→   970→   970→                  <Crown className="size-3.5" /> S&apos;abonner
+   971→   971→   971→                </Button>
+   972→   972→   972→              </div>
+   973→   973→   973→            </Card>
+   974→   974→   974→          )}
+   975→   975→   975→        </div>
+   976→   976→   976→      </div>
+   977→   977→   977→
+   978→   978→   978→      {/* ============ TROUVER UNE PHARMACIE ============ */}
+   979→   979→   979→      {items.length > 0 && (
+   980→   980→   980→        <section className="mt-8">
+   981→   981→   981→          <Card className="overflow-hidden border-brand/20 py-0">
+   982→   982→   982→            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+   983→   983→   983→              <div className="flex items-start gap-4">
+   984→   984→   984→                <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-light text-brand">
+   985→   985→   985→                  <Store className="size-6" />
+   986→   986→   986→                </span>
+   987→   987→   987→                <div>
+   988→   988→   988→                  <Heading level="h3">Trouver une pharmacie</Heading>
+   989→   989→   989→                  <p className="mt-1 max-w-md text-sm text-muted-foreground">
+   990→   990→   990→                    Voir les pharmacies pouvant fournir toute l&apos;ordonnance ou une partie
+   991→   991→   991→                    des médicaments à Abidjan.
+   992→   992→   992→                  </p>
+   993→   993→   993→                </div>
+   994→   994→   994→              </div>
+   995→   995→   995→              <Button
+   996→   996→   996→                className="shrink-0 bg-brand-gradient text-white hover:opacity-90"
+   997→   997→   997→                onClick={() => navigate("pharmacies")}
+   998→   998→   998→              >
+   999→   999→   999→                Voir les résultats <ArrowRight className="size-4" />
+  1000→  1000→  1000→              </Button>
+  1001→  1001→  1001→            </div>
+  1002→  1002→  1002→            {estimate && (
+  1003→  1003→  1003→              <div className="border-t border-border/50 bg-brand-light/30 px-5 py-3 sm:px-6">
+  1004→  1004→  1004→                <p className="text-sm text-foreground">
+  1005→  1005→  1005→                  <span className="font-bold text-brand-dark">
+  1006→  1006→  1006→                    {estimate.availablePharmacies}
+  1007→  1007→  1007→                  </span>{" "}
+  1008→  1008→  1008→                  pharmacie{estimate.availablePharmacies > 1 ? "s" : ""} peuve
+  1009→  1009→  1009→                  {estimate.availablePharmacies > 1 ? "nt" : ""} fournir tous vos médicaments.
+  1010→  1010→  1010→                </p>
+  1011→  1011→  1011→              </div>
+  1012→  1012→  1012→            )}
+  1013→  1013→  1013→          </Card>
+  1014→  1014→  1014→        </section>
+  1015→  1015→  1015→      )}
+  1016→  1016→  1016→
+  1017→  1017→  1017→      {/* ============ PRUDENCE ============ */}
+  1018→  1018→  1018→      <div className="mt-6">
+  1019→  1019→  1019→        <AlertMessage variant="warning" icon={Info}>
+  1020→  1020→  1020→          Cette estimation est indicative. Vérifiez toujours les disponibilités et demandez
+  1021→  1021→  1021→          conseil à un pharmacien ou professionnel de santé avant tout déplacement.
+  1022→  1022→  1022→        </AlertMessage>
+  1023→  1023→  1023→      </div>
+  1024→  1024→  1024→
+  1025→  1025→  1025→      {/* ============ DIALOGUE DE CONFIRMATION DE CRÉDIT ============ */}
+  1026→  1026→  1026→      <CreditConfirmDialog
+  1027→  1027→  1027→        open={showCreditDialog}
+  1028→  1028→  1028→        onOpenChange={setShowCreditDialog}
+  1029→  1029→  1029→        title="Estimer mon ordonnance"
+  1030→  1030→  1030→        cost={CREDIT_COSTS.estimatePrescription}
+  1031→  1031→  1031→        description="Obtenez le total estimatif, les médicaments disponibles, les pharmacies recommandées et les options de comparaison"
+  1032→  1032→  1032→        benefits={[
+  1033→  1033→  1033→          "Coût total estimatif min/max",
+  1034→  1034→  1034→          "Médicaments disponibles",
+  1035→  1035→  1035→          "Pharmacies recommandées",
+  1036→  1036→  1036→          "Options de comparaison",
+  1037→  1037→  1037→        ]}
+  1038→  1038→  1038→        onConfirm={() => handleEstimate()}
+  1039→  1039→  1039→      />
+  1040→  1040→  1040→    </div>
+  1041→  1041→  1041→  );
+  1042→  1042→  1042→}
+  1043→  1043→  1043→
+  1044→  1044→  1044→/* ============================================================
+  1045→  1045→  1045→   StatBox — petite statistique colorée
+  1046→  1046→  1046→   ============================================================ */
+  1047→  1047→  1047→function StatBox({
+  1048→  1048→  1048→  label,
+  1049→  1049→  1049→  value,
+  1050→  1050→  1050→  tone,
+  1051→  1051→  1051→}: {
+  1052→  1052→  1052→  label: string;
+  1053→  1053→  1053→  value: number;
+  1054→  1054→  1054→  tone: "brand" | "success" | "warning" | "danger" | "info" | "neutral";
+  1055→  1055→  1055→}) {
+  1056→  1056→  1056→  const tones = {
+  1057→  1057→  1057→    brand: "bg-brand-light text-brand-dark",
+  1058→  1058→  1058→    success: "bg-success-light text-success",
+  1059→  1059→  1059→    warning: "bg-warning-light text-warning-foreground",
+  1060→  1060→  1060→    danger: "bg-danger-light text-danger",
+  1061→  1061→  1061→    info: "bg-info-light text-info",
+  1062→  1062→  1062→    neutral: "bg-neutral-light text-neutral-foreground",
+  1063→  1063→  1063→  };
+  1064→  1064→  1064→  return (
+  1065→  1065→  1065→    <div className={cn("rounded-lg px-3 py-2 text-center", tones[tone])}>
+  1066→  1066→  1066→      <p className="text-xl font-extrabold leading-none tabular-nums">{value}</p>
+  1067→  1067→  1067→      <p className="mt-0.5 text-[10px] font-semibold leading-tight">{label}</p>
+  1068→  1068→  1068→    </div>
+  1069→  1069→  1069→  );
+  1070→  1070→  1070→}
+  1071→  1071→  1071→

@@ -530,3 +530,39 @@ Stage Summary:
 - Upsell Premium 500 FCFA/mois (valeur de l'abonnement mise en avant)
 - Message de prudence discret
 - Données réalistes : Paracétamol, Amoxicilline, Vitamine C, Smecta, Sérum physiologique, Bétadine, Doliprane
+
+---
+Task ID: 17
+Agent: main (orchestrator)
+Task: Page Résultat d'ordonnance complète — refonte avec résumé, meilleure option, pharmacies, filtres
+
+Work Log:
+- Grand résumé en haut : CheckCircle2 dans cercle brand-light, Eyebrow "Estimation terminée", titre "Résultat de votre ordonnance", sous-texte, grille 5 SummaryStat (Médicaments, Coût total min, Disponibles, À confirmer, Rupture) avec tons colorés
+- Carte "Résumé de l'ordonnance" (sticky right) : total estimatif (PriceRange), nombre de produits, disponibilité globale (Complète/Partielle), pharmacie recommandée, distance estimée, bouton "Voir la meilleure pharmacie"
+- Liste médicaments : cards avec icône Pill, nom + badge Rx + MedStatusBadge (Disponible/À confirmer/Rupture), forme+dosage+qté, PriceRange min-max, nombre pharmacies
+- Section "Meilleure option recommandée" : Card bg-brand-gradient avec Award, pharmacie recommandée (disponibilité complète + proximité + prix optimisé), badges (Ordonnance complète, Ouvert, De garde), total estimatif, 3 boutons (Voir la meilleure pharmacie / Appeler / Itinéraire)
+- Section "Pharmacies ayant toute l'ordonnance" : 6 filtres comparaison chips (Recommandée/Plus proche/Prix le plus bas/Ordonnance complète/Ouverte maintenant/De garde), grille FullPharmacyCard (badges Ordonnance complète + note, nom + commune + quartier, statuts Ouvert/De garde/24/7 + distance, total estimatif + médicaments X/Y, boutons Voir/Appeler/Itinéraire)
+- Section "Pharmacies ayant une partie de l'ordonnance" : PartialPharmacyCard avec badge "Disponibilité partielle X/Y médicaments", liste médicaments Disponibles (vert) + Manquants (rouge barré), boutons Voir détails/Itinéraire
+- Boutons d'action : Enregistrer (localStorage + auth), Modifier (→ prescription), Nouvelle (→ prescription), Partager (navigator.share), Voir mes ordonnances (→ history)
+- Upsell Premium : Card amber 500 FCFA/mois (estimations illimitées, comparateur avancé, alertes)
+- Message de prudence : AlertMessage warning "Les prix et disponibilités sont indicatifs. Veuillez confirmer auprès de la pharmacie avant tout déplacement. Demandez toujours conseil à un pharmacien ou professionnel de santé."
+- Correction bug : ajout navigate("prescription-result", { estimateItems }) dans prescription-view handleEstimate
+- Données fictives réalistes : 6 pharmacies Abidjan (Cocody/Deux Plateaux, Cocody/Riviera, Marcory/Zone 4, Plateau, Yopougon, Abobo) avec distances, statuts, garde
+- Layout responsive : desktop grid [1fr_360px] (détails+pharmacies left, résumé+actions right sticky), mobile empilé
+- Vérification Agent Browser :
+  * desktop 1440px : grand résumé (2 médicaments, 1150 FCFA, 2 dispo) + médicaments avec statut + meilleure option (Pharmacie de la Riviera, 2.8km, complète, Ouvert, De garde) + 3 pharmacies complètes avec filtres + 3 pharmacies partielles (dispo/manquants) + résumé + boutons — VLM confirme "grand résumé, carte résumé, médicaments, meilleure option, pharmacies complètes, pharmacies partielles, boutons, prudence, premium"
+  * filtre "Plus proche" → Riviera (2.8km) en premier
+  * mobile 390px : sections empilées, cartes lisibles — VLM confirme "empilement, lisibilité"
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Page Résultat d'ordonnance premium, responsive, complète conforme aux spécifications
+- Grand résumé : titre + 5 stats (médicaments, coût total, disponibles, à confirmer, rupture)
+- Carte Résumé : total estimatif, produits, disponibilité globale, pharmacie recommandée, distance, bouton Voir la meilleure pharmacie
+- Liste médicaments : nom, DCI, dosage, forme, qté, prix, statut (Disponible/Stock faible/Rupture/À confirmer)
+- Meilleure option recommandée : pharmacie optimale (complète + proche + prix) avec badges et 3 boutons
+- Pharmacies ayant toute l'ordonnance : 6 filtres comparaison + cartes enrichies (distance, prix, statut, garde, Voir/Appeler/Itinéraire)
+- Pharmacies ayant une partie : médicaments disponibles (vert) + manquants (rouge barré)
+- Boutons : Enregistrer/Modifier/Nouvelle/Partager/Voir ordonnances
+- Message de prudence discret mais visible
+- Montre la valeur SABLIN PHARMA : gagner du temps, comparer, préparer son budget

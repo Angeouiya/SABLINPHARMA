@@ -422,7 +422,7 @@ export function PrescriptionResultView() {
   };
 
   // ===== Actions avancées payantes =====
-  // Si l'utilisateur a un Pass Ordonnance actif, l'action est gratuite (pas de dialog).
+  // Si l'utilisateur a un Pass Ordonnance Unique actif, l'action est gratuite (pas de dialog).
   // Sinon, on ouvre un CreditConfirmDialog pour débiter le coût de l'action.
   const performPaidAction = (action: PaidAction) => {
     if (action === "bestPharmacy" && bestOption) {
@@ -453,7 +453,7 @@ export function PrescriptionResultView() {
     return (
       <LockedView
         title="Résultat indisponible"
-        message="Veuillez utiliser 2 crédits ou un Pass Ordonnance pour lancer l'estimation complète."
+        message="Veuillez utiliser 2 crédits ou un Pass Ordonnance Unique pour lancer l'estimation complète."
         cost={2}
         backLabel="Retour à l'ordonnance"
         backView="prescription"
@@ -987,7 +987,7 @@ export function PrescriptionResultView() {
             {hasPass && (
               <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
                 <span className="inline-flex items-center gap-1 font-bold text-amber-700">
-                  <Crown className="size-3" /> Pass Ordonnance actif — actions gratuites
+                  <Crown className="size-3" /> Pass Ordonnance Unique actif — actions gratuites
                 </span>
               </p>
             )}
@@ -1003,8 +1003,8 @@ export function PrescriptionResultView() {
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
               {hasPass
-                ? "Toutes les actions avancées sont gratuites avec votre Pass Ordonnance."
-                : "Chaque action avancée utilise des crédits. Achetez un Pass Ordonnance pour un usage illimité."}
+                ? "Toutes les actions avancées sont gratuites avec votre Pass Ordonnance Unique."
+                : "Chaque action avancée utilise des crédits. Achetez un Pass Ordonnance Unique pour un usage illimité."}
             </p>
 
             <div className="mt-3 space-y-2">

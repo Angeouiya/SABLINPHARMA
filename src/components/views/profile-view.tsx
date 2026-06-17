@@ -254,7 +254,7 @@ export function ProfileView() {
               </p>
             </div>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-brand-dark/80">
-              Rechargez vos crédits ou achetez un Pass Ordonnance pour débloquer les services avancés.
+              Rechargez vos crédits ou achetez un Pass Ordonnance Unique pour débloquer les services avancés.
             </p>
           </div>
           <div className="flex shrink-0 flex-col gap-2 sm:w-56">
@@ -578,7 +578,7 @@ export function ProfileView() {
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
                   <div className="flex-1">
                     <p>
-                      Rechargez vos crédits ou achetez un Pass Ordonnance pour débloquer ces services.
+                      Rechargez vos crédits ou achetez un Pass Ordonnance Unique pour débloquer ces services.
                     </p>
                     <Button
                       size="sm"

@@ -180,7 +180,7 @@ model PassOrdonnance {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   active    Boolean  @default(true)
-  price     Int      @default(300)
+  price     Int      @default(500)
   createdAt DateTime @default(now())
 }
 

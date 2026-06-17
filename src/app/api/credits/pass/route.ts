@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth/session";
 
-// Achat du Pass Ordonnance (300 FCFA) — estimation gratuite illimitée pendant 30 jours
-const PASS_PRICE = 300;
+// Achat du Pass Ordonnance (500 FCFA) — valable pour une seule ordonnance. Expire après utilisation.
+const PASS_PRICE = 500;
 
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     });
     if (existing) {
       return NextResponse.json(
-        { error: "Vous avez déjà un Pass Ordonnance actif." },
+        { error: "Vous avez déjà un Pass Ordonnance Unique actif." },
         { status: 400 }
       );
     }
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         type: "pass",
         amount: 0,
-        description: `Pass Ordonnance — ${PASS_PRICE} FCFA (${provider})`,
+        description: `Pass Ordonnance Unique — ${PASS_PRICE} FCFA (${provider})`,
         balanceAfter: balance,
       },
     });

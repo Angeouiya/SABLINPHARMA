@@ -276,7 +276,7 @@ export function PrescriptionView() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // L'édition reste gratuite ; un ajout est payant (1 crédit) sauf si Pass Ordonnance actif.
+    // L'édition reste gratuite ; un ajout est payant (1 crédit) sauf si Pass Ordonnance Unique actif.
     if (!editingSlug && !hasPass) {
       setShowAddDialog(true);
       return;
@@ -410,7 +410,7 @@ export function PrescriptionView() {
       {/* ============ ACCÈS VERROUILLÉ ============ */}
       {credits === 0 && !hasPass && (
         <LockedView
-          title="Le service Ordonnance nécessite des crédits ou un Pass Ordonnance actif"
+          title="Le service Ordonnance nécessite des crédits ou un Pass Ordonnance Unique actif"
           message="L'ajout de médicaments et l'estimation d'ordonnance sont des services avancés qui nécessitent des crédits."
           cost={1}
           backLabel="Retour à l'accueil"
@@ -935,7 +935,7 @@ export function PrescriptionView() {
             <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
               {hasPass ? (
                 <span className="inline-flex items-center gap-1 font-bold text-amber-700">
-                  <Crown className="size-3" /> Pass Ordonnance actif — actions gratuites
+                  <Crown className="size-3" /> Pass Ordonnance Unique actif — actions gratuites
                 </span>
               ) : (
                 <>
@@ -984,7 +984,7 @@ export function PrescriptionView() {
                   </span>
                   <div>
                     <p className="text-sm font-bold text-foreground">Rechargez vos crédits</p>
-                    <p className="text-[11px] text-muted-foreground">500 FCFA / mois</p>
+                    <p className="text-[11px] text-muted-foreground">500 FCFA — une seule ordonnance</p>
                   </div>
                 </div>
                 <ul className="mt-3 space-y-1 text-xs text-foreground/80">

@@ -89,7 +89,7 @@ export async function GET() {
           type: "success",
           title: "Pass Ordonnance activé",
           message:
-            "Votre Pass Ordonnance est actif. Vous pouvez estimer une ordonnance complète.",
+            "Votre Pass Ordonnance Unique est actif. Vous pouvez estimer une ordonnance complète.",
           icon: "Receipt",
           link: "wallet",
           createdAt: hoursAgo(24),

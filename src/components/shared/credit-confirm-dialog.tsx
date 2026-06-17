@@ -132,7 +132,7 @@ export function CreditConfirmDialog({
                     navigate("payment", { passOrdonnance: true });
                   }}
                 >
-                  Acheter un Pass Ordonnance — 300 FCFA
+                  Acheter un Pass Ordonnance Unique — 500 FCFA
                 </Button>
               </>
             ) : (

@@ -103,15 +103,15 @@ const POURQUOI = [
 
 const FAQ = [
   {
-    q: "Comment payer l'abonnement ?",
-    a: "Vous pouvez régler votre abonnement via Mobile Money (Orange Money, MTN MoMo, Moov Money) ou par carte bancaire (Visa, Mastercard). Le paiement est sécurisé et chiffré. Aucun prélèvement automatique : vous payez 500 FCFA pour 6 crédits.",
+    q: "Comment payer le Pass Ordonnance Unique ?",
+    a: "Vous pouvez régler votre Pass Ordonnance Unique via Mobile Money (Orange Money, MTN MoMo, Moov Money) ou par carte bancaire (Visa, Mastercard). Le paiement est sécurisé et chiffré. Aucun prélèvement automatique : vous payez 500 FCFA pour 6 crédits.",
   },
   {
     q: "Puis-je annuler ?",
-    a: "Oui, l'abonnement est sans engagement. Il n'est pas reconduit automatiquement. Vous conservez l'accès Crédits jusqu'à la fin de la période payée, puis le compte repasse en mode gratuit sans aucune action de votre part.",
+    a: "Oui, l'Pass Ordonnance Unique est sans engagement. Il n'est pas reconduit automatiquement. Vous conservez l'accès Crédits jusqu'à la fin de la période payée, puis le compte repasse en mode gratuit sans aucune action de votre part.",
   },
   {
-    q: "Que se passe-t-il si mon abonnement expire ?",
+    q: "Que se passe-t-il si mon Pass est expiré ?",
     a: "Votre compte repasse automatiquement en mode gratuit. Vous conservez accès aux fonctionnalités de base (recherche limitée, pharmacies). Vos favoris et historique sont conservés. Vous pouvez renouveler à tout moment pour retrouver toutes les fonctionnalités Crédits.",
   },
   {
@@ -220,7 +220,7 @@ export function SubscriptionView() {
               ))}
             </div>
 
-            {/* Statut de l'abonnement */}
+            {/* Statut du Pass Ordonnance Unique */}
             <SubscriptionStatus
               premium={premium}
               subscription={subscription}
@@ -278,7 +278,7 @@ export function SubscriptionView() {
                     size="lg"
                     onClick={() => navigate("payment")}
                   >
-                    <RotateCcw className="size-4" /> Renouveler mon abonnement
+                    <RotateCcw className="size-4" /> Acheter un nouveau Pass
                   </Button>
                 ) : (
                   <Button
@@ -460,7 +460,7 @@ export function SubscriptionView() {
                 <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
                   Rejoignez les utilisateurs Crédits de SABLIN PHARMA et débloquez
                   l&apos;expérience complète pour seulement{" "}
-                  <span className="font-bold text-amber-700">500 FCFA / mois</span>.
+                  <span className="font-bold text-amber-700">500 FCFA — une seule ordonnance</span>.
                 </p>
                 <Button
                   className="mt-6 bg-amber-500 text-white hover:bg-amber-600"
@@ -480,7 +480,7 @@ export function SubscriptionView() {
 }
 
 /* ============================================================
-   SubscriptionStatus — bloc statut de l'abonnement
+   SubscriptionStatus — bloc statut de l'Pass Ordonnance Unique
    ============================================================ */
 function SubscriptionStatus({
   premium,
@@ -497,7 +497,7 @@ function SubscriptionStatus({
     <Card className="overflow-hidden border-border/70 py-0 shadow-premium">
       <div className="flex items-center gap-2 border-b border-border/50 bg-muted/30 px-5 py-3">
         <CreditCard className="size-4 text-brand" />
-        <h3 className="text-sm font-bold text-foreground">Statut de votre abonnement</h3>
+        <h3 className="text-sm font-bold text-foreground">Statut de votre Pass Ordonnance Unique</h3>
       </div>
       <div className="p-5">
         {premium && subscription ? (
@@ -514,7 +514,7 @@ function SubscriptionStatus({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <StatusInfo label="Type d'abonnement" value="Crédits mensuel" />
+              <StatusInfo label="Type de Pass" value="Pass Ordonnance Unique" />
               <StatusInfo label="Statut" value="Actif" success />
               <StatusInfo label="Date de début" value={formatDate(subscription.startDate)} />
               <StatusInfo
@@ -545,7 +545,7 @@ function SubscriptionStatus({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <StatusInfo label="Type d'abonnement" value="Gratuit" />
+              <StatusInfo label="Type de Pass" value="Gratuit" />
               <StatusInfo label="Statut" value="Inactif" />
               <StatusInfo label="Date de début" value="—" />
               <StatusInfo label="Date d'expiration" value="—" />

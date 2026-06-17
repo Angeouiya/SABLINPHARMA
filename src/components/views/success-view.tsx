@@ -112,7 +112,7 @@ export function SuccessView() {
           <CardHeader className="px-0 pt-0">
             <CardTitle className="flex items-center justify-center gap-2 text-base font-bold text-foreground">
               <Crown className="size-4 text-amber-500" />
-              Récapitulatif de l&apos;abonnement
+              Récapitulatif du Pass Ordonnance Unique
             </CardTitle>
           </CardHeader>
 

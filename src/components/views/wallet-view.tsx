@@ -226,8 +226,8 @@ export function WalletView() {
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <InfoNote
           icon={CheckCircle2}
-          title="Aucun abonnement obligatoire"
-          desc="SABLIN PHARMA fonctionne sans abonnement forcé."
+          title="Aucun abonnement mensuel"
+          desc="SABLIN PHARMA fonctionne sans abonnement mensuel. Vous payez seulement ce que vous utilisez."
         />
         <InfoNote
           icon={Zap}
@@ -418,7 +418,7 @@ export function WalletView() {
 
       {/* ============ PASS ORDONNANCE ============ */}
       <section className="mt-10">
-        <SectionTitle icon={ClipboardList} title="Pass Ordonnance" />
+        <SectionTitle icon={ClipboardList} title="Pass Ordonnance Unique" />
         <Card className="border-amber-500/30 bg-amber-50 p-6 shadow-premium">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
@@ -459,14 +459,14 @@ export function WalletView() {
                 Prix unique
               </p>
               <p className="mt-1 text-3xl font-extrabold tabular-nums text-amber-900">
-                300 FCFA
+                500 FCFA
               </p>
               <p className="mt-0.5 text-xs text-amber-700">Valable à vie</p>
               <Button
                 onClick={() => navigate("payment", { passOrdonnance: true })}
                 className="mt-4 w-full bg-amber-500 text-white hover:bg-amber-600 sm:w-auto"
               >
-                Acheter le Pass — 300 FCFA
+                Acheter le Pass — 500 FCFA
               </Button>
             </div>
           </div>
@@ -475,7 +475,7 @@ export function WalletView() {
             <div className="mt-4 flex items-center gap-2 rounded-xl border border-success/30 bg-success-light/40 px-3 py-2 text-sm text-success">
               <CheckCircle2 className="size-4" />
               <span className="font-semibold">
-                Vous possédez déjà le Pass Ordonnance.
+                Vous possédez déjà le Pass Ordonnance Unique.
               </span>
             </div>
           )}
@@ -555,7 +555,7 @@ export function WalletView() {
                     <td className="px-4 py-3 text-right align-top">
                       {"isPass" in feat && feat.isPass ? (
                         <span className="text-xs font-bold text-amber-700">
-                          300 FCFA
+                          500 FCFA
                         </span>
                       ) : (
                         <CreditCost cost={feat.cost} />
@@ -641,7 +641,7 @@ export function WalletView() {
           <div className="mt-5 flex flex-col gap-3 rounded-xl border border-brand/20 bg-brand-light/40 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-semibold text-brand-dark">
               Rechargez vos crédits à partir de 200 FCFA ou achetez un Pass
-              Ordonnance à 300 FCFA pour débloquer ces services.
+              Ordonnance à 500 FCFA pour débloquer ces services.
             </p>
             <div className="flex shrink-0 flex-wrap gap-2">
               <Button

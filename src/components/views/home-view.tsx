@@ -298,7 +298,7 @@ export function HomeView() {
                 3. Rechargez vos crédits
               </h3>
               <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
-                Rechargez à partir de 200 FCFA ou achetez un Pass Ordonnance à 300 FCFA.
+                Rechargez à partir de 200 FCFA ou achetez un Pass Ordonnance Unique à 500 FCFA.
               </p>
             </Card>
           </div>
@@ -557,7 +557,7 @@ export function HomeView() {
                 variant="outline"
                 onClick={() => navigate("payment", { passOrdonnance: true })}
               >
-                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance — 300 FCFA
+                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance Unique — 500 FCFA
               </Button>
             </div>
           </Card>
@@ -589,7 +589,7 @@ export function HomeView() {
                   <CheckCircle2 className="size-4 shrink-0 text-brand" /> Recharge à partir de 200 FCFA
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Pass Ordonnance à 300 FCFA pour usage ponctuel
+                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Pass Ordonnance Unique à 500 FCFA pour usage ponctuel
                 </li>
               </ul>
               <Button
@@ -605,7 +605,7 @@ export function HomeView() {
                 variant="outline"
                 onClick={() => navigate("payment", { passOrdonnance: true })}
               >
-                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance — 300 FCFA
+                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance Unique — 500 FCFA
               </Button>
             </div>
           </Card>

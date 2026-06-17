@@ -213,7 +213,7 @@ const SECTIONS = [
   { id: "stats", label: "Statistiques" },
   { id: "alertes", label: "Alertes" },
   { id: "etats", label: "États" },
-  { id: "abonnement", label: "Portefeuille" },
+  { id: "portefeuille", label: "Portefeuille" },
   { id: "tableau", label: "Tableau" },
   { id: "formulaire", label: "Formulaire" },
 ] as const;
@@ -933,7 +933,7 @@ export function DesignSystemView() {
             </SectionShell>
 
             {/* ─────────── 9. Portefeuille Crédits ─────────── */}
-            <section id="abonnement" className="scroll-mt-24">
+            <section id="portefeuille" className="scroll-mt-24">
               <Card className="overflow-hidden border-brand/20 py-0 shadow-premium-lg">
                 <div className="relative bg-brand-gradient p-6 text-white">
                   <div className="bg-dotted-white absolute inset-0 opacity-30" />

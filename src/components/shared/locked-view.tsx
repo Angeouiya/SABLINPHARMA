@@ -17,7 +17,7 @@ interface LockedViewProps {
 
 /**
  * Page verrouillée professionnelle — affichée quand l'utilisateur
- * n'a pas assez de crédits ni de Pass Ordonnance actif.
+ * n'a pas assez de crédits ni de Pass Ordonnance Unique actif.
  */
 export function LockedView({
   title = "Fonctionnalité verrouillée",
@@ -76,7 +76,7 @@ export function LockedView({
             className="h-11 w-full border-amber-500/40 bg-amber-50 text-amber-700 hover:bg-amber-100"
             onClick={() => navigate("payment", { passOrdonnance: true })}
           >
-            <Crown className="size-4" /> Acheter un Pass Ordonnance — 300 FCFA
+            <Crown className="size-4" /> Acheter un Pass Ordonnance Unique — 500 FCFA
           </Button>
         </div>
 

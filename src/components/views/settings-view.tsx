@@ -495,7 +495,7 @@ export function SettingsView() {
                     className="w-full bg-brand-gradient text-white hover:opacity-90"
                     onClick={() => navigate("subscription")}
                   >
-                    Gérer l&apos;abonnement
+                    Mon portefeuille
                     <ChevronRight className="size-4" />
                   </Button>
                 </div>

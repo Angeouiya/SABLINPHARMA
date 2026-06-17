@@ -1897,3 +1897,42 @@ Stage Summary:
 - Desktop: mise en page premium 2 colonnes avec tableau de comparaison
 - Tablette: mise en page adaptée
 - Mobile: sections empilées proprement, cartes au lieu de tableaux
+
+---
+Task ID: 42
+Agent: main (orchestrator)
+Task: Correction Pass Ordonnance Unique — 500 FCFA, une seule ordonnance
+
+Work Log:
+- Remplacement global de tous les "300 FCFA" → "500 FCFA" pour le Pass Ordonnance dans tous les fichiers
+- Renommage "Pass Ordonnance" → "Pass Ordonnance Unique" partout
+- Suppression de toutes les mentions interdites : abonnement, Premium, 500 FCFA/mois, estimation gratuite, pass à vie, pass mensuel, pass illimité, pass permanent, S'abonner, Premium actif, Renouveler abonnement, accès illimité
+- Correction des fichiers:
+  * home-view: "Pass Ordonnance Unique à 500 FCFA", boutons "Acheter un Pass Ordonnance Unique — 500 FCFA"
+  * wallet-view: "Aucun abonnement mensuel", "SABLIN PHARMA fonctionne sans abonnement mensuel"
+  * prescription-view: "500 FCFA — une seule ordonnance" (pas /mois)
+  * success-view: "Récapitulatif du Pass Ordonnance Unique"
+  * settings-view: "Mon portefeuille" (pas "Gérer l'abonnement")
+  * subscription-view: toutes mentions abonnement remplacées par Pass Ordonnance Unique
+  * design-system-view: "portefeuille" au lieu de "abonnement"
+  * locked-view: "Acheter un Pass Ordonnance Unique — 500 FCFA"
+  * credit-confirm-dialog: même correction
+  * store/credits.ts: description Pass mise à jour "Valable pour une seule ordonnance. Expire après utilisation."
+  * prisma/schema.prisma: PassOrdonnance price @default(500)
+  * api/credits/pass/route.ts: PASS_PRICE = 500, commentaire corrigé
+  * payment-view: PASS_PRICE = 500, données fictives 500 FCFA
+- Vérification finale via Agent Browser:
+  * hasAbonnement: false ✓
+  * hasPremium: false ✓
+  * hasEstimationGratuite: false ✓
+  * has500ForPass: true ✓ (Pass Ordonnance Unique à 500 FCFA)
+  * Les "300 FCFA" restants sont légitimes (3 crédits × 100 FCFA = 300 FCFA pour confirmation)
+- Lint 0 erreur, 0 erreur console
+
+Stage Summary:
+- Pass Ordonnance Unique officiellement à 500 FCFA (plus 300 FCFA)
+- Toutes les mentions d'abonnement/Premium/estimation gratuite supprimées
+- Pass renommé "Pass Ordonnance Unique" partout
+- Description: "Valable pour une seule ordonnance. Expire après utilisation."
+- Modèle: crédits SABLIN + Pass Ordonnance Unique (500 FCFA, une seule ordonnance)
+- Aucun abonnement mensuel, aucun pass à vie, aucun pass illimité

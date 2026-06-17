@@ -151,5 +151,5 @@ export const PAID_FEATURES = [
   { label: "Trouver la meilleure pharmacie pour une ordonnance", cost: 1, desc: "Pharmacie optimale selon disponibilité et proximité" },
   { label: "Comparer les pharmacies (prix et distance)", cost: 1, desc: "Tableau comparatif détaillé" },
   { label: "Activer une alerte de disponibilité", cost: 1, desc: "Notification quand un médicament est de nouveau disponible" },
-  { label: "Pass Ordonnance (300 FCFA)", cost: 0, desc: "Estimation complète sans crédits, pour usage occasionnel", isPass: true },
+  { label: "Pass Ordonnance (500 FCFA)", cost: 0, desc: "Valable pour une seule ordonnance. Expire après utilisation.", isPass: true },
 ];

@@ -83,7 +83,7 @@ const PROVIDERS: {
   },
 ];
 
-const PASS_PRICE = 300;
+const PASS_PRICE = 500;
 type PaymentMode = "recharge" | "pass";
 
 // Fictive payment history
@@ -98,8 +98,8 @@ const PAYMENT_HISTORY = [
   },
   {
     date: "2026-05-28",
-    formule: "Pass Ordonnance",
-    montant: 300,
+    formule: "Pass Ordonnance Unique",
+    montant: 500,
     moyen: "Wave",
     statut: "success" as const,
     reference: "SPL-PASS-202605280912",
@@ -160,12 +160,12 @@ export function PaymentView() {
       const pack = CREDIT_PACKS.find((p) => p.amount === selectedPackAmount);
       return pack ? `${pack.label} (${pack.credits} crédits)` : "Recharge de crédits";
     }
-    return "Pass Ordonnance";
+    return "Pass Ordonnance Unique";
   }, [mode, selectedPackAmount]);
 
   const currentShortLabel = useMemo(() => {
     if (mode === "recharge") return "Recharge de crédits";
-    return "Pass Ordonnance";
+    return "Pass Ordonnance Unique";
   }, [mode]);
 
   // Not connected

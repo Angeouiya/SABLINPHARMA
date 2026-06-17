@@ -1798,3 +1798,29 @@ Stage Summary:
 - Vocabulaire harmonisé : "crédit SABLIN", "solde de crédits", "recharger mes crédits", "service avancé"
 - Règle 1 crédit = 100 FCFA visible partout
 - Transparence : coût affiché avant chaque action, solde avant/après dans les modales
+
+---
+Task ID: 39
+Agent: main (orchestrator)
+Task: Comparaison des prix par pharmacie dans le résultat d'ordonnance
+
+Work Log:
+- Génération de prix par médicament par pharmacie : calcul déterministe basé sur unitMin/unitMax et l'index de la pharmacie, stocké dans medPrices
+- Ajout section "Comparaison des prix par pharmacie" dans prescription-result-view :
+  * Tableau avec colonnes : Pharmacie + 1 colonne par médicament (avec quantité) + Total
+  * Lignes triées par total croissant (moins cher en premier)
+  * Badge "Moins cher" (bg-success text-white) sur la pharmacie la moins chère
+  * Prix par médicament affiché en FCFA (lineTotal = unitPrice × quantity)
+  * Total en gras (text-success pour le moins cher, text-brand-dark pour les autres)
+  * Ligne "Moins cher" surlignée (bg-brand-light/30)
+  * Message : "Les prix affichés sont indicatifs. Le badge Moins cher indique la pharmacie avec le total le plus bas."
+  * Tableau responsive (overflow-x-auto scroll-thin, min-w-[640px])
+- Vérification Agent Browser : ajout Paracétamol (1 crédit) → estimation (2 crédits) → tableau comparaison visible avec "Moins cher" — VLM confirme "Tableau Comparaison des prix par pharmacie avec prix par médicament et total, badge Moins cher présent"
+- 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Tableau de comparaison des prix par pharmacie ajouté dans le résultat d'ordonnance
+- Chaque pharmacie affiche le prix de chaque médicament + le total
+- Tri par prix croissant (moins cher en premier)
+- Badge "Moins cher" sur la pharmacie la plus économique
+- L'utilisateur peut comparer les prix et choisir la pharmacie optimale

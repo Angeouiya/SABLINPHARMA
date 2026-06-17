@@ -306,11 +306,26 @@ export function PrescriptionResultView() {
       const missingMeds = estimate.lines
         .slice(availableCount)
         .map((l) => l.medication.name);
-      const totalEstimate =
-        estimate.lines
-          .slice(0, availableCount)
-          .reduce((s, l) => s + l.lineMin, 0) +
-        (idx < 3 ? 0 : estimate.lines.slice(availableCount).reduce((s, l) => s + l.lineMin, 0) * 0);
+
+      // Generate per-medication prices for this pharmacy
+      const medPrices = estimate.lines.map((line, lineIdx) => {
+        if (lineIdx >= availableCount) return null;
+        // Deterministic price between unitMin and unitMax based on pharmacy index
+        const range = line.unitMax - line.unitMin;
+        const factor = ((idx * 37 + lineIdx * 53) % 100) / 100;
+        const unitPrice = line.unitMin + Math.round(range * factor);
+        return {
+          name: line.medication.name,
+          quantity: line.quantity,
+          unitPrice,
+          lineTotal: unitPrice * line.quantity,
+        };
+      });
+
+      const totalEstimate = medPrices
+        .filter(Boolean)
+        .reduce((s, mp) => s + (mp?.lineTotal ?? 0), 0);
+
       const dist = distanceKm(
         ABIDJAN_CENTER.lat,
         ABIDJAN_CENTER.lon,
@@ -329,6 +344,7 @@ export function PrescriptionResultView() {
         totalCount: total,
         availableMeds,
         missingMeds,
+        medPrices,
         totalEstimate: totalEstimate || estimate.totalMin,
         distance: dist,
         openNow,
@@ -701,6 +717,95 @@ export function PrescriptionResultView() {
                   </div>
                 </div>
               </Card>
+            </section>
+          )}
+
+          {/* Comparaison des prix par pharmacie */}
+          {fullPharmacies.length > 0 && estimate && (
+            <section>
+              <div className="mb-4">
+                <Eyebrow>Comparaison</Eyebrow>
+                <Heading level="h2">
+                  Comparaison des prix par pharmacie
+                </Heading>
+                <Muted className="mt-0.5">
+                  Comparez le prix de chaque médicament et le total de votre ordonnance selon la pharmacie.
+                </Muted>
+              </div>
+
+              <Card className="overflow-hidden border-border/70 py-0 shadow-card">
+                <div className="overflow-x-auto scroll-thin">
+                  <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+                    <thead className="border-b border-border/60 bg-muted/40">
+                      <tr>
+                        <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                          Pharmacie
+                        </th>
+                        {estimate.lines.map((line, i) => (
+                          <th key={i} className="px-3 py-3 text-center text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                            {line.medication.name}
+                            <span className="block text-[10px] font-normal text-muted-foreground/70">×{line.quantity}</span>
+                          </th>
+                        ))}
+                        <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-brand-dark">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {fullPharmacies
+                        .slice()
+                        .sort((a, b) => a.totalEstimate - b.totalEstimate)
+                        .map((p, pIdx) => (
+                          <tr
+                            key={p.id}
+                            className={cn(
+                              "transition-colors hover:bg-accent/30",
+                              pIdx === 0 && "bg-brand-light/30"
+                            )}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                {pIdx === 0 && (
+                                  <span className="inline-flex items-center gap-0.5 rounded-full bg-success px-1.5 py-0.5 text-[9px] font-bold text-white">
+                                    <TrendingDown className="size-2.5" /> Moins cher
+                                  </span>
+                                )}
+                                <div>
+                                  <p className="text-xs font-bold text-foreground">{p.name}</p>
+                                  <p className="text-[10px] text-muted-foreground">{p.commune} · {p.distance} km</p>
+                                </div>
+                              </div>
+                            </td>
+                            {p.medPrices?.map((mp, i) => (
+                              <td key={i} className="px-3 py-3 text-center">
+                                {mp ? (
+                                  <span className="text-xs font-semibold text-foreground">
+                                    {mp.lineTotal.toLocaleString("fr-FR")} F
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-danger">—</span>
+                                )}
+                              </td>
+                            ))}
+                            <td className="px-4 py-3 text-center">
+                              <span className={cn(
+                                "text-sm font-extrabold",
+                                pIdx === 0 ? "text-success" : "text-brand-dark"
+                              )}>
+                                {p.totalEstimate.toLocaleString("fr-FR")} F
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+
+              <p className="mt-3 text-xs text-muted-foreground">
+                Les prix affichés sont indicatifs et peuvent varier. Le badge « Moins cher » indique la pharmacie avec le total le plus bas pour votre ordonnance complète.
+              </p>
             </section>
           )}
 

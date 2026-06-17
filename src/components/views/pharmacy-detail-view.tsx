@@ -28,6 +28,8 @@ import {
   MapPinned,
   Coins,
   Lock,
+  MessageCircle,
+  Lightbulb,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +43,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { GoogleMap } from "@/components/shared/google-map";
 import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
 import { CreditCost } from "@/components/shared/credit-cost";
+import { LockedContact } from "@/components/shared/locked-contact";
 import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { useCredits, CREDIT_COSTS } from "@/store/credits";
@@ -100,10 +103,17 @@ export function PharmacyDetailView() {
   const [medQuery, setMedQuery] = useState("");
   const [availabilityUnlocked, setAvailabilityUnlocked] = useState(false);
   const [pricesUnlocked, setPricesUnlocked] = useState(false);
+  const [contactUnlocked, setContactUnlocked] = useState(false);
+  const [whatsappUnlocked, setWhatsappUnlocked] = useState(false);
   const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
   const [showPricesDialog, setShowPricesDialog] = useState(false);
   const [showCompareDialog, setShowCompareDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [showWhatsappDialog, setShowWhatsappDialog] = useState(false);
+  const [showAdviceDialog, setShowAdviceDialog] = useState(false);
+  const [showConfirmPriceDialog, setShowConfirmPriceDialog] = useState(false);
+  const [showConfirmFullDialog, setShowConfirmFullDialog] = useState(false);
   const { hasPass } = useCredits();
 
   useEffect(() => {
@@ -116,6 +126,8 @@ export function PharmacyDetailView() {
     setNotFound(false);
     setAvailabilityUnlocked(false);
     setPricesUnlocked(false);
+    setContactUnlocked(false);
+    setWhatsappUnlocked(false);
     (async () => {
       try {
         const r = await fetch(`/api/pharmacies/${params.slug}`);
@@ -186,6 +198,10 @@ export function PharmacyDetailView() {
 
   const mapsUrl = `https://www.google.com/maps?q=${pharmacy.latitude},${pharmacy.longitude}`;
   const phoneHref = `tel:${pharmacy.phone.replace(/\s/g, "")}`;
+  const whatsappHref = `https://wa.me/${pharmacy.phone.replace(/[^0-9]/g, "")}`;
+  const phoneDisplay = pharmacy.phone.replace("+225 ", "");
+  const contactVisible = contactUnlocked || hasPass;
+  const whatsappVisible = whatsappUnlocked || hasPass;
   const dist = distanceKm(
     ABIDJAN_CENTER.lat,
     ABIDJAN_CENTER.lon,
@@ -380,13 +396,40 @@ export function PharmacyDetailView() {
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <InfoCard icon={MapPin} label="Adresse" value={pharmacy.address} sub={`${pharmacy.commune}, Abidjan`} />
-              <InfoCard
-                icon={Phone}
-                label="Téléphone"
-                value={pharmacy.phone.replace("+225 ", "")}
-                sub="Appel direct"
-                href={phoneHref}
-              />
+              {/* Téléphone verrouillé tant que non débloqué */}
+              <Card className="border-border/70 p-4 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+                    <Phone className="size-5" />
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Téléphone
+                    </p>
+                    {contactVisible ? (
+                      <>
+                        <p className="text-sm font-bold text-foreground">
+                          {phoneDisplay}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Appel direct</p>
+                        <Button size="sm" asChild className="bg-brand text-white hover:bg-brand-dark">
+                          <a href={phoneHref}>
+                            <Phone className="size-3.5" /> Appeler
+                          </a>
+                        </Button>
+                      </>
+                    ) : (
+                      <LockedContact
+                        type="phone"
+                        cost={CREDIT_COSTS.seeContact}
+                        unlocked={false}
+                        onUnlock={() => setShowContactDialog(true)}
+                        className="flex-wrap"
+                      />
+                    )}
+                  </div>
+                </div>
+              </Card>
               <InfoCard
                 icon={Navigation}
                 label="Distance estimée"
@@ -409,11 +452,41 @@ export function PharmacyDetailView() {
           <Card className="border-border/70 p-4 shadow-premium">
             <h3 className="mb-3 text-sm font-bold text-foreground">Actions rapides</h3>
             <div className="grid grid-cols-2 gap-2">
-              <Button size="sm" className="bg-brand text-white hover:bg-brand-dark" asChild>
-                <a href={phoneHref}>
+              {/* Appeler — verrouillé tant que contact non débloqué */}
+              {contactVisible ? (
+                <Button size="sm" className="bg-brand text-white hover:bg-brand-dark" asChild>
+                  <a href={phoneHref}>
+                    <Phone className="size-4" /> Appeler
+                  </a>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="bg-brand text-white hover:bg-brand-dark"
+                  onClick={() => setShowContactDialog(true)}
+                >
                   <Phone className="size-4" /> Appeler
-                </a>
-              </Button>
+                  <CreditCost cost={CREDIT_COSTS.callPharmacy} className="ml-1" />
+                </Button>
+              )}
+              {/* WhatsApp — verrouillé tant que non débloqué */}
+              {whatsappVisible ? (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle className="size-4" /> WhatsApp
+                  </a>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-brand/30 text-brand-dark hover:bg-brand-light"
+                  onClick={() => setShowWhatsappDialog(true)}
+                >
+                  <MessageCircle className="size-4" /> WhatsApp
+                  <CreditCost cost={CREDIT_COSTS.whatsappPharmacy} className="ml-1" />
+                </Button>
+              )}
               <Button size="sm" variant="outline" asChild>
                 <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
                   <Navigation className="size-4" /> Itinéraire
@@ -437,6 +510,7 @@ export function PharmacyDetailView() {
                 meta={pharmacy.commune}
                 variant="button"
                 size="sm"
+                className="col-span-2"
               />
             </div>
             <Button
@@ -469,7 +543,26 @@ export function PharmacyDetailView() {
               <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.comparePharmacies} className="ml-1" />
             </Button>
 
-            {/* Demander une confirmation avant déplacement — 3 crédits */}
+            {/* Demander conseil — 2 crédits */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+              onClick={() => {
+                if (hasPass) {
+                  toast.success("Demande de conseil envoyée", {
+                    description: "La pharmacie vous répondra par téléphone ou WhatsApp.",
+                  });
+                } else {
+                  setShowAdviceDialog(true);
+                }
+              }}
+            >
+              <Lightbulb className="size-4" /> Demander conseil
+              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.advicePharmacy} className="ml-1" />
+            </Button>
+
+            {/* Confirmer disponibilité — 3 crédits */}
             <Button
               size="sm"
               className="mt-2 w-full bg-brand text-white hover:bg-brand-dark"
@@ -483,8 +576,46 @@ export function PharmacyDetailView() {
                 }
               }}
             >
-              <Phone className="size-4" /> Demander une confirmation
-              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.confirmBeforeVisit} className="ml-1" />
+              <CheckCircle2 className="size-4" /> Confirmer disponibilité
+              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.confirmAvailability} className="ml-1" />
+            </Button>
+
+            {/* Confirmer prix — 3 crédits */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+              onClick={() => {
+                if (hasPass) {
+                  toast.success("Demande de confirmation de prix envoyée", {
+                    description: "La pharmacie vous confirmera le prix avant votre déplacement.",
+                  });
+                } else {
+                  setShowConfirmPriceDialog(true);
+                }
+              }}
+            >
+              <Coins className="size-4" /> Confirmer prix
+              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.confirmPrice} className="ml-1" />
+            </Button>
+
+            {/* Confirmation complète — 4 crédits */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+              onClick={() => {
+                if (hasPass) {
+                  toast.success("Demande de confirmation complète envoyée", {
+                    description: "Vérification médicament + prix + disponibilité en cours.",
+                  });
+                } else {
+                  setShowConfirmFullDialog(true);
+                }
+              }}
+            >
+              <CheckCircle2 className="size-4" /> Confirmation complète
+              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.confirmFull} className="ml-1" />
             </Button>
           </Card>
 
@@ -764,9 +895,9 @@ export function PharmacyDetailView() {
       <CreditConfirmDialog
         open={showConfirmDialog}
         onOpenChange={setShowConfirmDialog}
-        title="Confirmation avant déplacement"
-        cost={CREDIT_COSTS.confirmBeforeVisit}
-        description="La pharmacie confirmera le stock avant votre déplacement."
+        title="Confirmer la disponibilité"
+        cost={CREDIT_COSTS.confirmAvailability}
+        description="Cette confirmation coûte 3 crédits. Elle permet de demander à la pharmacie de confirmer le stock avant votre déplacement."
         benefits={[
           "Éviter un déplacement inutile",
           "Confirmation par téléphone",
@@ -775,6 +906,83 @@ export function PharmacyDetailView() {
         onConfirm={() => {
           toast.success("Demande de confirmation envoyée", {
             description: "La pharmacie vous rappellera pour confirmer le stock.",
+          });
+        }}
+      />
+      <CreditConfirmDialog
+        open={showContactDialog}
+        onOpenChange={setShowContactDialog}
+        title="Débloquer le contact pharmacie"
+        cost={CREDIT_COSTS.seeContact}
+        description="Cette action coûte 1 crédit. Elle vous permet de voir le contact complet de cette pharmacie."
+        benefits={[
+          "Voir le numéro de téléphone",
+          "Bouton Appeler débloqué",
+          "Contact accessible pendant 24h",
+        ]}
+        onConfirm={() => setContactUnlocked(true)}
+      />
+      <CreditConfirmDialog
+        open={showWhatsappDialog}
+        onOpenChange={setShowWhatsappDialog}
+        title="Débloquer WhatsApp"
+        cost={CREDIT_COSTS.whatsappPharmacy}
+        description="Cette action coûte 1 crédit. Elle débloque le contact WhatsApp direct de cette pharmacie."
+        benefits={[
+          "Lien WhatsApp direct",
+          "Conversation écrite",
+          "Partage de documents possibles",
+        ]}
+        onConfirm={() => setWhatsappUnlocked(true)}
+      />
+      <CreditConfirmDialog
+        open={showAdviceDialog}
+        onOpenChange={setShowAdviceDialog}
+        title="Demander conseil à cette pharmacie"
+        cost={CREDIT_COSTS.advicePharmacy}
+        description="Cette action coûte 2 crédits. Elle permet d'envoyer une demande ou d'ouvrir un canal de contact avec la pharmacie. SABLIN PHARMA ne remplace pas un professionnel de santé."
+        benefits={[
+          "Demande envoyée à la pharmacie",
+          "Réponse par téléphone ou WhatsApp",
+          "Conseil personnalisé",
+        ]}
+        onConfirm={() => {
+          toast.success("Demande de conseil envoyée", {
+            description: "La pharmacie vous répondra par téléphone ou WhatsApp.",
+          });
+        }}
+      />
+      <CreditConfirmDialog
+        open={showConfirmPriceDialog}
+        onOpenChange={setShowConfirmPriceDialog}
+        title="Confirmer le prix"
+        cost={CREDIT_COSTS.confirmPrice}
+        description="Cette confirmation coûte 3 crédits. Elle permet de demander à la pharmacie de confirmer le prix avant votre déplacement."
+        benefits={[
+          "Prix exact confirmé",
+          "Aucune surprise à la caisse",
+          "Budget maîtrisé",
+        ]}
+        onConfirm={() => {
+          toast.success("Demande de confirmation de prix envoyée", {
+            description: "La pharmacie vous confirmera le prix avant votre déplacement.",
+          });
+        }}
+      />
+      <CreditConfirmDialog
+        open={showConfirmFullDialog}
+        onOpenChange={setShowConfirmFullDialog}
+        title="Confirmation complète"
+        cost={CREDIT_COSTS.confirmFull}
+        description="Vérification complète : médicament + prix + disponibilité avant votre déplacement."
+        benefits={[
+          "Médicament confirmé en stock",
+          "Prix exact garanti",
+          "Aucun déplacement inutile",
+        ]}
+        onConfirm={() => {
+          toast.success("Demande de confirmation complète envoyée", {
+            description: "Vérification médicament + prix + disponibilité en cours.",
           });
         }}
       />

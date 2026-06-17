@@ -102,6 +102,14 @@ export const CREDIT_COSTS = {
   comparePharmacies: 1,
   alertAvailability: 1,
   confirmBeforeVisit: 3,
+  // Contact pharmacy features
+  seeContact: 1,
+  callPharmacy: 1,
+  whatsappPharmacy: 1,
+  advicePharmacy: 2,
+  confirmAvailability: 3,
+  confirmPrice: 3,
+  confirmFull: 4,
 } as const;
 
 // Credit packs
@@ -121,8 +129,8 @@ export const FREE_FEATURES = [
   "Voir les pharmacies proches",
   "Consulter les pharmacies ouvertes",
   "Consulter les pharmacies de garde",
-  "Voir les horaires des pharmacies",
-  "Voir l'adresse et le téléphone d'une pharmacie",
+  "Voir les horaires généraux des pharmacies",
+  "Voir le nom, la commune et le quartier d'une pharmacie",
   "Consulter son profil",
   "Accéder à l'aide et au support",
 ];
@@ -131,10 +139,17 @@ export const FREE_FEATURES = [
 export const PAID_FEATURES = [
   { label: "Voir les pharmacies qui possèdent un médicament", cost: 1, desc: "Liste exacte des pharmacies avec le médicament en stock" },
   { label: "Voir les prix détaillés par pharmacie", cost: 1, desc: "Prix indicatif précis pour chaque pharmacie" },
+  { label: "Voir le contact (téléphone) d'une pharmacie", cost: 1, desc: "Numéro de téléphone complet de la pharmacie" },
+  { label: "Appeler une pharmacie", cost: 1, desc: "Débloquer le bouton d'appel direct" },
+  { label: "Contacter une pharmacie via WhatsApp", cost: 1, desc: "Débloquer le contact WhatsApp" },
+  { label: "Demander conseil à une pharmacie", cost: 2, desc: "Envoyer une demande de conseil à la pharmacie" },
+  { label: "Demander une confirmation de disponibilité", cost: 3, desc: "Confirmer le stock avant déplacement" },
+  { label: "Demander une confirmation de prix", cost: 3, desc: "Confirmer le prix avant déplacement" },
+  { label: "Confirmation complète (médicament + prix + dispo)", cost: 4, desc: "Vérification complète avant déplacement" },
   { label: "Estimer une ordonnance complète", cost: 2, desc: "Coût total, médicaments disponibles, pharmacies recommandées" },
+  { label: "Ajouter un médicament à une ordonnance", cost: 1, desc: "Ajouter un produit à votre ordonnance" },
   { label: "Trouver la meilleure pharmacie pour une ordonnance", cost: 1, desc: "Pharmacie optimale selon disponibilité et proximité" },
   { label: "Comparer les pharmacies (prix et distance)", cost: 1, desc: "Tableau comparatif détaillé" },
   { label: "Activer une alerte de disponibilité", cost: 1, desc: "Notification quand un médicament est de nouveau disponible" },
-  { label: "Demander une confirmation avant déplacement", cost: 3, desc: "Vérification du stock par la pharmacie avant votre déplacement" },
   { label: "Pass Ordonnance (300 FCFA)", cost: 0, desc: "Estimation complète sans crédits, pour usage occasionnel", isPass: true },
 ];

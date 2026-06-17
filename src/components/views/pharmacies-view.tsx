@@ -20,6 +20,7 @@ import {
   Baby,
   Cross,
   ArrowRight,
+  Lock,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/empty-state";
 import { GoogleMap } from "@/components/shared/google-map";
+import { CreditCost } from "@/components/shared/credit-cost";
 import { Heading, Eyebrow, Muted } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { distanceKm } from "@/lib/format";
@@ -673,6 +675,9 @@ function OnDutyMiniCard({ pharma }: { pharma: Pharmacy & { distance?: number } }
               <Clock className="size-2.5" /> 24/7
             </span>
           )}
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">
+            <Lock className="size-2.5" /> Contact <CreditCost cost={1} />
+          </span>
         </div>
       </div>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
@@ -690,7 +695,6 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
     distanceKm(ABIDJAN_CENTER.lat, ABIDJAN_CENTER.lon, pharma.latitude, pharma.longitude);
   const quartier = pharma.address.split(",")[0]?.trim() ?? pharma.commune;
   const mapsUrl = `https://www.google.com/maps?q=${pharma.latitude},${pharma.longitude}`;
-  const phoneHref = `tel:${pharma.phone.replace(/\s/g, "")}`;
   const todayHours = pharma.hoursWeekday;
 
   return (
@@ -784,28 +788,32 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
           </div>
         </div>
 
-        {/* Phone */}
-        <a
-          href={phoneHref}
-          className="flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Phone className="size-3.5" /> {pharma.phone.replace("+225 ", "")}
-        </a>
+        {/* Contact verrouillé — aucune info téléphone affichée, aucun lien tel: */}
+        <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2.5 py-2">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
+            <Lock className="size-3.5" /> Contact verrouillé
+          </span>
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-dark">
+            <Phone className="size-3.5" /> Voir contact <CreditCost cost={1} />
+          </span>
+        </div>
 
-        {/* Actions */}
+        {/* Actions — aucun lien tel: généré */}
         <div className="grid grid-cols-2 gap-2 pt-1">
           <Button
             size="sm"
-            className="bg-brand-gradient text-white hover:opacity-90"
+            className="bg-brand text-white hover:bg-brand-dark"
             onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
           >
             Voir détails <ChevronRight className="size-3.5" />
           </Button>
-          <Button size="sm" variant="outline" asChild>
-            <a href={phoneHref}>
-              <Phone className="size-3.5" /> Appeler
-            </a>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-brand/30 text-brand-dark hover:bg-brand-light"
+            onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
+          >
+            <Phone className="size-3.5" /> Voir contact
           </Button>
           <Button size="sm" variant="outline" asChild>
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer">

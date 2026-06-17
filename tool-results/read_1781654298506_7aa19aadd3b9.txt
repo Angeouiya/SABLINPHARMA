@@ -1,0 +1,828 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from "react";
+     4→import {
+     5→  Search,
+     6→  ChevronLeft,
+     7→  X,
+     8→  Clock,
+     9→  Timer,
+    10→  MapPin,
+    11→  Plus,
+    12→  Phone,
+    13→  Navigation,
+    14→  ChevronRight,
+    15→  SlidersHorizontal,
+    16→  CheckCircle2,
+    17→  MapPinned,
+    18→  Pill,
+    19→  Stethoscope,
+    20→  Baby,
+    21→  Cross,
+    22→  ArrowRight,
+    23→} from "lucide-react";
+    24→import { Input } from "@/components/ui/input";
+    25→import { Button } from "@/components/ui/button";
+    26→import { Card } from "@/components/ui/card";
+    27→import { Badge } from "@/components/ui/badge";
+    28→import { Skeleton } from "@/components/ui/skeleton";
+    29→import {
+    30→  Select,
+    31→  SelectTrigger,
+    32→  SelectValue,
+    33→  SelectContent,
+    34→  SelectItem,
+    35→} from "@/components/ui/select";
+    36→import { EmptyState } from "@/components/shared/empty-state";
+    37→import { GoogleMap } from "@/components/shared/google-map";
+    38→import { Heading, Eyebrow, Muted } from "@/components/ui/typography";
+    39→import { useNav } from "@/store/nav";
+    40→import { distanceKm } from "@/lib/format";
+    41→import { cn } from "@/lib/utils";
+    42→import type { Pharmacy } from "@/lib/types";
+    43→
+    44→const COMMUNES = [
+    45→  "Cocody",
+    46→  "Plateau",
+    47→  "Yopougon",
+    48→  "Marcory",
+    49→  "Treichville",
+    50→  "Adjamé",
+    51→  "Abobo",
+    52→  "Koumassi",
+    53→  "Port-Bouët",
+    54→  "Attécoubé",
+    55→  "Bingerville",
+    56→  "Songon",
+    57→];
+    58→
+    59→const SERVICES = [
+    60→  { key: "247", label: "Ouvert 24/7" },
+    61→  { key: "garde", label: "Pharmacie de garde" },
+    62→  { key: "parking", label: "Parking" },
+    63→  { key: "delivery", label: "Livraison" },
+    64→];
+    65→
+    66→type QuickFilter = "all" | "open" | "on-duty" | "near";
+    67→
+    68→const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
+    69→
+    70→interface Filters {
+    71→  commune: string;
+    72→  quartier: string;
+    73→  openNow: boolean;
+    74→  onDuty: boolean;
+    75→  nearMe: boolean;
+    76→  maxDistance: string;
+    77→  medication: string;
+    78→  service: string;
+    79→}
+    80→
+    81→const DEFAULT_FILTERS: Filters = {
+    82→  commune: "all",
+    83→  quartier: "",
+    84→  openNow: false,
+    85→  onDuty: false,
+    86→  nearMe: false,
+    87→  maxDistance: "all",
+    88→  medication: "",
+    89→  service: "all",
+    90→};
+    91→
+    92→export function PharmaciesView() {
+    93→  const { params, navigate } = useNav();
+    94→  const [allPharmacies, setAllPharmacies] = useState<Pharmacy[]>([]);
+    95→  const [loading, setLoading] = useState(true);
+    96→  const [query, setQuery] = useState(params.query ?? "");
+    97→  const [quickFilter, setQuickFilter] = useState<QuickFilter>(
+    98→    (params.filter === "on-duty" || params.filter === "open" ? (params.filter as QuickFilter) : "all")
+    99→  );
+   100→  const [filters, setFilters] = useState<Filters>({
+   101→    ...DEFAULT_FILTERS,
+   102→    commune: "all",
+   103→  });
+   104→  const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+   105→
+   106→  // Fetch all pharmacies once
+   107→  useEffect(() => {
+   108→    let active = true;
+   109→    setLoading(true);
+   110→    (async () => {
+   111→      try {
+   112→        const r = await fetch("/api/pharmacies");
+   113→        const data = await r.json();
+   114→        if (active) setAllPharmacies(data);
+   115→      } catch {
+   116→        if (active) setAllPharmacies([]);
+   117→      } finally {
+   118→        if (active) setLoading(false);
+   119→      }
+   120→    })();
+   121→    return () => {
+   122→      active = false;
+   123→    };
+   124→  }, []);
+   125→
+   126→  // Enrich pharmacies with distance
+   127→  const enriched = useMemo(
+   128→    () =>
+   129→      allPharmacies.map((p) => ({
+   130→        ...p,
+   131→        distance: distanceKm(ABIDJAN_CENTER.lat, ABIDJAN_CENTER.lon, p.latitude, p.longitude),
+   132→      })),
+   133→    [allPharmacies]
+   134→  );
+   135→
+   136→  // On-duty pharmacies (for the special section)
+   137→  const onDutyPharmacies = useMemo(
+   138→    () => enriched.filter((p) => p.isOnDuty).slice(0, 3),
+   139→    [enriched]
+   140→  );
+   141→
+   142→  // Client-side filtering
+   143→  const filteredPharmacies = useMemo(() => {
+   144→    let result = enriched;
+   145→
+   146→    // Query
+   147→    if (query.trim()) {
+   148→      const q = query.toLowerCase().trim();
+   149→      result = result.filter(
+   150→        (p) =>
+   151→          p.name.toLowerCase().includes(q) ||
+   152→          p.commune.toLowerCase().includes(q) ||
+   153→          p.address.toLowerCase().includes(q)
+   154→      );
+   155→    }
+   156→
+   157→    // Quick filter
+   158→    if (quickFilter === "open") result = result.filter((p) => p.openNow);
+   159→    if (quickFilter === "on-duty") result = result.filter((p) => p.isOnDuty);
+   160→    if (quickFilter === "near") {
+   161→      result = [...result].sort((a, b) => a.distance - b.distance).slice(0, 6);
+   162→    }
+   163→
+   164→    // Commune
+   165→    if (filters.commune !== "all") {
+   166→      result = result.filter((p) => p.commune === filters.commune);
+   167→    }
+   168→
+   169→    // Quartier
+   170→    if (filters.quartier.trim()) {
+   171→      const q = filters.quartier.toLowerCase().trim();
+   172→      result = result.filter((p) => p.address.toLowerCase().includes(q));
+   173→    }
+   174→
+   175→    // Open now
+   176→    if (filters.openNow) result = result.filter((p) => p.openNow);
+   177→
+   178→    // On duty
+   179→    if (filters.onDuty) result = result.filter((p) => p.isOnDuty);
+   180→
+   181→    // Max distance
+   182→    if (filters.maxDistance !== "all") {
+   183→      const max = parseFloat(filters.maxDistance);
+   184→      result = result.filter((p) => p.distance <= max);
+   185→    }
+   186→
+   187→    // Sort: nearMe first, then on-duty, then rating
+   188→    if (filters.nearMe) {
+   189→      result = [...result].sort((a, b) => a.distance - b.distance);
+   190→    } else {
+   191→      result = [...result].sort((a, b) => {
+   192→        if (a.isOnDuty !== b.isOnDuty) return a.isOnDuty ? -1 : 1;
+   193→        return b.rating - a.rating;
+   194→      });
+   195→    }
+   196→
+   197→    return result;
+   198→  }, [enriched, query, quickFilter, filters]);
+   199→
+   200→  const activeFiltersCount =
+   201→    (filters.commune !== "all" ? 1 : 0) +
+   202→    (filters.quartier.trim() ? 1 : 0) +
+   203→    (filters.openNow ? 1 : 0) +
+   204→    (filters.onDuty ? 1 : 0) +
+   205→    (filters.nearMe ? 1 : 0) +
+   206→    (filters.maxDistance !== "all" ? 1 : 0) +
+   207→    (filters.medication.trim() ? 1 : 0) +
+   208→    (filters.service !== "all" ? 1 : 0);
+   209→
+   210→  const resetAll = () => {
+   211→    setQuery("");
+   212→    setQuickFilter("all");
+   213→    setFilters(DEFAULT_FILTERS);
+   214→  };
+   215→
+   216→  return (
+   217→    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+   218→      {/* Back link */}
+   219→      <button
+   220→        onClick={() => navigate("home")}
+   221→        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+   222→      >
+   223→        <ChevronLeft className="size-4" /> Accueil
+   224→      </button>
+   225→
+   226→      {/* Header */}
+   227→      <div className="flex flex-col gap-2">
+   228→        <Eyebrow>Recherche de pharmacies</Eyebrow>
+   229→        <Heading level="h1">Pharmacies</Heading>
+   230→        <p className="text-sm text-muted-foreground sm:text-base">
+   231→          Trouvez une pharmacie proche, ouverte ou de garde à Abidjan, et accédez à toutes
+   232→          les informations utiles.
+   233→        </p>
+   234→      </div>
+   235→
+   236→      {/* ============ SEARCH ZONE ============ */}
+   237→      <Card className="mt-6 border-border/70 p-4 shadow-premium sm:p-5">
+   238→        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+   239→          <div className="relative flex-1">
+   240→            <Search className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+   241→            <Input
+   242→              value={query}
+   243→              onChange={(e) => setQuery(e.target.value)}
+   244→              placeholder="Rechercher une pharmacie, une commune ou un quartier"
+   245→              className="h-12 border-border bg-background pl-11 pr-10 text-[15px]"
+   246→              aria-label="Rechercher une pharmacie"
+   247→            />
+   248→            {query && (
+   249→              <button
+   250→                onClick={() => setQuery("")}
+   251→                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+   252→                aria-label="Effacer"
+   253→              >
+   254→                <X className="size-4" />
+   255→              </button>
+   256→            )}
+   257→          </div>
+   258→          <Button
+   259→            size="lg"
+   260→            className="h-12 shrink-0 bg-brand-gradient text-white hover:opacity-90"
+   261→          >
+   262→            <Search className="size-4" /> Rechercher
+   263→          </Button>
+   264→          <Button
+   265→            size="lg"
+   266→            variant="outline"
+   267→            className="relative h-12 shrink-0 lg:hidden"
+   268→            onClick={() => setShowFiltersMobile((v) => !v)}
+   269→          >
+   270→            <SlidersHorizontal className="size-4" /> Filtres
+   271→            {activeFiltersCount > 0 && (
+   272→              <span className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">
+   273→                {activeFiltersCount}
+   274→              </span>
+   275→            )}
+   276→          </Button>
+   277→        </div>
+   278→        <p className="mt-2.5 text-xs text-muted-foreground">
+   279→          <span className="font-medium">Exemple :</span> Cocody, Yopougon, Marcory,
+   280→          Pharmacie de garde, Riviera…
+   281→        </p>
+   282→
+   283→        {/* Quick filter chips */}
+   284→        <div className="mt-3 flex flex-wrap gap-2">
+   285→          {(
+   286→            [
+   287→              { key: "all" as const, label: "Toutes", icon: Plus },
+   288→              { key: "open" as const, label: "Ouvertes maintenant", icon: Clock },
+   289→              { key: "on-duty" as const, label: "De garde", icon: Timer },
+   290→              { key: "near" as const, label: "À proximité", icon: Navigation },
+   291→            ]
+   292→          ).map((chip) => {
+   293→            const active = quickFilter === chip.key;
+   294→            return (
+   295→              <button
+   296→                key={chip.key}
+   297→                onClick={() => setQuickFilter(chip.key)}
+   298→                className={cn(
+   299→                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+   300→                  active
+   301→                    ? "border-brand bg-brand text-white"
+   302→                    : "border-border bg-background text-foreground/70 hover:border-brand/40 hover:text-brand"
+   303→                )}
+   304→              >
+   305→                <chip.icon className="size-3.5" /> {chip.label}
+   306→              </button>
+   307→            );
+   308→          })}
+   309→        </div>
+   310→      </Card>
+   311→
+   312→      {/* ============ ON-DUTY SECTION (highlighted) ============ */}
+   313→      {!loading && onDutyPharmacies.length > 0 && (
+   314→        <section className="mt-6">
+   315→          <Card className="overflow-hidden border-amber-500/30 py-0 shadow-premium">
+   316→            <div className="flex items-center gap-3 border-b border-amber-500/20 bg-amber-50 px-5 py-3.5">
+   317→              <span className="flex size-10 items-center justify-center rounded-xl bg-amber-400 text-amber-950">
+   318→                <Timer className="size-5" />
+   319→              </span>
+   320→              <div className="flex-1">
+   321→                <h2 className="text-base font-extrabold text-foreground">
+   322→                  Pharmacies de garde proches
+   323→                </h2>
+   324→                <p className="text-xs text-muted-foreground">
+   325→                  Actuellement de garde à Abidjan — pour vos urgences
+   326→                </p>
+   327→              </div>
+   328→              <Button
+   329→                size="sm"
+   330→                variant="ghost"
+   331→                className="hidden text-amber-700 hover:bg-amber-50 sm:inline-flex"
+   332→                onClick={() => setQuickFilter("on-duty")}
+   333→              >
+   334→                Voir tout <ArrowRight className="size-3.5" />
+   335→              </Button>
+   336→            </div>
+   337→            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+   338→              {onDutyPharmacies.map((p) => (
+   339→                <OnDutyMiniCard key={p.id} pharma={p} />
+   340→              ))}
+   341→            </div>
+   342→          </Card>
+   343→        </section>
+   344→      )}
+   345→
+   346→      {/* ============ GOOGLE MAP ============ */}
+   347→      <section className="mt-6">
+   348→        <Card className="overflow-hidden border-brand/20 py-0">
+   349→          <GoogleMap
+   350→            lat={5.34}
+   351→            lng={-4.008}
+   352→            zoom={12}
+   353→            label="Pharmacies Abidjan"
+   354→            title="Carte des pharmacies à Abidjan"
+   355→            className="h-72 sm:h-80"
+   356→          />
+   357→        </Card>
+   358→      </section>
+   359→
+   360→      {/* ============ MAIN LAYOUT: filters sidebar + results ============ */}
+   361→      <div className="mt-6 grid gap-6 lg:grid-cols-[270px_1fr]">
+   362→        {/* Desktop filters sidebar */}
+   363→        <aside className="hidden lg:block">
+   364→          <FiltersPanel
+   365→            filters={filters}
+   366→            setFilters={setFilters}
+   367→            activeCount={activeFiltersCount}
+   368→            onReset={() => setFilters(DEFAULT_FILTERS)}
+   369→          />
+   370→        </aside>
+   371→
+   372→        {/* Mobile filters (collapsible) */}
+   373→        {showFiltersMobile && (
+   374→          <Card className="border-border/70 p-4 lg:hidden">
+   375→            <div className="mb-3 flex items-center justify-between">
+   376→              <h3 className="text-sm font-bold">Filtres</h3>
+   377→              <button
+   378→                onClick={() => setShowFiltersMobile(false)}
+   379→                className="text-muted-foreground hover:text-foreground"
+   380→              >
+   381→                <X className="size-4" />
+   382→              </button>
+   383→            </div>
+   384→            <FiltersPanel
+   385→              filters={filters}
+   386→              setFilters={setFilters}
+   387→              activeCount={activeFiltersCount}
+   388→              onReset={() => setFilters(DEFAULT_FILTERS)}
+   389→              isMobile
+   390→            />
+   391→          </Card>
+   392→        )}
+   393→
+   394→        {/* Results */}
+   395→        <div>
+   396→          {/* Toolbar */}
+   397→          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+   398→            <p className="text-sm text-muted-foreground">
+   399→              {loading ? (
+   400→                "Chargement..."
+   401→              ) : (
+   402→                <>
+   403→                  <span className="font-bold text-foreground">
+   404→                    {filteredPharmacies.length}
+   405→                  </span>{" "}
+   406→                  pharmacie{filteredPharmacies.length > 1 ? "s" : ""} trouvée
+   407→                  {filteredPharmacies.length > 1 ? "s" : ""}
+   408→                </>
+   409→              )}
+   410→            </p>
+   411→            {activeFiltersCount > 0 && (
+   412→              <button
+   413→                onClick={resetAll}
+   414→                className="text-xs font-semibold text-brand hover:underline"
+   415→              >
+   416→                Tout effacer ({activeFiltersCount})
+   417→              </button>
+   418→            )}
+   419→          </div>
+   420→
+   421→          {/* Results grid */}
+   422→          {loading ? (
+   423→            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+   424→              {Array.from({ length: 6 }).map((_, i) => (
+   425→                <Skeleton key={i} className="h-64 rounded-2xl" />
+   426→              ))}
+   427→            </div>
+   428→          ) : filteredPharmacies.length === 0 ? (
+   429→            <EmptyState
+   430→              icon={Search}
+   431→              title="Aucune pharmacie trouvée"
+   432→              description="Essayez d'élargir vos critères de recherche : modifiez le terme, la commune ou les filtres pour découvrir d'autres pharmacies partenaires."
+   433→              action={{ label: "Réinitialiser les filtres", onClick: resetAll }}
+   434→            />
+   435→          ) : (
+   436→            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+   437→              {filteredPharmacies.map((p) => (
+   438→                <PharmacyResultCard key={p.id} pharma={p} />
+   439→              ))}
+   440→            </div>
+   441→          )}
+   442→        </div>
+   443→      </div>
+   444→    </div>
+   445→  );
+   446→}
+   447→
+   448→/* ============================================================
+   449→   FiltersPanel — panneau de filtres réutilisable
+   450→   ============================================================ */
+   451→function FiltersPanel({
+   452→  filters,
+   453→  setFilters,
+   454→  activeCount,
+   455→  onReset,
+   456→  isMobile = false,
+   457→}: {
+   458→  filters: Filters;
+   459→  setFilters: React.Dispatch<React.SetStateAction<Filters>>;
+   460→  activeCount: number;
+   461→  onReset: () => void;
+   462→  isMobile?: boolean;
+   463→}) {
+   464→  return (
+   465→    <div className={cn("space-y-5", !isMobile && "sticky top-24")}>
+   466→      <div className="flex items-center justify-between">
+   467→        <div className="flex items-center gap-2">
+   468→          <SlidersHorizontal className="size-4 text-brand" />
+   469→          <h3 className="text-sm font-bold text-foreground">Filtres</h3>
+   470→          {activeCount > 0 && (
+   471→            <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-white">
+   472→              {activeCount}
+   473→            </span>
+   474→          )}
+   475→        </div>
+   476→        {activeCount > 0 && (
+   477→          <button
+   478→            onClick={onReset}
+   479→            className="text-xs font-semibold text-brand hover:underline"
+   480→          >
+   481→            Effacer
+   482→          </button>
+   483→        )}
+   484→      </div>
+   485→
+   486→      {/* Commune */}
+   487→      <FilterGroup label="Commune">
+   488→        <Select
+   489→          value={filters.commune}
+   490→          onValueChange={(v) => setFilters((f) => ({ ...f, commune: v }))}
+   491→        >
+   492→          <SelectTrigger className="h-10">
+   493→            <SelectValue placeholder="Toutes les communes" />
+   494→          </SelectTrigger>
+   495→          <SelectContent>
+   496→            <SelectItem value="all">Toutes les communes</SelectItem>
+   497→            {COMMUNES.map((c) => (
+   498→              <SelectItem key={c} value={c}>
+   499→                {c}
+   500→              </SelectItem>
+   501→            ))}
+   502→          </SelectContent>
+   503→        </Select>
+   504→      </FilterGroup>
+   505→
+   506→      {/* Quartier */}
+   507→      <FilterGroup label="Quartier">
+   508→        <Input
+   509→          value={filters.quartier}
+   510→          onChange={(e) => setFilters((f) => ({ ...f, quartier: e.target.value }))}
+   511→          placeholder="Ex : Riviera, Zone 4…"
+   512→          className="h-10"
+   513→        />
+   514→      </FilterGroup>
+   515→
+   516→      {/* Toggles: open / on-duty / near */}
+   517→      <FilterGroup label="Disponibilité">
+   518→        <div className="space-y-1.5">
+   519→          <ToggleRow
+   520→            label="Ouverte maintenant"
+   521→            icon={Clock}
+   522→            checked={filters.openNow}
+   523→            onChange={(v) => setFilters((f) => ({ ...f, openNow: v }))}
+   524→          />
+   525→          <ToggleRow
+   526→            label="Pharmacie de garde"
+   527→            icon={Timer}
+   528→            checked={filters.onDuty}
+   529→            onChange={(v) => setFilters((f) => ({ ...f, onDuty: v }))}
+   530→          />
+   531→          <ToggleRow
+   532→            label="Pharmacie proche de moi"
+   533→            icon={Navigation}
+   534→            checked={filters.nearMe}
+   535→            onChange={(v) => setFilters((f) => ({ ...f, nearMe: v }))}
+   536→          />
+   537→        </div>
+   538→      </FilterGroup>
+   539→
+   540→      {/* Max distance */}
+   541→      <FilterGroup label="Distance maximale">
+   542→        <Select
+   543→          value={filters.maxDistance}
+   544→          onValueChange={(v) => setFilters((f) => ({ ...f, maxDistance: v }))}
+   545→        >
+   546→          <SelectTrigger className="h-10">
+   547→            <SelectValue placeholder="Toutes distances" />
+   548→          </SelectTrigger>
+   549→          <SelectContent>
+   550→            <SelectItem value="all">Toutes distances</SelectItem>
+   551→            <SelectItem value="2">≤ 2 km</SelectItem>
+   552→            <SelectItem value="5">≤ 5 km</SelectItem>
+   553→            <SelectItem value="10">≤ 10 km</SelectItem>
+   554→            <SelectItem value="20">≤ 20 km</SelectItem>
+   555→          </SelectContent>
+   556→        </Select>
+   557→      </FilterGroup>
+   558→
+   559→      {/* Medication availability */}
+   560→      <FilterGroup label="Disponibilité d'un médicament">
+   561→        <div className="relative">
+   562→          <Pill className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+   563→          <Input
+   564→            value={filters.medication}
+   565→            onChange={(e) => setFilters((f) => ({ ...f, medication: e.target.value }))}
+   566→            placeholder="Nom du médicament…"
+   567→            className="h-10 pl-9"
+   568→          />
+   569→        </div>
+   570→      </FilterGroup>
+   571→
+   572→      {/* Services */}
+   573→      <FilterGroup label="Services disponibles">
+   574→        <Select
+   575→          value={filters.service}
+   576→          onValueChange={(v) => setFilters((f) => ({ ...f, service: v }))}
+   577→        >
+   578→          <SelectTrigger className="h-10">
+   579→            <SelectValue placeholder="Tous les services" />
+   580→          </SelectTrigger>
+   581→          <SelectContent>
+   582→            <SelectItem value="all">Tous les services</SelectItem>
+   583→            {SERVICES.map((s) => (
+   584→              <SelectItem key={s.key} value={s.key}>
+   585→                {s.label}
+   586→              </SelectItem>
+   587→            ))}
+   588→          </SelectContent>
+   589→        </Select>
+   590→      </FilterGroup>
+   591→    </div>
+   592→  );
+   593→}
+   594→
+   595→function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+   596→  return (
+   597→    <div>
+   598→      <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+   599→        {label}
+   600→      </p>
+   601→      {children}
+   602→    </div>
+   603→  );
+   604→}
+   605→
+   606→function ToggleRow({
+   607→  label,
+   608→  icon: Icon,
+   609→  checked,
+   610→  onChange,
+   611→}: {
+   612→  label: string;
+   613→  icon: typeof Clock;
+   614→  checked: boolean;
+   615→  onChange: (v: boolean) => void;
+   616→}) {
+   617→  return (
+   618→    <button
+   619→      onClick={() => onChange(!checked)}
+   620→      className={cn(
+   621→        "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors",
+   622→        checked
+   623→          ? "border-brand bg-brand-light text-brand-dark"
+   624→          : "border-border bg-background text-muted-foreground hover:border-brand/30"
+   625→      )}
+   626→    >
+   627→      <Icon className="size-4" />
+   628→      <span className="flex-1">{label}</span>
+   629→      <span
+   630→        className={cn(
+   631→          "flex size-4 items-center justify-center rounded-full border",
+   632→          checked ? "border-brand bg-brand" : "border-border"
+   633→        )}
+   634→      >
+   635→        {checked && <CheckCircle2 className="size-3 text-white" />}
+   636→      </span>
+   637→    </button>
+   638→  );
+   639→}
+   640→
+   641→/* ============================================================
+   642→   OnDutyMiniCard — carte compacte pour la section "de garde"
+   643→   ============================================================ */
+   644→function OnDutyMiniCard({ pharma }: { pharma: Pharmacy & { distance?: number } }) {
+   645→  const { navigate } = useNav();
+   646→  const dist =
+   647→    pharma.distance ??
+   648→    distanceKm(ABIDJAN_CENTER.lat, ABIDJAN_CENTER.lon, pharma.latitude, pharma.longitude);
+   649→  const quartier = pharma.address.split(",")[0]?.trim() ?? pharma.commune;
+   650→
+   651→  return (
+   652→    <button
+   653→      onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
+   654→      className="group flex items-center gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all hover:border-brand/30 hover:shadow-premium"
+   655→    >
+   656→      <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
+   657→        <Plus className="size-5" strokeWidth={3} />
+   658→        <span className="absolute -right-1 -top-1 flex size-3.5 items-center justify-center rounded-full bg-amber-400 ring-2 ring-background" />
+   659→      </span>
+   660→      <div className="min-w-0 flex-1">
+   661→        <h3 className="truncate text-sm font-bold text-foreground">
+   662→          {pharma.name}
+   663→        </h3>
+   664→        <p className="truncate text-xs text-muted-foreground">
+   665→          {quartier}, {pharma.commune} · {dist} km
+   666→        </p>
+   667→        <div className="mt-1 flex items-center gap-1.5">
+   668→          <span className="inline-flex items-center gap-0.5 rounded-full bg-success-light px-1.5 py-0.5 text-[9px] font-bold text-success">
+   669→            <span className="size-1.5 rounded-full bg-success animate-pulse" /> Ouvert
+   670→          </span>
+   671→          {pharma.isOpen247 && (
+   672→            <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-light px-1.5 py-0.5 text-[9px] font-bold text-brand-dark">
+   673→              <Clock className="size-2.5" /> 24/7
+   674→            </span>
+   675→          )}
+   676→        </div>
+   677→      </div>
+   678→      <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+   679→    </button>
+   680→  );
+   681→}
+   682→
+   683→/* ============================================================
+   684→   PharmacyResultCard — carte pharmacie complète avec 4 boutons
+   685→   ============================================================ */
+   686→function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number } }) {
+   687→  const { navigate } = useNav();
+   688→  const dist =
+   689→    pharma.distance ??
+   690→    distanceKm(ABIDJAN_CENTER.lat, ABIDJAN_CENTER.lon, pharma.latitude, pharma.longitude);
+   691→  const quartier = pharma.address.split(",")[0]?.trim() ?? pharma.commune;
+   692→  const mapsUrl = `https://www.google.com/maps?q=${pharma.latitude},${pharma.longitude}`;
+   693→  const phoneHref = `tel:${pharma.phone.replace(/\s/g, "")}`;
+   694→  const todayHours = pharma.hoursWeekday;
+   695→
+   696→  return (
+   697→    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg">
+   698→      {/* Header banner */}
+   699→      <div className="relative flex items-center justify-between bg-brand px-4 py-3">
+   700→        {pharma.imageUrl && (
+   701→          <img
+   702→            src={pharma.imageUrl}
+   703→            alt={pharma.name}
+   704→            className="absolute inset-0 size-full object-cover"
+   705→          />
+   706→        )}
+   707→        <div className="absolute inset-0 bg-black/40" />
+   708→        <div className="relative flex items-center gap-2.5">
+   709→          <span className="flex size-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
+   710→            <Plus className="size-5 text-white" strokeWidth={3} />
+   711→          </span>
+   712→          <span className="inline-flex items-center gap-1 rounded-full bg-brand-dark px-1.5 py-0.5 text-[10px] font-bold text-white">
+   713→            <span className="size-1.5 rounded-full bg-amber-300" />
+   714→            {pharma.rating.toFixed(1)}
+   715→          </span>
+   716→        </div>
+   717→        <div className="relative flex items-center gap-1.5">
+   718→          {pharma.isOnDuty && (
+   719→            <Badge className="border-0 bg-amber-400 text-[10px] font-bold text-amber-950">
+   720→              <Timer className="size-3" /> De garde
+   721→            </Badge>
+   722→          )}
+   723→          {pharma.isOpen247 && (
+   724→            <Badge className="border-0 bg-white/20 text-[10px] font-bold text-white backdrop-blur-sm">
+   725→              <Clock className="size-3" /> 24/7
+   726→            </Badge>
+   727→          )}
+   728→        </div>
+   729→      </div>
+   730→
+   731→      {/* Body */}
+   732→      <div className="space-y-3 p-4">
+   733→        <div>
+   734→          <h3 className="text-sm font-bold leading-tight text-foreground">
+   735→            {pharma.name}
+   736→          </h3>
+   737→          <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
+   738→            <MapPin className="mt-0.5 size-3.5 shrink-0 text-brand/70" />
+   739→            <span>
+   740→              {quartier}, <span className="font-medium text-foreground/70">{pharma.commune}</span>
+   741→            </span>
+   742→          </p>
+   743→        </div>
+   744→
+   745→        {/* Status + distance row */}
+   746→        <div className="flex flex-wrap items-center gap-1.5">
+   747→          <span
+   748→            className={cn(
+   749→              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold",
+   750→              pharma.openNow
+   751→                ? "bg-success-light text-success"
+   752→                : "bg-neutral-light text-neutral-foreground"
+   753→            )}
+   754→          >
+   755→            <span
+   756→              className={cn(
+   757→                "size-1.5 rounded-full",
+   758→                pharma.openNow ? "bg-success animate-pulse" : "bg-muted-foreground/50"
+   759→              )}
+   760→            />
+   761→            {pharma.openNow ? "Ouvert" : "Fermé"}
+   762→          </span>
+   763→          {pharma.openNow && (
+   764→            <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-light px-2 py-0.5 text-[10px] font-bold text-brand-dark">
+   765→              <CheckCircle2 className="size-2.5" /> Disponible aujourd&apos;hui
+   766→            </span>
+   767→          )}
+   768→          {dist <= 5 && (
+   769→            <span className="inline-flex items-center gap-0.5 rounded-full bg-info-light px-2 py-0.5 text-[10px] font-bold text-info">
+   770→              <Navigation className="size-2.5" /> À proximité
+   771→            </span>
+   772→          )}
+   773→        </div>
+   774→
+   775→        {/* Info grid: distance + hours */}
+   776→        <div className="grid grid-cols-2 gap-2 border-t border-border/50 pt-2.5">
+   777→          <div className="flex items-center gap-1.5 text-xs">
+   778→            <Navigation className="size-3.5 text-brand" />
+   779→            <span className="font-bold text-foreground">{dist} km</span>
+   780→          </div>
+   781→          <div className="flex items-center gap-1.5 text-xs">
+   782→            <Clock className="size-3.5 text-brand" />
+   783→            <span className="truncate text-muted-foreground">{todayHours}</span>
+   784→          </div>
+   785→        </div>
+   786→
+   787→        {/* Phone */}
+   788→        <a
+   789→          href={phoneHref}
+   790→          className="flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
+   791→          onClick={(e) => e.stopPropagation()}
+   792→        >
+   793→          <Phone className="size-3.5" /> {pharma.phone.replace("+225 ", "")}
+   794→        </a>
+   795→
+   796→        {/* Actions */}
+   797→        <div className="grid grid-cols-2 gap-2 pt-1">
+   798→          <Button
+   799→            size="sm"
+   800→            className="bg-brand-gradient text-white hover:opacity-90"
+   801→            onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
+   802→          >
+   803→            Voir détails <ChevronRight className="size-3.5" />
+   804→          </Button>
+   805→          <Button size="sm" variant="outline" asChild>
+   806→            <a href={phoneHref}>
+   807→              <Phone className="size-3.5" /> Appeler
+   808→            </a>
+   809→          </Button>
+   810→          <Button size="sm" variant="outline" asChild>
+   811→            <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+   812→              <Navigation className="size-3.5" /> Itinéraire
+   813→            </a>
+   814→          </Button>
+   815→          <Button
+   816→            size="sm"
+   817→            variant="outline"
+   818→            className="border-brand/30 text-brand-dark hover:bg-brand-light"
+   819→            onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
+   820→          >
+   821→            <Pill className="size-3.5" /> Médicaments
+   822→          </Button>
+   823→        </div>
+   824→      </div>
+   825→    </Card>
+   826→  );
+   827→}
+   828→

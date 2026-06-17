@@ -14,6 +14,7 @@ import {
   Plus,
   Lock,
   Crown,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -432,6 +433,37 @@ export function WalletView() {
         </Card>
       </section>
 
+      {/* ============ SERVICES DE CONTACT PHARMACIE ============ */}
+      <section className="mt-10">
+        <SectionTitle icon={Phone} title="Services de contact pharmacie" />
+        <Muted className="mb-4">
+          Les contacts directs des pharmacies nécessitent des crédits.
+        </Muted>
+        <Card className="border-border/70 p-5">
+          <ul className="grid gap-2.5 sm:grid-cols-2">
+            {[
+              { label: "Voir le contact pharmacie (téléphone)", cost: "1 crédit" },
+              { label: "Appeler une pharmacie", cost: "1 crédit" },
+              { label: "WhatsApp pharmacie", cost: "1 crédit" },
+              { label: "Demander conseil pharmacie", cost: "2 crédits" },
+              { label: "Confirmer disponibilité", cost: "3 crédits" },
+              { label: "Confirmer prix", cost: "3 crédits" },
+              { label: "Confirmation complète", cost: "4 crédits" },
+            ].map((s) => (
+              <li
+                key={s.label}
+                className="flex items-center justify-between gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5 text-sm"
+              >
+                <span className="font-medium text-foreground/85">{s.label}</span>
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-light px-2 py-0.5 text-[10px] font-bold text-brand-dark">
+                  {s.cost}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </section>
+
       {/* ============ SERVICES BLOQUÉS SANS CRÉDITS ============ */}
       <section className="mt-10">
         <SectionTitle icon={Lock} title="Services bloqués sans crédits" />
@@ -449,6 +481,11 @@ export function WalletView() {
               "Disponibilité réelle par pharmacie",
               "Confirmation avant déplacement",
               "Alertes de disponibilité",
+              "Voir le contact (téléphone) d'une pharmacie",
+              "Appeler une pharmacie",
+              "Contacter via WhatsApp",
+              "Demander conseil à une pharmacie",
+              "Confirmer le prix avant déplacement",
             ].map((s) => (
               <li
                 key={s}

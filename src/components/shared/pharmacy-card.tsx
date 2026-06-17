@@ -1,8 +1,9 @@
 "use client";
 
-import { MapPin, Clock, Phone, Navigation, ChevronRight, Plus, Timer } from "lucide-react";
+import { MapPin, Clock, ChevronRight, Plus, Timer, Lock, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { CreditCost } from "@/components/shared/credit-cost";
 import { useNav } from "@/store/nav";
 import { cn } from "@/lib/utils";
 import type { Pharmacy } from "@/lib/types";
@@ -86,6 +87,15 @@ export function PharmacyCard({ pharma, showPrice }: { pharma: Pharmacy; showPric
               </span>
             )}
           </div>
+          {/* Contact verrouillé — aucune info téléphone affichée */}
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2 py-1.5">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+              <Lock className="size-3" /> Contact verrouillé
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-dark">
+              <Phone className="size-3" /> Voir contact <CreditCost cost={1} />
+            </span>
+          </div>
         </div>
       </Card>
     </button>
@@ -116,8 +126,11 @@ export function PharmacyRow({ pharma }: { pharma: Pharmacy }) {
           <MapPin className="mr-1 inline size-3" />
           {pharma.commune} · {pharma.isOpen247 ? "Ouvert 24/7" : pharma.hoursWeekday}
         </span>
+        <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+          <Lock className="size-2.5" /> Contact verrouillé <CreditCost cost={1} />
+        </span>
       </span>
-      <span className="flex flex-col items-end shrink-0">
+      <span className="flex flex-col items-end gap-1 shrink-0">
         <span
           className={cn(
             "rounded-full px-2 py-0.5 text-[10px] font-bold",

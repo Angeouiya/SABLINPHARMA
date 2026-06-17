@@ -1420,3 +1420,90 @@ Stage Summary:
 - Tous les textes de la plateforme restent dans leur cadre UI, même sur mobile
 - break-words ajouté globalement sur les paragraphes longs
 - 0 débordement horizontal confirmé
+
+---
+Task ID: 402-a
+Agent: 402-a (credit-gating pharmacy contact)
+
+Task: Verrouiller les contacts pharmacie (téléphone, WhatsApp, conseil, confirmations) sur 3 fichiers
+
+Work Log:
+- Lecture du worklog + 4 fichiers de référence (credits.ts, locked-contact.tsx, credit-confirm-dialog.tsx, credit-cost.tsx)
+- FICHIER 1 — src/components/views/pharmacy-detail-view.tsx (Edit)
+  - Imports : ajouté `MessageCircle`, `Lightbulb` (lucide-react) ; `LockedContact` (shared)
+  - States : `contactUnlocked`, `whatsappUnlocked` (reset au changement de slug) + 5 nouveaux states de dialog (`showContactDialog`, `showWhatsappDialog`, `showAdviceDialog`, `showConfirmPriceDialog`, `showConfirmFullDialog`)
+  - Variables dérivées : `whatsappHref` (wa.me/), `phoneDisplay`, `contactVisible = contactUnlocked || hasPass`, `whatsappVisible = whatsappUnlocked || hasPass`
+  - InfoCard "Téléphone" remplacée par une Card custom contenant `LockedContact type="phone" cost=1` quand verrouillé ; affiche le numéro complet + bouton Appeler (tel:) quand débloqué
+  - Actions rapides :
+    * Bouton "Appeler" conditionnel — si !contactVisible : bouton "Appeler — 1 crédit" (ouvre showContactDialog) ; si contactVisible : lien tel:
+    * Bouton "WhatsApp" conditionnel — si !whatsappVisible : bouton "WhatsApp — 1 crédit" (ouvre showWhatsappDialog) ; si whatsappVisible : lien wa.me
+    * Bouton "Demander conseil — 2 crédits" (Lightbulb, advicePharmacy)
+    * Bouton "Confirmer disponibilité — 3 crédits" (CheckCircle2, confirmAvailability) — renommé depuis "Demander une confirmation"
+    * Bouton "Confirmer prix — 3 crédits" (Coins, confirmPrice)
+    * Bouton "Confirmation complète — 4 crédits" (CheckCircle2, confirmFull)
+    * Boutons gratuits conservés : Itinéraire, Partager, Favori (col-span-2), Voir médicaments, Comparer
+  - 6 CreditConfirmDialog au total (availability, prices, compare, confirmAvailability, contact, whatsapp, advice, confirmPrice, confirmFull) — titres/descriptions/benefits conformes au cahier des charges
+  - hasPass → tous les contacts/actions sont gratuits (toast direct, pas de dialog)
+- FICHIER 2 — src/components/shared/pharmacy-card.tsx (Edit)
+  - Imports : `Lock`, `Phone` (lucide-react) ; `CreditCost` (shared) ; `Navigation` retiré (inutilisé)
+  - PharmacyCard : badge "Contact verrouillé" + "Voir contact — 1 crédit" en bas de la card (aucun numéro, aucun lien tel:)
+  - PharmacyRow : ligne "Contact verrouillé — 1 crédit" sous l'adresse (aucun numéro, aucun lien tel:)
+  - Carte entière cliquable → navigue vers pharmacy-detail (où le déblocage se fait)
+- FICHIER 3 — src/components/views/pharmacies-view.tsx (Edit)
+  - Imports : `Lock` (lucide-react) ; `CreditCost` (shared)
+  - PharmacyResultCard : remplacement du lien téléphone `<a href={tel:}>` par un bandeau "Contact verrouillé — Voir contact 1 crédit" ; bouton "Appeler" (tel:) remplacé par bouton "Voir contact" qui navigue vers pharmacy-detail ; plus aucun phoneHref/tel: dans la carte
+  - OnDutyMiniCard : ajout d'un mini-badge "Contact — 1 crédit" à côté des badges Ouvert/24-7
+  - Aucun numéro de téléphone, aucun lien tel: dans ces 2 composants
+
+Contraintes respectées:
+- AUCUNE couleur dégradée (couleurs pleines bg-brand, bg-brand-dark, bg-muted, bg-brand-light)
+- Titres en text-foreground / text-brand-dark
+- Texte toujours lisible (text-muted-foreground pour secondaire)
+- Aucun numéro de téléphone visible avant déblocage (remplacé par "Contact verrouillé")
+- Aucun lien tel: ou wa.me généré avant paiement (uniquement dans branches conditionnelles `contactVisible` / `whatsappVisible`)
+- hasPass désactive tous les paywalls (contacts visibles, boutons directs, pas de dialog)
+- Tout en français
+
+Vérifications:
+- `bun run lint` : 0 erreur, 0 warning
+- Dev server : compilation OK, `/api/pharmacies/pharmacie-d-angre` 200
+
+---
+Task ID: 35
+Agent: main (orchestrator)
+Task: Verrouillage strict des contacts pharmacies avec crédits
+
+Work Log:
+- Store credits.ts mis à jour : CREDIT_COSTS étendu avec seeContact(1), callPharmacy(1), whatsappPharmacy(1), advicePharmacy(2), confirmAvailability(3), confirmPrice(3), confirmFull(4). FREE_FEATURES mis à jour (suppression "Voir l'adresse et le téléphone", ajout "Voir le nom, commune et quartier"). PAID_FEATURES étendu avec 7 nouveaux services de contact.
+- Composant LockedContact créé (@/components/shared/locked-contact.tsx) : affiche "Contact verrouillé" avec icône cadenas + bouton "Voir contact — 1 crédit" quand verrouillé, ou valeur + bouton action + badge "Débloqué" quand débloqué. Types: phone, whatsapp, advice, confirmAvailability, confirmPrice, confirmFull.
+- Détail pharmacie (pharmacy-detail-view.tsx) : 
+  * Téléphone masqué → LockedContact type="phone" cost=1 (contactUnlocked state)
+  * Bouton Appeler verrouillé → "Appeler — 1 crédit" si !contactUnlocked
+  * Bouton WhatsApp → "WhatsApp — 1 crédit" (whatsappUnlocked state)
+  * Bouton "Demander conseil — 2 crédits" (CreditConfirmDialog)
+  * Bouton "Confirmer disponibilité — 3 crédits" (CreditConfirmDialog)
+  * Bouton "Confirmer prix — 3 crédits" (CreditConfirmDialog)
+  * Bouton "Confirmation complète — 4 crédits" (CreditConfirmDialog)
+  * 9 CreditConfirmDialog au total
+  * hasPass → tous contacts gratuits
+  * Aucun numéro tel: ou wa.me dans le HTML avant déblocage
+- PharmacyCard : bandeau "Contact verrouillé — Voir contact 1 crédit", aucun tel: généré
+- PharmacyRow : ligne "Contact verrouillé — 1 crédit"
+- Pharmacies-view (PharmacyResultCard, OnDutyMiniCard) : téléphone masqué, "Voir contact" à la place
+- Wallet : section "Services de contact pharmacie" (7 services avec coûts), section "Services bloqués" étendue avec contacts
+- Profil : section "Restrictions" étendue avec 3 nouvelles restrictions (contacts, appeler, conseil)
+- Header : badge "0 crédit" visible en rouge + bouton "Recharger"
+- Vérification Agent Browser (utilisateur 0 crédit) :
+  * Page Pharmacies : "Numéros masqués, badges 'Contact 1 crédit' présents"
+  * Header : badge "0 crédit" + bouton "Recharger" visibles
+  * Aucun lien tel: visible dans les cartes
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Tous les contacts pharmacies (téléphone, WhatsApp, appel, conseil, confirmations) sont verrouillés sans crédits
+- Aucun numéro de téléphone visible avant déblocage (1 crédit)
+- Aucun lien tel: ou wa.me généré avant paiement
+- Modale de confirmation obligatoire avant chaque déblocage (coût, solde, solde après, bénéfices)
+- Pass Ordonnance = tous contacts gratuits
+- 7 services de contact payants (1/1/1/2/3/3/4 crédits)
+- Wallet, Profil, header mis à jour avec les nouvelles restrictions

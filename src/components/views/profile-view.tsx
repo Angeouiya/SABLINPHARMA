@@ -529,6 +529,24 @@ export function ProfileView() {
                     Sans crédit, vous ne pouvez pas demander de confirmation avant déplacement.
                   </span>
                 </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                  <span>
+                    Sans crédit, vous ne pouvez pas voir les contacts complets des pharmacies.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                  <span>
+                    Sans crédit, vous ne pouvez pas appeler une pharmacie depuis SABLIN PHARMA.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                  <span>
+                    Sans crédit, vous ne pouvez pas envoyer une demande de conseil.
+                  </span>
+                </li>
                 <li className="flex items-start gap-3 rounded-xl bg-success-light/40 p-3 text-sm font-bold text-foreground">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
                   <div className="flex-1">

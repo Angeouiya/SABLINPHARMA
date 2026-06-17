@@ -190,20 +190,24 @@
   * {
     @apply border-border outline-ring/50;
     box-sizing: border-box;
+    max-width: 100%;
   }
   html {
     -webkit-text-size-adjust: 100%;
     overflow-x: hidden;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overflow-x: hidden;
+    width: 100%;
   }
   /* Prevent horizontal scroll from any element */
   img, video, svg, table {
     max-width: 100%;
+    height: auto;
   }
   /* Headings use foreground (dark) for maximum readability on all backgrounds */
   h1, h2, h3, h4, h5, h6 {
@@ -211,10 +215,12 @@
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
-  /* Responsive font sizes */
-  h1 { font-size: clamp(1.5rem, 5vw, 2.5rem); }
-  h2 { font-size: clamp(1.25rem, 4vw, 2rem); }
-  h3 { font-size: clamp(1.1rem, 3.5vw, 1.5rem); }
+  /* Responsive font sizes — optimized for all breakpoints */
+  h1 { font-size: clamp(1.375rem, 4.5vw, 2.5rem); }
+  h2 { font-size: clamp(1.125rem, 3.5vw, 2rem); }
+  h3 { font-size: clamp(1rem, 3vw, 1.5rem); }
+  h4 { font-size: clamp(0.9rem, 2.5vw, 1.25rem); }
+
   /* Prevent text overflow on all elements */
   p, span, li, td, th, label, button, a {
     overflow-wrap: break-word;
@@ -223,6 +229,28 @@
   /* Long words/URLs break */
   .break-all {
     word-break: break-all;
+  }
+
+  /* Ensure all containers respect viewport */
+  div, section, article, aside, nav, header, footer, main {
+    max-width: 100%;
+  }
+
+  /* Tables: allow horizontal scroll on small screens */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Form inputs: full width on mobile */
+  input, textarea, select {
+    max-width: 100%;
+  }
+
+  /* Buttons: prevent text from breaking awkwardly */
+  button {
+    white-space: normal;
   }
 }
 

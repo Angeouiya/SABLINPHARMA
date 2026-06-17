@@ -9,7 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Timer,
-  Crown,
+  Coins,
+  Receipt,
   Pill,
   AlertTriangle,
   Info,
@@ -40,7 +41,8 @@ const ICONS: Record<string, LucideIcon> = {
   Bell,
   CheckCircle2,
   Timer,
-  Crown,
+  Coins,
+  Receipt,
   Pill,
   AlertTriangle,
   Info,
@@ -56,7 +58,7 @@ const TYPE_STYLES: Record<NotificationType, { circle: string; dot: string; label
 };
 
 // 8 filtres par catégorie
-type FilterKey = "all" | "unread" | "medications" | "pharmacies" | "prescriptions" | "subscription" | "payment" | "support";
+type FilterKey = "all" | "unread" | "medications" | "pharmacies" | "prescriptions" | "credits" | "payment" | "support";
 
 const FILTERS: { key: FilterKey; label: string; icon: LucideIcon }[] = [
   { key: "all", label: "Toutes", icon: Bell },
@@ -64,7 +66,7 @@ const FILTERS: { key: FilterKey; label: string; icon: LucideIcon }[] = [
   { key: "medications", label: "Médicaments", icon: Pill },
   { key: "pharmacies", label: "Pharmacies", icon: Timer },
   { key: "prescriptions", label: "Ordonnances", icon: ClipboardList },
-  { key: "subscription", label: "Abonnement", icon: Crown },
+  { key: "credits", label: "Crédits", icon: Coins },
   { key: "payment", label: "Paiement", icon: CreditCard },
   { key: "support", label: "Support", icon: Headphones },
 ];
@@ -74,8 +76,8 @@ function categorizeNotification(n: AppNotification): FilterKey {
   const t = (n.title + " " + n.message).toLowerCase();
   if (t.includes("médicament") || t.includes("stock") || t.includes("rupture") || t.includes("disponible")) return "medications";
   if (t.includes("pharmacie") || t.includes("garde")) return "pharmacies";
-  if (t.includes("ordonnance") || t.includes("estimée")) return "prescriptions";
-  if (t.includes("abonnement") || t.includes("premium")) return "subscription";
+  if (t.includes("ordonnance") || t.includes("estimée") || t.includes("estimation")) return "prescriptions";
+  if (t.includes("crédit") || t.includes("recharge") || t.includes("pass") || t.includes("solde")) return "credits";
   if (t.includes("paiement") || t.includes("wave") || t.includes("money")) return "payment";
   if (t.includes("support") || t.includes("message")) return "support";
   return "all";
@@ -86,7 +88,7 @@ const LINK_VIEWS: View[] = [
   "medications",
   "pharmacies",
   "prescription",
-  "subscription",
+  "wallet",
   "profile",
   "favorites",
 ];
@@ -106,10 +108,10 @@ function getAction(n: AppNotification): { label: string; view: View } | null {
       return { label: "Voir la pharmacie", view: "pharmacies" };
     case "prescriptions":
       return { label: "Consulter l'ordonnance", view: "prescription" };
-    case "subscription":
-      return { label: "Renouveler l'abonnement", view: "subscription" };
+    case "credits":
+      return { label: "Recharger mes crédits", view: "wallet" };
     case "payment":
-      return { label: "Voir le paiement", view: "subscription" };
+      return { label: "Voir le portefeuille", view: "wallet" };
     case "support":
       return { label: "Contacter le support", view: "profile" };
     default:
@@ -149,7 +151,7 @@ export function NotificationsView() {
       medications: 0,
       pharmacies: 0,
       prescriptions: 0,
-      subscription: 0,
+      credits: 0,
       payment: 0,
       support: 0,
     };
@@ -212,7 +214,7 @@ export function NotificationsView() {
           <EmptyState
             icon={Bell}
             title="Connectez-vous pour voir vos notifications"
-            description="Recevez des alertes sur les pharmacies de garde, les nouveautés et les offres Premium."
+            description="Recevez des alertes sur les pharmacies de garde, les nouveautés et l'état de vos crédits."
             action={{
               label: "Se connecter",
               onClick: () => navigate("auth", { authMode: "login" }),
@@ -245,7 +247,7 @@ export function NotificationsView() {
         </div>
         <Muted>
           Restez informé des disponibilités de médicaments, pharmacies de garde,
-          abonnement, paiements et ordonnances.
+          crédits, paiements et ordonnances.
         </Muted>
       </div>
 

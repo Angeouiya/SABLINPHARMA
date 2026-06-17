@@ -1,0 +1,1535 @@
+     1→# SABLIN PHARMA — Worklog partagé
+     2→
+     3→---
+     4→Task ID: 1
+     5→Agent: main (orchestrator)
+     6→Task: Fondation de la plateforme SABLIN PHARMA (thème, schéma, seed, stores, API, composants partagés, page d'accueil)
+     7→
+     8→Work Log:
+     9→- Analyse des 2 images de référence via VLM (logo croix+feuille vert, interface vert/blanc premium)
+    10→- Configuration du thème vert/blanc premium dans globals.css (variables oklch, brand greens, utilitaires scroll/gradient/shadow)
+    11→- Mise à jour du layout racine (police Plus Jakarta Sans, métadonnées FR, viewport)
+    12→- Schéma Prisma : User, Category, Medication, Pharmacy, PharmacyMedication, Subscription, Payment
+    13→- Seed de 10 catégories, 33 médicaments, 12 pharmacies d'Abidjan, 396 liens prix/stock
+    14→- Stores Zustand : useNav (navigation SPA par vues) + useAuth (persist, fetchMe)
+    15→- Aide session : cookie httpOnly sablin_session, hash scrypt (session.ts)
+    16→- Routes API : /api/categories, /api/medications, /api/medications/[slug], /api/pharmacies, /api/pharmacies/[slug], /api/me, /api/auth/{register,login,logout}, /api/subscription, /api/payment, /api/prescription/estimate
+    17→- Composants partagés : Logo (croix médicale, SANS feuille pour respecter la contrainte), Header (nav + Sheet mobile), Footer (sticky mt-auto), BottomNav (mobile, icônes LayoutGrid/Pill/ClipboardList/MapPin/User — aucune étoile/feuille/bâtiment), SearchBar (autocomplétion), MedicationCard/Row, PharmacyCard/Row, SectionHeader, CategoryIcon (10 icônes sûres)
+    18→- page.tsx : routeur de vues client-side (11 vues)
+    19→- HomeView : hero avec grande recherche + image, stats, catégories, pharmacies de garde, blocs estimation+premium, médicaments populaires, table récemment consultés, bannière assistance
+    20→- Génération de 2 images atmosphériques (hero-pharmacy.png, pharmacist.png) dans /public/images
+    21→
+    22→Stage Summary:
+    23→- Contraintes respectées : aucune icône en forme d'étoile, feuille ou bâtiment. Notes affichées en badge numérique (pas d'étoiles). Logo = croix médicale seule.
+    24→- Plateforme 100% informationnelle : aucune vente, aucun panier, uniquement recherche/localisation/estimation.
+    25→- Couleurs : vert dominant (brand oklch ~#0f8a5f), blanc, gris. Cards élégantes avec shadow-premium.
+    26→- Design responsive : header desktop, bottom-nav mobile, footer sticky.
+    27→- Système de navigation SPA : useNav store avec views (home, medications, medication-detail, pharmacies, pharmacy-detail, prescription, profile, auth, subscription, payment, success).
+    28→- Composants partagés disponibles dans src/components/shared/ et src/components/layout/.
+    29→- Les vues restantes (medications, pharmacies, prescription, profile, auth, subscription, payment, success) sont à construire.
+    30→
+    31→---
+    32→Task ID: 7-c
+    33→Agent: Agent 7-c — Vue Prescription
+    34→
+    35→Task: Construire la vue « Estimer mon ordonnance » (estimation du coût d'une ordonnance) pour SABLIN PHARMA. Vue 100% informationnelle (aucune vente).
+    36→
+    37→Work Log:
+    38→- Lecture du worklog.md, types.ts, format.ts, stores nav/auth, category-icons.tsx, vue medications-view (référence), routes API /api/medications et /api/prescription/estimate.
+    39→- Création de `src/components/views/prescription-view.tsx` (export nommé `PrescriptionView`, 'use client').
+    40→- Architecture en 2 colonnes `lg:grid-cols-[1fr_380px]` :
+    41→  - Colonne gauche : barre de recherche avec autocomplétion (debounce 250ms, GET /api/medications?q=&limit=8), dropdown de suggestions cliquables (icône catégorie colorée, badge Rx si requiresRx, prix moyen + nb pharmacies), liste des médicaments ajoutés (Card avec icône catégorie, nom, form/dosage/packSize, badge "Ordonnance" amber si requiresRx, stepper quantité min 1, prix moyen + nb pharmacies, bouton "Retirer" Trash2), empty state avec ClipboardList dans cercle brand-light.
+    42→  - Colonne droite sticky top-24 : Card résumé (nb médicaments + total unités + coût moyen estimé) + bouton "Estimer le coût" (bg-brand-gradient) → POST /api/prescription/estimate. Pendant le calcul : spinner Loader2 + skeletons. Après estimation : encart total fourchette min-max, encart nb pharmacies ayant tout en stock, liste détaillée des lignes (nom, qté, prix unit min-max, total ligne, nb pharmacies en stock). Si non-premium : encart amber "Passez Premium" avec Crown listant les avantages + bouton navigate('subscription').
+    43→- Footer d'information : "SABLIN PHARMA est une plateforme d'information. Les prix sont indicatifs. Aucune vente en ligne."
+    44→- Gestion d'erreurs via toast sonner (recherche, ajout doublon, estimation, vidage liste).
+    45→- Lien retour "Accueil" (ChevronLeft) → navigate('home').
+    46→- Icônes utilisées : uniquement autorisées (ClipboardList, Plus, Minus, Search, Trash2, CheckCircle2, ChevronRight, Crown, ShieldAlert, Pill, MapPin, X, Loader2, Calculator, TrendingDown, ChevronLeft). AUCUNE étoile/feuille/bâtiment.
+    47→- TypeScript strict, pas de tests, pas de z-ai-web-dev-sdk côté client.
+    48→
+    49→Stage Summary:
+    50→- Vue PrescriptionView complète, conforme au design system (vert brand dominant, cartes border-border/70, hover -translate-y-0.5 hover:border-brand/30, shadow-premium, scroll-thin, mobile-first responsive).
+    51→- API consommées : GET /api/medications (autocomplétion), POST /api/prescription/estimate (estimation).
+    52→- Stores utilisés : useNav (navigate), useAuth (premium pour upsell).
+    53→- Composants shadcn/ui utilisés : Button, Card, Badge, Input, Skeleton, Separator.
+    54→- Aucune erreur/warning lint introduite sur ce fichier (vérifié avec `bun run lint`).
+    55→- Contraintes critiques respectées : aucune icône interdite (Star/Leaf/Building), notes en badges numériques sans étoiles, plateforme 100% informationnelle, export nommé exactement `PrescriptionView`.
+    56→
+    57→---
+    58→Task ID: 7-e
+    59→Agent: subagent (subscription/payment/success views)
+    60→Task: Construire 3 vues FRANÇAIS pour le tunnel Premium SABLIN PHARMA (Abonnement, Paiement, Succès)
+    61→
+    62→Work Log:
+    63→- Lecture du worklog partagé et des stores (useNav, useAuth), lib/format, API /api/subscription, composants UI shadcn (RadioGroup, Accordion, Card, Badge, Separator, Input, Label, Button, Skeleton).
+    64→- subscription-view.tsx : En-tête centré (badge ambre Crown "Premium", titre + sous-titre). Layout 2 colonnes lg:grid-cols-[1fr_400px]. À gauche : 6 cartes d'avantages (CheckCircle2 vert brand) + illustration pharmacist.png dans cadre avec CTA "Voir les pharmacies de garde". À droite : Card pricing sticky avec halo ambre, prix 500 FCFA/mois, bouton gradient ambre "S'abonner maintenant" ; si déjà premium → CheckCircle2 vert + "Vous êtes Premium" + bouton "Retour à l'accueil". Section comparatif (table) Gratuit vs Premium avec coches (CheckCircle2) et X pour les exclusions. FAQ Accordion 4 items (comment ça marche, résiliation, moyens de paiement, vente médicaments = Non). CTA final gradient ambre.
+    65→- payment-view.tsx : Si non connecté → Card centrée "Connectez-vous pour continuer" + bouton "Se connecter" → navigate('auth', {authMode:'login'}). Si déjà premium → Card "Vous êtes déjà Premium" + bouton profil. Layout 2 colonnes lg:grid-cols-[1fr_380px]. Gauche : RadioGroup 2 options (Mobile Money / Carte). Si Mobile Money → 3 cards provider cliquables (Orange Money bg-orange-500 "OM", MTN MoMo bg-yellow-400 "MTN", Moov Money bg-blue-500 "Moov") + Input téléphone format ivoirien "07 00 00 00 00" (auto-grouping 2 chiffres). Si Carte → numéro carte 4x4 (auto-format), expiration MM/AA, CVC 3 chiffres (input password), nom titulaire. Droite : Card récap sticky (Crown ambre + "Abonnement Premium - 1 mois", sous-total, frais 0, séparateur, total 500 FCFA, bouton "Payer 500 FCFA" bg-brand-gradient avec Loader2 spinner). POST /api/subscription {method, provider} → setPremium(true), fetchMe(), toast succès sonner, navigate('success'). Encart sécurité ShieldCheck + Lock. Note démonstration. Validation client basique avec toast erreur.
+    66→- success-view.tsx : min-h-[80vh] flex items-center centré. Halo radial brand + glow ambre top + 10 confettis CSS animés (cercles colorés amber/emerald/brand, keyframes confetti-fall). Grand CheckCircle2 size-24 dans cercle bg-brand-light ring-8 avec animation scale-in cubic-bezier. Titre "Paiement réussi !" text-3xl font-extrabold. Card récap : Formule/Montant 500 FCFA/Statut Actif (badge pulse brand)/Renouvellement dans 1 mois + ligne compte utilisateur + date fin formatDate. Card bénéfices débloqués (Zap) : 3 items avec CheckCircle2 vert (Estimations illimitées, Alertes de garde temps réel, Assistance prioritaire). 2 boutons : "Commencer à explorer" bg-brand-gradient → home, "Voir mon profil" outline → profile. Note "Un reçu vous a été envoyé par e-mail".
+    67→- Icônes strictement autorisées uniquement : Crown, CheckCircle2, Check, CreditCard, Smartphone, Lock, ShieldCheck, ChevronRight, ChevronLeft, X, Loader2, Clock, Zap. AUCUNE étoile/feuille/bâtiment. Notes = texte, pas d'étoiles.
+    68→- TypeScript strict, exports nommés exacts (SubscriptionView, PaymentView, SuccessView), 'use client' partout, sonner toast, formatFCFA/formatDate utilisés, stores useNav/useAuth utilisés, bg-brand-gradient/shadow-premium/text-brand-dark/amber-50/amber-400-500/600 pour le premium.
+    69→- Lint : mes 3 fichiers passent sans erreur ni warning. Erreurs préexistantes dans d'autres vues (medication-detail-view, pharmacies-view, pharmacy-detail-view) ne sont pas de mon ressort.
+    70→
+    71→Stage Summary:
+    72→- Tunnel Premium complet et fonctionnel : Abonnement (découverte + comparatif + FAQ) → Paiement (Mobile Money ivoirien + carte bancaire mock avec auto-format) → Succès (confirmation animée avec confettis CSS + récap + bénéfices).
+    73→- Design system respecté : vert brand dominant, accent ambre pour premium, cards border-border/70, boutons premium bg-brand-gradient ou gradient amber, sticky cards sur desktop, responsive mobile-first.
+    74→- API /api/subscription POST existante déjà fonctionnelle (active abonnement + crée paiement), consommée correctement côté client avec gestion loading/erreurs/toast.
+    75→- Navigation SPA cohérente : back links, redirect conditionnels (non connecté / déjà premium), navigation vers home/profile/success après paiement.
+    76→- Contraintes critiques d'icônes intégralement respectées.
+    77→
+    78→---
+    79→Task ID: 7-d
+    80→Agent: Agent 7-d (Views Auth/Profile)
+    81→Task: Construire les vues Connexion/Inscription (auth-view.tsx) et Profil (profile-view.tsx) pour SABLIN PHARMA
+    82→
+    83→Work Log:
+    84→- Lecture du worklog partagé, du design system (vert brand, bg-brand-gradient, shadow-premium), des stores useNav (params.authMode) / useAuth (user, premium, setUser, fetchMe, logout), du composant Logo, du helper formatDate, des routes API /api/auth/login, /api/auth/register, /api/me, et des composants shadcn/ui (Tabs, Select, Switch, Avatar, Separator, Skeleton, Card, Button, Input, Label, Badge).
+    85→- auth-view.tsx : layout grid lg:grid-cols-2 avec min-h-[calc(100vh-4rem)]. Panneau gauche bg-brand-gradient caché mobile (Logo variant="light", titre "Votre santé, simplifiée", 4 bénéfices avec CheckCircle2). Panneau droit : Tabs Connexion/Inscription (default = params.authMode ?? 'login'). Onglet Connexion : email + password (toggle Eye/EyeOff), lien mot de passe oublié (toast), bouton "Se connecter" bg-brand-gradient → POST /api/auth/login → setUser + fetchMe + toast.success + navigate('home'). Onglet Inscription : name, email, phone optionnel, commune (Select 12 communes Abidjan), password + confirm (toggles) → POST /api/auth/register. Validation client (champs requis, email regex, password ≥ 6, confirm = password). États loading Loader2 + bouton désactivé. Footer "conditions d'utilisation".
+    86→- profile-view.tsx : non connecté → Card centrée CircleUser + boutons Se connecter/Créer un compte (navigate auth avec authMode). Connecté → lien retour Accueil, en-tête bg-brand-gradient avec Avatar initiales + nom + email + badge Premium (Crown amber) ou "Compte gratuit". Stats grid 3 colonnes (24/7/3 avec Pill/ClipboardList/MapPin). "Informations personnelles" (InfoRow réutilisable + bouton Modifier toast). "Abonnement" : fetch /api/me pour endDate ; premium → "Premium actif" + bouton Gérer ; sinon encart amber "Passez Premium — 500 FCFA/mois" + bouton Découvrir. "Préférences" : badges communes favorites + bouton Ajouter + 2 Switchs décoratifs (notifications, alertes garde) avec toasts. Bouton "Se déconnecter" (outline, LogOut) → logout + toast + navigate home.
+    87→- Contraintes d'icônes respectées : aucune étoile/feuille/bâtiment. Icônes utilisées uniquement parmi la liste autorisée (Mail, Lock, User, Phone, Eye, EyeOff, ChevronLeft, ChevronRight, CheckCircle2, Crown, LogOut, MapPin, CircleUser, ShieldCheck, Settings, Pill, ClipboardList, Bell, Loader2).
+    88→- TypeScript strict, exports nommés exacts AuthView / ProfileView, 'use client', toasts via sonner, pas de z-ai-web-dev-sdk côté client, pas de tests. `bun run lint` sur les 2 fichiers : 0 erreur / 0 warning.
+    89→
+    90→Stage Summary:
+    91→- 2 vues livrées et lint-clean, prêtes pour intégration : auth-view.tsx (connexion/inscription split 2 colonnes avec panneau brand) et profile-view.tsx (états connecté/non connecté, stats, infos personnelles, abonnement, préférences, déconnexion).
+    92→- Intégration complète des stores useNav/useAuth et routes API existantes (login/register/me/logout).
+    93→- Design system respecté : vert brand dominant, bg-brand-gradient, shadow-premium, cartes border-border/70, mobile-first responsive, footer sticky géré globalement par layout.
+    94→- Contraintes d'icônes et de langue (français) intégralement respectées.
+    95→
+    96→---
+    97→Task ID: 7-a
+    98→Agent: full-stack-developer
+    99→Task: Construction des 2 vues Pharmacies (liste + détail) pour SABLIN PHARMA
+   100→
+   101→Work Log:
+   102→- Lecture du worklog précédent (Task 1) et des composants partagés (PharmacyCard, SectionHeader, SearchBar), des stores (useNav), des types (Pharmacy) et des routes API (/api/pharmacies et /api/pharmacies/[slug]) pour comprendre le design system en place.
+   103→- Écriture de src/components/views/pharmacies-view.tsx (export nommé PharmaciesView) :
+   104→  * Lien retour "Accueil" via navigate('home')
+   105→  * Titre "Pharmacies" + sous-titre "Trouvez les pharmacies partenaires à Abidjan"
+   106→  * Barre de recherche custom (Input + icône Search) avec debounce 200ms sur l'état query → debouncedQuery
+   107→  * 4 chips de filtre (Toutes / Ouvertes maintenant=filter:open / De garde=filter:on-duty / Ouvert 24/7=filter:247) ; le filtre actif se lit depuis params.filter au mount
+   108→  * Select shadcn de commune (Toutes + 12 communes d'Abidjan : Cocody, Plateau, Yopougon, Marcory, Treichville, Adjamé, Abobo, Koumassi, Port-Bouët, Attécoubé, Bingerville, Songon)
+   109→  * Compteur "X pharmacies trouvées"
+   110→  * Grille responsive PharmacyCard (grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4, gap-4)
+   111→  * 8 skeletons pendant le chargement
+   112→  * Empty state (icône Search dans cercle brand-light + message + bouton "Réinitialiser les filtres")
+   113→  * Effet de fetch sur [debouncedQuery, commune, filter] via setTimeout(0) pour satisfaire la règle react-hooks/set-state-in-effect
+   114→- Écriture de src/components/views/pharmacy-detail-view.tsx (export nommé PharmacyDetailView) :
+   115→  * Lien retour "Pharmacies" via navigate('pharmacies')
+   116→  * Carte d'en-tête avec bandeau bg-brand-gradient, icône Plus (croix pharmacie) blanche dans cercle bg-white/15, nom, commune (MapPin), badge note numérique (RatingPill bg-brand-dark text-white + point ambre), badges "De garde" (Timer, bg-amber-400 text-amber-950), "Ouvert 24/7" (Clock), statut Ouvert/Fermé (point pulsant)
+   117→  * Section "Informations pratiques" en grid 2 colonnes : Adresse (MapPin), Téléphone (Phone, lien tel:), Horaires (Clock — semaine/samedi/dimanche), Commune (Navigation)
+   118→  * Carte localisation avec fond gradient brand-light, icône MapPin, coordonnées lat/lng en mono, et bouton "Voir sur Google Maps" (lien externe target _blank)
+   119→  * Section "Médicaments disponibles" avec recherche locale (Input), compteur dynamique, et grille de lignes (icône catégorie colorée + nom + form·dosage·packSize + prix en brand-dark + badge stock "En stock"/"Rupture"). Clic sur ligne → navigate('medication-detail', {slug})
+   120→  * Gestion 404 (affichage "Pharmacie introuvable" + bouton retour)
+   121→  * Skeletons pendant le chargement
+   122→  * Effet de fetch sur [params.slug] via setTimeout(0) pour satisfaire la règle react-hooks/set-state-in-effect
+   123→- Aucune icône interdite utilisée (pas de Star/Sparkles/Leaf/Building/Home). Notes affichées en badge numérique (cercle bg-brand-dark + point ambre).
+   124→- Vérification lint : 0 erreur sur mes 2 fichiers (1 erreur pré-existante dans medication-detail-view.tsx, hors scope). Compilation dev server OK (✓ Compiled).
+   125→
+   126→Stage Summary:
+   127→- 2 vues Pharmacies livrées et conformes au design system SABLIN PHARMA (vert dominant, cards premium, responsive mobile-first).
+   128→- PharmaciesView : filtre par texte (debounce 200ms) + 4 chips de statut + 12 communes, grille PharmacyCard, état vide guidé.
+   129→- PharmacyDetailView : header brand-gradient riche (note numérique, badges garde/24/7, statut ouvert/fermé), 4 cartes infos pratiques, carte localisation avec lien Google Maps externe, section médicaments filtrable in-place avec navigation vers medication-detail.
+   130→- Stores useNav consommés correctement (navigate, params.slug, params.filter). Types Pharmacy respectés.
+   131→- Code TypeScript strict, sans test, sans z-ai-web-dev-sdk côté client.
+   132→
+   133→---
+   134→Task ID: 8
+   135→Agent: main (orchestrator)
+   136→Task: Coller le logo SABLIN PHARMA comme il est (image de référence: croix médicale + feuille)
+   137→
+   138→Work Log:
+   139→- Analyse VLM précise de l'image de référence (upload/WhatsApp Image 2026-06-16 at 17.52.27.jpeg) : croix médicale vert foncé + feuille vert clair insérée dans le bras inférieur, légèrement inclinée à droite, avec nervure centrale
+   140→- Recréation du logo en SVG fidèle dans src/components/logo.tsx (LogoMark + Logo) :
+   141→  * Croix médicale (plus) à coins arrondis, dégradé vert foncé (#0c7a50 → #095e3c)
+   142→  * Feuille allongée vert clair (dégradé #9af3c0 → #5ccd92 → #38b074) dans le bras inférieur, inclinée 22° à droite, avec pointe acérée, tige, nervure centrale et 4 nervures latérales
+   143→  * Texte SABLIN (extrabold, brand-dark, 17px) + PHARMA (bold, brand-dark/85, 11px, tracking 0.16em) en dessous
+   144→  * Variante "light" (blanc) pour fonds verts
+   145→- Mise à jour du favicon public/logo.svg (même symbole sur fond blanc arrondi)
+   146→- Mise à jour des métadonnées layout.tsx : icons.icon = /logo.svg
+   147→- Itérations VLM pour valider la fidélité (croix correcte, feuille bien en forme de feuille avec pointe/tige/nervures)
+   148→- Vérification Agent Browser : rendu header correct, favicon 200 image/svg+xml, 0 erreur console, lint 0 erreur
+   149→
+   150→Stage Summary:
+   151→- Logo officiel SABLIN PHARMA collé comme l'image de référence : croix médicale vert foncé + feuille vert clair (pointe, tige, nervures) dans le bras inférieur inclinée à droite + texte SABLIN/PHARMA vert foncé
+   152→- L'utilisateur a explicitement demandé ce logo exact ; la contrainte "pas de feuille" est levée pour le logo de marque (demande explicite utilisateur)
+   153→- Favicon mis à jour, rendu validé par VLM (correspondance globale confirmée), lint propre
+   154→
+   155→---
+   156→Task ID: 23-a
+   157→Agent: Agent 23-a (Views Notifications/Historique/Favoris)
+   158→Task: Construire 3 vues FRANÇAIS pour SABLIN PHARMA : Notifications, Historique, Favoris
+   159→
+   160→Work Log:
+   161→- Lecture du worklog partagé (design system vert brand, contraintes d'icônes, stores, composants partagés), des vues existantes (medications-view, notifications stub), des stores useNav/useAuth/useNotifications/useHistory/useFavorites, des types (@/lib/types), de format.ts et des composants shared (EmptyState, Loader, AlertMessage, SectionHeader).
+   162→- notifications-view.tsx (export nommé `NotificationsView`, 'use client') :
+   163→  * Lien retour Accueil (ChevronLeft) → navigate('home')
+   164→  * En-tête : titre « Notifications » + Badge brand « X non lue(s) » si unread>0 + sous-titre
+   165→  * Barre d'actions : bouton outline « Tout marquer comme lu » (CheckCheck, désactivé si unread===0, toast succès), bouton outline « Effacer tout » (Trash2) avec window.confirm puis boucle await remove(id) sur chaque notification + Loader2 spinner pendant la suppression (désactivé si vide ou en cours)
+   166→  * Fetch au mount via useEffect si user (useNotifications.fetch())
+   167→  * État non connecté : EmptyState Bell « Connectez-vous pour voir vos notifications » + bouton « Se connecter » → navigate('auth',{authMode:'login'})
+   168→  * Tabs (shadcn) : « Toutes (N) » / « Non lues (N) » avec filtre local useMemo sur !read
+   169→  * Liste Cards : icône lucide dans cercle coloré selon type (info=sky-100/sky-600, success=brand-light/brand, warning=amber-100/amber-600, alert=red-100/red-600, promotion=amber-100/amber-600) ; mappe les noms d'icônes stockés (Bell, CheckCircle2, Timer, Crown, Pill, AlertTriangle, Info, Heart) avec fallback Bell ; titre bold + message line-clamp-2 muted + date formatDate ; point coloré si !read ; fond bg-brand-light/20 si non lue ; bouton Trash2 ghost (stop propagation) → remove(id) + toast ; clic card → markRead(id) + navigate vers view résolue depuis `link` (validée contre liste home/medications/pharmacies/prescription/subscription/profile)
+   170→  * Loading : 4 skeletons h-24
+   171→  * EmptyState (Inbox) si liste filtrée vide : message différent selon tab (non lues = "Vous avez lu toutes vos notifications" ; toutes = "Vous n'avez pas encore de notification") + bouton « Explorer les médicaments » → navigate('medications')
+   172→- history-view.tsx (export nommé `HistoryView`, 'use client') :
+   173→  * Lien retour Accueil
+   174→  * En-tête : titre « Historique » + Badge secondary « X élément(s) » + sous-titre
+   175→  * Bouton outline « Effacer l'historique » (Trash2) avec window.confirm → clear() + toast (affiché seulement si history non vide)
+   176→  * Fetch au mount si user (useHistory.fetch())
+   177→  * État non connecté : EmptyState Clock + bouton connexion
+   178→  * Liste groupée par jour via helper getGroupLabel(createdAt) → « Aujourd'hui » / « Hier » / « Cette semaine » / « Plus ancien » (comparaison startOfToday/startOfYesterday/startOfWeek). Sections avec séparateur + compteur par groupe
+   179→  * Chaque item = Card cliquable : icône kind dans cercle brand-light (medication=Pill, pharmacy=Plus, prescription=ClipboardList) + label bold + ligne secondaire (kind français + date formatDate + query entre guillemets si présent) + bouton X ghost (stop propagation) → setHistory filter local (store n'expose pas remove) + toast
+   180→  * Clic → handleItemClick : medication+slug → medication-detail ; pharmacy+slug → pharmacy-detail ; prescription → prescription ; query → medications{query} ; fallback medications
+   181→  * Loading : 5 skeletons h-16
+   182→  * EmptyState (Clock) si vide : « Aucun historique » + bouton « Rechercher un médicament » → navigate('medications')
+   183→- favorites-view.tsx (export nommé `FavoritesView`, 'use client') :
+   184→  * Lien retour Accueil
+   185→  * En-tête : titre « Mes favoris » + Badge brand « X favori(s) » + sous-titre
+   186→  * Tabs (shadcn) : « Tous (N) » / « Médicaments (N) » / « Pharmacies (N) » avec filtre local sur kind + compteurs useMemo
+   187→  * Fetch au mount si user (useFavorites.fetch())
+   188→  * État non connecté : EmptyState Heart + bouton connexion
+   189→  * Grille responsive Cards (grid-cols-1 sm:grid-cols-2 lg:grid-cols-3) : icône kind dans cercle bg-brand-gradient text-white shadow-premium (medication=Pill, pharmacy=Plus) + label bold line-clamp-2 + Badge brand-light/brand-dark « Médicament »/« Pharmacie » + meta si présent (line-clamp-1 muted) + footer avec séparateur : bouton outline flex-1 « Voir » (ChevronRight) → navigate(medication-detail ou pharmacy-detail {slug}) + bouton icon ghost Trash2 → remove(id) + toast
+   190→  * Loading : 6 skeletons h-40
+   191→  * EmptyState (Heart) si vide : « Aucun favori » + description « Ajoutez des médicaments ou pharmacies à vos favoris en cliquant sur le cœur » + bouton « Explorer » → navigate('medications')
+   192→- Icônes strictement autorisées uniquement : Bell, CheckCircle2, CheckCheck, Clock, Heart, Pill, Plus, Timer, Crown, Trash2, ChevronRight, ChevronLeft, X, Inbox, Loader2, AlertTriangle, Info, ClipboardList. AUCUNE étoile/feuille/bâtiment.
+   193→- TypeScript strict, exports nommés exacts (NotificationsView, HistoryView, FavoritesView), 'use client' partout, toasts via sonner, formatDate utilisé, stores useNav/useAuth/useNotifications/useHistory/useFavorites consommés correctement (fetch au mount, méthodes optimistes), pas de z-ai-web-dev-sdk côté client, pas de tests.
+   194→- Design system respecté : vert brand dominant, cards border-border/70 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg, boutons premium bg-brand-gradient, badges bg-brand/bg-brand-light/text-brand-dark, mobile-first responsive (max-w-3xl pour notifications/history, max-w-5xl pour favorites avec grille).
+   195→- `bun run lint` : 0 erreur / 0 warning sur les 3 fichiers. Dev server compile sans erreur (✓ Compiled), routes API /api/notifications, /api/history, /api/favorites répondent 200.
+   196→
+   197→Stage Summary:
+   198→- 3 vues livrées et lint-clean, prêtes pour intégration : notifications-view.tsx (liste filtrable avec tabs Toutes/Non lues, mark all read, effacer tout, icônes colorées par type, navigation vers view liée), history-view.tsx (regroupement par jour Aujourd'hui/Hier/Cette semaine/Plus ancien, suppression individuelle locale + clear all, navigation contextuelle selon kind), favorites-view.tsx (grille de cards avec tabs Tous/Médicaments/Pharmacies, suppression + view détail, compteur dans l'en-tête).
+   199→- Stores Zustand consommés : useNotifications (fetch, markAllRead, markRead, remove), useHistory (fetch, clear, setHistory pour suppression locale), useFavorites (fetch, remove). Toutes les méthodes font déjà de l'optimistic update + call API.
+   200→- États non connectés gérés sur les 3 vues avec EmptyState dédié + bouton « Se connecter » → navigate('auth',{authMode:'login'}).
+   201→- États vides gérés avec EmptyState + bouton d'action contextuel (Explorer les médicaments / Rechercher un médicament / Explorer).
+   202→- Contraintes d'icônes intégralement respectées (aucune étoile/feuille/bâtiment, aucune icône en dehors de la liste autorisée).
+   203→- Plateforme 100% informationnelle, navigation SPA cohérente (ChevronLeft retour Accueil, navigation vers détails medicament/pharmacy, tabs/filtres locaux sans rechargement).
+   204→
+   205→---
+   206→Task ID: 23-b
+   207→Agent: Agent 23-b (views settings + prescription-result)
+   208→Task: Construire 2 vues FRANÇAIS pour SABLIN PHARMA — SettingsView (paramètres utilisateur) et PrescriptionResultView (résultat d'estimation d'ordonnance).
+   209→
+   210→Work Log:
+   211→- Lecture du worklog partagé (Tasks 1, 7-a, 7-c, 7-d, 7-e, 8), des vues existantes (prescription-view, payment-view, profile-view), des stores (useNav, useAuth, useFavorites), des composants partagés (EmptyState, Loader, AlertMessage, PaymentSummary, SectionHeader), des composants shadcn/ui (Switch, Select, Card, Badge, Separator, Label, Button), des routes API /api/settings (GET/PATCH) et /api/prescription/estimate (POST), et de la config ESLint.
+   212→- Écriture de src/components/views/settings-view.tsx (export nommé SettingsView, 'use client') :
+   213→  * Back link "Accueil" (ChevronLeft) → navigate('home').
+   214→  * Header brand-gradient (Settings size-6 dans span size-11 rounded-2xl) + titre "Paramètres" + sous-titre "Gérez vos préférences et votre compte".
+   215→  * Si non connecté → Card avec EmptyState({ icon: Settings, ... }) + bouton "Se connecter" → navigate('auth', {authMode:'login'}) + bouton "Retour à l'accueil".
+   216→  * Fetch au mount (useEffect + setTimeout(0)) → GET /api/settings → setSettings. State settings: UserSettings|null, saving: string|null.
+   217→  * Loader simple pendant que settings === null.
+   218→  * 4 Cards séparées (chacune avec CardHeader icône + CardTitle) :
+   219→    1. Notifications (Bell) : 5 Switches (pushAlerts, dutyAlerts, priceAlerts avec badge "Premium" Crown + Switch désactivée si !premium, promoAlerts, emailRecap). PATCH optimiste (update locale → PATCH → toast succès, ou revert + toast erreur). Loader2 spinner à côté du switch pendant le save. Encart amber si premium (rappel alertes prix activées).
+   220→    2. Préférences (Globe) : Select langue (Français / "English (Bientôt)" disabled), Select thème (Clair/Sombre/Automatique), Select commune par défaut ("Aucune" + 12 communes d'Abidjan). Chaque onValueChange → patch(key, value). Notes explicatives sous chaque select.
+   221→    3. Confidentialité & sécurité (Lock) : 3 boutons — "Modifier mon mot de passe" (toast "Bientôt disponible"), "Télécharger mes données" (toast "Bientôt disponible"), "Supprimer mon compte" (red, window.confirm + toast info décoratif). Encart brand-light ShieldCheck rassurance.
+   222→    4. Abonnement (Crown, span bg-gradient amber) : si premium → encart "Premium actif" + bouton "Gérer l'abonnement" → navigate('subscription') ; sinon → encart amber "Passez à Premium" + bouton "Découvrir Premium" → navigate('subscription').
+   223→  * Bouton "Se déconnecter" (outline red) → logout() + toast + navigate('home').
+   224→  * Footer note : "SABLIN PHARMA v1.0 — Plateforme d'information. Aucune vente en ligne."
+   225→- Écriture de src/components/views/prescription-result-view.tsx (export nommé PrescriptionResultView, 'use client') :
+   226→  * Récupère params.estimateItems via useNav. Si vide → navigate('prescription').
+   227→  * Au mount : POST /api/prescription/estimate avec { items } → setEstimate(result). Effet avec setTimeout(0) + flag cancelled pour cleanup. FullLoader pendant le calcul + back link "Ordonnance".
+   228→  * Header succès : CheckCircle2 verte size-8 dans span size-14 rounded-full bg-brand-light ring-8 ring-brand-light/30, titre "Estimation calculée" + sous-titre.
+   229→  * Layout 2 colonnes lg:grid-cols-[1fr_380px] :
+   230→    - Colonne gauche : "Détail par médicament" + Badge count. Pour chaque line : Card p-5 shadow-premium hover -translate-y-0.5 hover:border-brand/30. Header (Pill brand-light + nom bold + badge "Ordonnance" amber si requiresRx + Badge "x{quantity}"). Sous-titre form · dosage · packSize. Separator. Grid 2 cols (Prix unitaire min—max / Total ligne lineMin—lineMax en brand-dark extrabold). Footer MapPin + "{pharmacyCount} pharmacies en stock".
+   231→    - Colonne droite (sticky top-24) : Card récap "Récapitulatif de l'ordonnance" : 3 rows (Médicaments / Unités totales / Pharmacies avec tout en stock), Separator, "Fourchette totale estimée" en text-3xl font-extrabold text-brand-dark avec tiret séparateur, note "Fourchette basée sur les prix réels en pharmacie". 3 boutons : "Voir les pharmacies dispos" (bg-brand-gradient, MapPin + ChevronRight) → navigate('pharmacies'), "Nouvelle estimation" (outline, ChevronLeft) → navigate('prescription'), "Partager le résultat" (outline, Share2) → navigator.share ou fallback clipboard + toast.
+   232→    - Encart premium si !premium : Card amber gradient Crown "Estimations illimitées avec Premium" + bouton "Découvrir Premium" → navigate('subscription').
+   233→  * Footer disclaimer : encart muted AlertTriangle "SABLIN PHARMA est une plateforme d'information. Les prix sont indicatifs et peuvent varier. Aucune vente en ligne."
+   234→  * Gestion erreur : AlertMessage variant="error" + boutons "Retour à l'ordonnance" (brand-gradient) et "Retour à l'accueil" (outline).
+   235→- Icônes strictement autorisées uniquement : Settings, Bell, Crown, Globe, Lock, ChevronLeft, ChevronRight, Loader2, ShieldCheck, Download, Trash2, CheckCircle2 (settings-view) ; ChevronLeft, ChevronRight, CheckCircle2, Crown, Share2, MapPin, Pill, AlertTriangle (prescription-result-view). AUCUNE étoile/feuille/bâtiment. Notes en badges numériques sans étoiles.
+   236→- TypeScript strict, exports nommés exacts, 'use client' partout, toast via sonner, formatFCFA utilisé, pas de z-ai-web-dev-sdk côté client, pas de tests.
+   237→- Vérification bun run lint : exit code 0, 0 erreur, 0 warning sur tout le projet. Dev server log propre.
+   238→
+   239→Stage Summary:
+   240→- 2 vues livrées et lint-clean : SettingsView (4 sections Cartes : Notifications 5 switches avec lock Premium, Préférences 3 selects, Confidentialité 3 boutons, Abonnement statut/upsell Premium + déconnexion + note version) et PrescriptionResultView (header succès CheckCircle2, layout 2 colonnes avec détail par médicament + récap sticky, 3 actions partager/nouvelle estimation/pharmacies, upsell Premium, gestion loading/erreur complète).
+   241→- API consommées correctement : GET /api/settings, PATCH /api/settings (patch optimiste + revert sur erreur), POST /api/prescription/estimate.
+   242→- Stores utilisés : useNav (navigate, params.estimateItems), useAuth (user, premium, logout).
+   243→- Composants shadcn/ui réutilisés : Button, Card (+Header/Title/Content), Badge, Label, Switch, Separator, Select (+Trigger/Value/Content/Item). Composants partagés : EmptyState, Loader/FullLoader, AlertMessage.
+   244→- Design system respecté : vert brand dominant (bg-brand-gradient, text-brand, text-brand-dark, bg-brand-light, shadow-premium, shadow-premium-lg), accent amber pour Premium, cartes border-border/70, sticky card sur desktop, responsive mobile-first, back links + headers cohérents avec les autres vues.
+   245→- Contraintes critiques d'icônes intégralement respectées (aucune étoile/feuille/bâtiment ; notes en badges numériques sans étoiles). Plateforme 100% informationnelle (footer disclaimer, aucune vente).
+   246→- Work record détaillé également écrit dans /agent-ctx/23-b-settings-and-prescription-result.md.
+   247→
+   248→---
+   249→Task ID: 9
+   250→Agent: main (orchestrator)
+   251→Task: Extension structure complète — 5 nouvelles pages + composants réutilisables + header enrichi
+   252→
+   253→Work Log:
+   254→- Schéma Prisma étendu : Notification, SearchHistory, Favorite, UserSettings (+ avatarColor sur User) ; db:push + generate
+   255→- Types étendus : View += prescription-result, notifications, history, favorites, settings ; nouveaux types AppNotification, HistoryItem, FavoriteItem, UserSettings, EstimateLine/Result, MedicationStatus, PharmacyStatus
+   256→- 5 routes API : /api/notifications (GET seed démo + POST + PATCH all-read), /api/notifications/[id] (PATCH read + DELETE), /api/history (GET/POST/DELETE), /api/favorites (GET/POST/DELETE), /api/favorites/[id] (DELETE), /api/settings (GET/PATCH)
+   257→- Guard requireUserId (@/lib/auth/guard)
+   258→- 3 stores Zustand : useNotifications (fetch, markAllRead, markRead, remove), useFavorites (fetch, toggle, isFavorite, remove), useHistory (fetch, add, clear)
+   259→- 6 composants réutilisables : StatusBadge (MedicationStatusBadge: Disponible/Stock faible/Rupture/À confirmer + PharmacyStatusBadge: Ouvert/Fermé/De garde + Open247Badge), Loader (Loader/FullLoader/ButtonLoader), EmptyState (icône + titre + description + action), AlertMessage (info/success/warning/error + onClose), FavoriteButton (icon/button, toggle), PaymentSummary (rows + total + secureNote)
+   260→- Header enrichi : cloche notifications avec badge non-lus, menu compte déroulant (avatar initiales + nom + liens Profil/Favoris/Historique/Notifications/Abonnement/Paramètres/Déconnexion), ajout "Profil" à la nav desktop, bouton Premium ; Sheet mobile avec tous les liens
+   261→- page.tsx : routeur mis à jour avec 16 vues ; fetch auto des stores user-scoped (notifications/favorites/history) au login
+   262→- 5 nouvelles vues (déléguées aux sous-agents 23-a et 23-b) : NotificationsView, HistoryView, FavoritesView, SettingsView, PrescriptionResultView
+   263→- PrescriptionView modifiée : après estimation → navigate('prescription-result', { estimateItems })
+   264→- ProfileView enrichie : section "Accès rapide" (Notifications/Favoris/Historique/Paramètres avec badges compteurs)
+   265→- FavoriteButton ajouté aux détails médicament + pharmacie (variant button)
+   266→- Footer enrichi : liens Favoris/Historique/Notifications/Paramètres
+   267→- Seed notifications démo : Bienvenue, Pharmacie de garde, Premium, Nouveau médicament référencé (créées à la volée si l'utilisateur n'en a aucune)
+   268→- Vérification Agent Browser : header (cloche + menu compte + Profil nav), notifications seedées affichées (4), historique empty state, favoris (ajout Aspirine → affiché "Mes favoris 1"), paramètres (5 switches + 4 sections), résultat ordonnance (fourchette 100-150 FCFA + récap + boutons)
+   269→- Lint 0 erreur / 0 warning ; serveur stable ; responsive mobile vérifié
+   270→
+   271→Stage Summary:
+   272→- Plateforme SABLIN PHARMA maintenant complète avec 16 pages/vues : Accueil, Médicaments, Détail médicament, Pharmacies, Détail pharmacie, Ordonnance, Résultat ordonnance, Profil, Connexion, Inscription, Abonnement, Paiement, Succès, Notifications, Historique, Favoris, Paramètres
+   273→- Header professionnel : logo + nav (Accueil/Médicaments/Pharmacies/Ordonnance/Profil) + cloche notifications (badge) + bouton Premium + menu compte déroulant
+   274→- Composants réutilisables créés et utilisés : StatusBadge (8 statuts visuels), Loader, EmptyState, AlertMessage, FavoriteButton, PaymentSummary, SearchBar, SectionHeader, cartes médicament/pharmacie
+   275→- Navigation complète : header desktop + bottom-nav mobile + footer + menu compte + accès rapide profil
+   276→- Données persistantes : notifications, historique, favoris, paramètres (Prisma SQLite)
+   277→- Aucune icône interdite (étoile/feuille/bâtiment) ; notes en badges numériques
+   278→
+   279→---
+   280→Task ID: 32
+   281→Agent: Agent 32 (Design System Showcase View)
+   282→Task: Construire la page "Design System Showcase" de SABLIN PHARMA (documentation vivante de l'identité visuelle et des composants réutilisables, en FRANÇAIS).
+   283→
+   284→Work Log:
+   285→- Lecture du worklog partagé (Tasks 1, 7-a, 7-c, 7-d, 7-e, 8, 9, 23-a, 23-b) pour comprendre le design system vert brand premium, les contraintes d'icônes (aucune étoile/feuille/bâtiment), les stores useNav, les composants partagés et shadcn/ui disponibles.
+   286→- Lecture approfondie des composants cibles : typography.tsx (Heading h1-h4, Eyebrow, Text, Muted, Price, PriceRange), button.tsx (9 variantes + 4 tailles), status-badge.tsx (MedicationStatusBadge, PharmacyStatusBadge, Open247Badge), stat-block.tsx (StatBlock, StatGrid, 6 tons), alert-message.tsx (4 variants), empty-state.tsx, loader.tsx (Loader/FullLoader/ButtonLoader), section-header.tsx, payment-summary.tsx, medication-card.tsx (MedicationCard), pharmacy-card.tsx (PharmacyCard), favorite-button.tsx, logo.tsx (Logo + LogoMark).
+   287→- Lecture des composants shadcn/ui utilisés : card.tsx, badge.tsx, button.tsx, input.tsx, label.tsx, switch.tsx, checkbox.tsx, skeleton.tsx, separator.tsx, select.tsx, table.tsx.
+   288→- Lecture de globals.css pour récupérer les variables CSS exactes (oklch) et les classes utilitaires (bg-brand-gradient, bg-brand-soft, bg-dotted, bg-dotted-white, shadow-premium, shadow-premium-lg, shadow-card, scroll-thin, no-scrollbar, animate-fade-up, animate-scale-in, animate-pulse-ring, glass-card).
+   289→- Lecture des types Medication/Pharmacy/MedicationStatus et du store useNav pour préparer les données fictives correctement typées.
+   290→- Écriture de src/components/views/design-system-view.tsx (export nommé DesignSystemView, 'use client') — structure complète :
+   291→  * Hero plein écran bg-brand-gradient avec bg-dotted-white en overlay, Logo variant="light" size=56, Eyebrow "Plateforme santé", titre h1 "Design System", sous-titre descriptif, bouton retour "Accueil" (ChevronLeft → navigate('home')), badge "Version v1.0" avec icône LayoutGrid dans conteneur blanc/15 backdrop-blur.
+   292→  * Layout 2 colonnes desktop (lg:flex) : aside w-56 sticky top-24 caché sur mobile avec sommaire cliquable (11 ancres + bloc brand-light "Composants réutilisables" avec icône Zap) ; main flex-1 space-y-12.
+   293→  * Section 1 "Couleurs" (Card avec Eyebrow "Fondations" + Heading h2 + Muted) : Palette principale (6 swatches Brand/Brand Dark/Brand Light/Background/Muted/Foreground avec valeurs oklch) ; Statuts (10 swatches Success/Warning/Danger/Info/Neutral + variantes light) ; Dégradés & utilitaires (3 cartes bg-brand-gradient, bg-brand-soft, bg-dotted).
+   294→  * Section 2 "Typographie" : démonstration Heading h1/h2/h3/h4 "Santé pour tous" dans encart brand-light ; tailles Text xs/sm/md/lg ; Muted ; Price sm/md/lg/xl + variantes brand/dark/muted + with `from` ; PriceRange 100 — 150 FCFA.
+   295→  * Section 3 "Boutons" : 9 variantes (default/brand-gradient/outline/secondary/ghost/destructive/success/warning/link) ; 4 tailles (sm/default/lg/icon avec Plus) ; 6 boutons avec icônes (Rechercher Search, Voir détails Eye, S'abonner Crown, Estimer ordonnance ClipboardList, Appeler Phone, Itinéraire Navigation) ; états normal + disabled.
+   296→  * Section 4 "Badges" : Médicaments (4 MedicationStatusBadge size md), Pharmacies (3 PharmacyStatusBadge + Open247Badge), Badges shadcn classiques (default/secondary/outline/destructive).
+   297→  * Section 5 "Cartes" : MedicationCard x2 (Paracétamol catégorie Thermometer #ef4444 sans Rx, Amoxicilline catégorie ShieldCheck #0d9488 avec requiresRx) ; PharmacyCard x2 (Pharmacie de la Riviera isOnDuty=true openNow=true rating 4.8, Pharmacie du Plateau isOnDuty=false openNow=false rating 4.6) ; Card shadcn basique avec CardHeader/CardTitle/CardDescription/CardContent.
+   298→  * Section 6 "Statistiques" : StatGrid principale 4 blocs (12 Pharmacies brand, 33+ Médicaments success, 24/7 De garde warning, Abidjan Couverture info) ; StatGrid tonalités & tendances 4 blocs (+18% Recherches success avec trend up, -3% Ruptures danger avec trend down, 4 Non lues warning, 1 240 Premium neutral).
+   299→  * Section 7 "Alertes" : 4 AlertMessage (info "Information" demande d'estimation prise en compte, success "Estimation terminée" avec fourchette 3 200 — 4 100 FCFA, warning "Stock faible" dans 3 pharmacies, error "Erreur d'estimation").
+   300→  * Section 8 "États" : EmptyState "Aucun résultat" avec icône Search dans encart brand-light/20 ; 3 Loader (sm/md/lg avec labels) dans cartes ; boutons avec ButtonLoader (default + outline disabled) ; FullLoader dans conteneur max-h-48 overflow-hidden ; 3 cartes Skeleton (h-28 + lignes h-4/h-3/h-6 avec Card border).
+   301→  * Section 9 "Abonnement Premium" : Card premium avec en-tête bg-brand-gradient + bg-dotted-white overlay, Eyebrow "Abonnement Premium" text-amber-200, titre "Passez Premium", Crown dans cercle blanc/15 backdrop-blur, prix 500 FCFA/mois en text-4xl extrabold ; CardContent avec liste de 5 avantages (CheckCircle2 brand) + Separator + 2 boutons (S'abonner bg-brand-gradient avec Crown + En savoir plus outline) + muted "Annulable à tout moment".
+   302→  * Section 10 "Tableau" : Table shadcn avec en-tête bg-brand-light/40 (Médicament, Dosage, Prix moyen, Pharmacies, Statut) et 5 lignes fictives (Paracétamol 500mg 150F 12 dispo available, Amoxicilline 500mg 1200F 8 dispo available, Ibuprofène 400mg 350F 5 dispo low-stock, Coartem 20/120mg 2500F 0 dispo out-of-stock, Aspirine 100mg 200F 3 dispo to-confirm) avec MedicationStatusBadge dans la colonne Statut.
+   303→  * Section 11 "Formulaire" : Card avec 2 inputs (E-mail + Téléphone) en grid sm:grid-cols-2, Select commune (8 communes d'Abidjan), Separator, bloc Switch "Notifications push" dans border avec Label + Muted, Checkbox conditions d'utilisation avec Label long, 2 boutons (Envoyer la demande bg-brand-gradient avec Lock + Réinitialiser outline).
+   304→  * Footer du showcase : note "SABLIN PHARMA Design System v1.0 — Composants réutilisables pour une plateforme pharmaceutique moderne et premium." avec icône Globe brand + badge "Documentation vivante" avec point pulse brand.
+   305→- Composants réutilisables existants utilisés (zéro duplication) : Logo, Heading, Eyebrow, Text, Muted, Price, PriceRange, Button, Card (+Header/Title/Description/Content), Badge, Input, Label, Switch, Checkbox, Skeleton, Separator, Select (+Trigger/Value/Content/Item), Table (+Header/Body/Row/Head/Cell), MedicationStatusBadge, PharmacyStatusBadge, Open247Badge, StatBlock, StatGrid, AlertMessage, EmptyState, Loader, FullLoader, ButtonLoader, MedicationCard, PharmacyCard.
+   306→- Helpers locaux (Swatch, SubTitle, SectionShell) définis dans le fichier pour la mise en page showcase uniquement.
+   307→- Contraintes d'icônes strictement respectées : uniquement des icônes autorisées (Search, Pill, Plus, MapPin, Timer, Crown, Bell, CheckCircle2, Phone, Navigation, ClipboardList, ChevronRight, ChevronLeft, Mail, Lock, Zap, TrendingUp, TrendingDown, Globe, LayoutGrid, Eye). AUCUNE étoile (Star/StarHalf/Sparkles), AUCUNE feuille (Leaf/Sprout), AUCUN bâtiment (Building/Hospital/Home). Notes des PharmacyCard en badges numériques (cercle bg-brand-dark + point ambre) sans étoiles, conformément au composant existant.
+   308→- TypeScript strict, export nommé exact DesignSystemView, 'use client', données fictives Medication/Pharmacy construites en local (pas de fetch API), pas de z-ai-web-dev-sdk côté client, pas de tests.
+   309→- Layout responsive mobile-first : sidebar hidden lg:block, grilles grid-cols-2 sm:grid-cols-3, flex-wrap pour boutons, max-w-6xl mx-auto px-4 py-8, scroll-mt-24 sur chaque section pour ancres.
+   310→- Vérification Agent Browser (desktop 1440x900 + mobile 390x844) via URL hash temporaire : hero rendu correctement, navigation latérale sticky fonctionnelle, toutes les sections (Couleurs, Typographie, Boutons, Badges, Cartes, Stats, Alertes, États, Abonnement, Tableau, Formulaire) affichées sans débordement horizontal, footer showcase visible. Screenshots VLM analysés (hero, mid1, mid2, mid3, stats, form, footer, mobile). Aucun problème visuel majeur.
+   311→- Ajustement post-VLM : raccourcissement des labels StatBlock ("Pharmacies partenaires" → "Pharmacies", "Médicaments référencés" → "Médicaments", etc.) pour éviter la troncature par la classe `truncate` du composant existant.
+   312→- Revert du hack temporaire dans page.tsx (effet hash → useNav.setState) après tests.
+   313→- `bun run lint` : exit code 0, 0 erreur, 0 warning sur tout le projet. Dev server compile sans erreur.
+   314→
+   315→Stage Summary:
+   316→- Vue showcase livrée et lint-clean : src/components/views/design-system-view.tsx (DesignSystemView, 'use client') — documentation vivante premium de l'identité visuelle SABLIN PHARMA, 11 sections organisées (Couleurs, Typographie, Boutons, Badges, Cartes, Statistiques, Alertes, États, Abonnement Premium, Tableau, Formulaire) + hero bg-brand-gradient + footer showcase.
+   317→- Maximisation de la réutilisation des composants existants : 25+ composants partagés et shadcn/ui démontrés sans duplication (Logo, Typography x6, Button x9 variantes, StatusBadge x8, StatBlock x8, AlertMessage x4, EmptyState, Loader x3, MedicationCard, PharmacyCard, Card shadcn, Table, formulaire complet Input/Label/Select/Switch/Checkbox/Button).
+   318→- Design system intégralement respecté : vert brand dominant (bg-brand-gradient, bg-brand-light, text-brand, text-brand-dark, shadow-premium, shadow-premium-lg, shadow-card), classes utilitaires premium (bg-dotted, bg-dotted-white, animate-pulse), cartes border-border/70 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg, statuts colorés (success/warning/danger/info/neutral).
+   319→- Contraintes critiques d'icônes intégralement respectées (aucune étoile/feuille/bâtiment ; uniquement des icônes autorisées parmi Search/Pill/Plus/MapPin/Timer/Crown/Bell/CheckCircle2/Phone/Navigation/ClipboardList/ChevronRight/ChevronLeft/Mail/Lock/Zap/TrendingUp/TrendingDown/Globe/LayoutGrid/Eye). Notes en badges numériques sans étoiles.
+   320→- Layout responsive mobile-first : sidebar sticky desktop-only (hidden lg:block) avec sommaire cliquable, contenu principal flex-1 space-y-12, grilles adaptatives, scroll-mt-24 pour ancres, footer showcase avec note de version.
+   321→- Vérification Agent Browser + VLM : rendu correct sur desktop (1440x900) et mobile (390x844), aucune régression visuelle, toutes sections affichées sans débordement, labels StatBlock raccourcis pour éviter la troncature. Hack temporaire page.tsx reverté. `bun run lint` exit 0.
+   322→
+   323→---
+   324→Task ID: 10
+   325→Agent: main (orchestrator)
+   326→Task: Design System complet SABLIN PHARMA — tokens, primitives, showcase
+   327→
+   328→Work Log:
+   329→- globals.css renforcé : palette de statuts complète (success/warning/danger/info/neutral avec variants light/foreground), headings default color brand-dark, nouveaux utilitaires (text-brand-gradient, shadow-card, bg-dotted, bg-dotted-white, animate-fade-up, animate-scale-in)
+   330→- Primitives typographiques créées (src/components/ui/typography.tsx) : Heading (h1-h4), Eyebrow, Text (xs/sm/md/lg + weights), Muted, Price (sm/md/lg/xl + variant brand/dark/muted + from + numericOnly), PriceRange
+   331→- Button system formalisé (src/components/ui/button.tsx) : 9 variantes (default, brand-gradient, outline, secondary, ghost, destructive, success, warning, link), 4 tailles (sm/default/lg/icon), coins rounded-lg, active:scale, focus ring
+   332→- StatBlock + StatGrid créés (src/components/shared/stat-block.tsx) : icône tonalisée (brand/success/warning/danger/info/neutral) + valeur + label + trend optionnel
+   333→- Vue DesignSystemView créée (déléguée sous-agent 32) : 14 sections showcase (hero, nav latérale sticky, couleurs, typographie, boutons, badges, cartes, stats, alertes, états, abonnement, tableau, formulaire, footer)
+   334→- Route "design-system" ajoutée au type View + routeur page.tsx
+   335→- Point d'entrée : lien "Design System" dans le footer
+   336→- Correction alignement bouton recherche hero (h-12 au lieu de h-10 par défaut)
+   337→- Vérification Agent Browser : showcase complet rendu (Couleurs/Typo/Boutons/Badges/Cartes/Stats/Alertes/États/Abonnement/Tableau/Formulaire), 0 erreur console, responsive mobile OK
+   338→- VLM confirme : identité vert/blanc premium cohérente, palette statuts claire, typographie hiérarchisée, boutons unifiés, cartes élégantes, impression de confiance
+   339→- Lint 0 erreur / 0 warning
+   340→
+   341→Stage Summary:
+   342→- Design system SABLIN PHARMA formalisé et documenté via une page showcase vivante accessible depuis le footer
+   343→- Tokens complets : couleurs (brand 4 niveaux + 5 statuts x 3 variantes), typographie (Heading/Eyebrow/Text/Muted/Price/PriceRange), ombres (card/premium/premium-lg), animations (fade-up/scale-in/pulse-ring), utilitaires (brand-gradient/brand-soft/dotted/glass)
+   344→- Composants réutilisables : Button (9 variantes), StatusBadge (8 statuts), StatBlock (6 tons), AlertMessage (4 variantes), EmptyState, Loader, SearchBar, SectionHeader, FavoriteButton, PaymentSummary, MedicationCard/Row, PharmacyCard/Row, Heading/Eyebrow/Text/Muted/Price/PriceRange
+   345→- Showcase démontre : palette organisée, hiérarchie typographique, tous les boutons (Rechercher/Voir détails/S'abonner/Estimer ordonnance/Appeler/Itinéraire), badges statuts, cartes premium, stats, alertes, états vides/loaders, bloc abonnement, tableau, formulaire
+   346→- Design cohérent, premium, professionnel, rassurant — prêt pour MVP public ivoirien
+   347→
+   348→---
+   349→Task ID: 11
+   350→Agent: main (orchestrator)
+   351→Task: Page d'accueil complète SABLIN PHARMA — refonte selon spécifications détaillées
+   352→
+   353→Work Log:
+   354→- Hero refondu : logo SABLIN PHARMA prominent (variant light), titre exact "Trouvez vos médicaments plus rapidement en Côte d'Ivoire", sous-texte rassurant, grande SearchBar + bouton secondaire "Estimer mon ordonnance" + bouton "Pharmacies de garde", recherches populaires, image hero avec carte pharmacie overlay + badge flottant "12 pharmacies de garde ce soir"
+   355→- Section confiance : 4 StatBlocks (12 pharmacies partenaires, 33+ médicaments référencés, 15 000+ recherches effectuées, 12 communes couvertes) avec tons variés (brand/success/info/warning)
+   356→- Section catégories : 7 catégories exactes demandées (Douleur & Fièvre, Antibiotiques, Toux & Rhume, Vitamines, Digestion, Peau & Soins, Bébé & Maman) mappées depuis les slugs DB avec noms affichés conviviaux, cartes élégantes avec icônes colorées et hover premium
+   357→- Section pharmacies de garde proches : nouvelle DutyPharmacyCard custom avec bandeau bg-brand-gradient, badge "De garde" + "Ouvert", nom + commune + quartier (extrait de l'adresse), distance km, téléphone (lien tel:), boutons "Voir détails" + "Itinéraire" (lien Google Maps). 4 pharmacies : Deux Plateaux, Riviera, Angré, Marcory Zone 4
+   358→- Section estimation ordonnance : Card brand-light avec Eyebrow "Estimation gratuite", illustration ClipboardList, liste fonctionnalités, bouton "Commencer l'estimation"
+   359→- Section Premium : Card amber avec Crown, prix 500 FCFA/mois, 7 avantages demandés (Recherche illimitée, Estimation d'ordonnance, Pharmacies ouvertes, Pharmacies de garde, Historique complet, Favoris illimités, Alertes de disponibilité) en grille 2 colonnes, bouton "S'abonner maintenant"
+   360→- Section médicaments récemment recherchés : tableau enrichi avec 6 colonnes (Médicament, Dosage, Forme, Prix indicatif, Pharmacies, Statut), statuts variés déterministes (Disponible/Stock faible/Rupture) via MedicationStatusBadge, lignes cliquables vers le détail
+   361→- Section support : Card bg-brand-gradient avec Headphones, message "Besoin d'aide ? Notre équipe vous accompagne pour trouver vos médicaments plus facilement", boutons "Appeler" (tel:) + "Contacter le support"
+   362→- Design system utilisé : Heading, Eyebrow, Price, StatBlock, MedicationStatusBadge, SectionHeader, Logo, SearchBar, Button (variantes brand-gradient/outline/ghost)
+   363→- Vérification Agent Browser : desktop 1440px (toutes sections + VLM confirme hero efficace, sections organisées, identité premium, boutons visibles, confiance), tablette 768px, mobile 390px (VLM confirme empilement propre, boutons cliquables, lisibilité bonne)
+   364→- 0 erreur console, lint 0 erreur/0 warning
+   365→
+   366→Stage Summary:
+   367→- Page d'accueil complète, premium, responsive conforme aux spécifications détaillées
+   368→- 8 sections : Hero (logo + titre + recherche + 2 boutons), Confiance (4 stats), Catégories (7 cartes), Pharmacies de garde (cartes enrichies avec distance/téléphone/Voir détails/Itinéraire), Estimation ordonnance, Premium (500 FCFA + 7 avantages), Tableau médicaments (6 colonnes + statuts variés), Support
+   369→- Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Bingerville
+   370→- Responsive parfait desktop/tablette/mobile vérifié par VLM
+   371→- Aucune icône interdite (étoile/feuille/bâtiment)
+   372→
+   373→---
+   374→Task ID: 12
+   375→Agent: main (orchestrator)
+   376→Task: Page Médicaments complète — refonte avec filtres, catégories, badges statut, 3 vues
+   377→
+   378→Work Log:
+   379→- MedicationCard enrichi : badges de statut variés (Disponible/Stock faible/Rupture/À confirmer) via getMedStatus déterministe, bouton "Voir détails", badge Ordonnance, Price avec "À partir de", icône catégorie colorée, hover premium -translate-y-1
+   380→- MedicationTable créé : tableau responsive 8 colonnes (Médicament, DCI, Forme, Dosage, Prix indicatif, Pharmacies, Statut, Action) avec MedicationStatusBadge, lignes cliquables
+   381→- Page Médicaments recréée (medications-view.tsx) :
+   382→  * Zone de recherche dédiée : Input large + bouton "Rechercher" brand-gradient + texte d'aide "Exemple : Paracétamol 500 mg, Amoxicilline, Vitamine C..."
+   383→  * Section 7 catégories cliquables (Douleur & Fièvre, Antibiotiques, Toux & Rhume, Vitamines, Digestion, Peau & Soins, Bébé & Maman) avec icônes colorées, état actif brand-light
+   384→  * Filtres latéraux desktop (sticky) / repliables mobile : catégorie (Select), forme (Select dynamique), disponibilité (boutons radio : Tous/Disponible/Stock faible/Rupture), commune (Select 12 communes Abidjan), prix indicatif max (Select ≤500/1000/2000/5000 FCFA), pharmacie proche (toggle)
+   385→  * Chips de filtres actifs avec bouton "Tout effacer"
+   386→  * 3 modes d'affichage : Grille / Liste / Tableau (toggle avec icônes LayoutGrid/List/Table2)
+   387→  * Filtrage client-side (useMemo) : query + catégorie + forme + disponibilité + prix
+   388→  * EmptyState quand 0 résultat + bouton réinitialiser
+   389→  * Compteur de résultats dynamique
+   390→- Responsive : desktop filtres latéraux sticky 260px, mobile bouton "Filtres" avec badge compteur + panneau collapsible, cartes s'empilent en grid-cols-2
+   391→- Vérification Agent Browser : 
+   392→  * desktop 1440px : zone recherche + 7 catégories + filtres latéraux + cartes avec badges (Disponible/Stock faible/Ordonnance) + boutons Voir détails — VLM confirme "Zone de recherche claire, filtres organisés, cartes modernes, identité premium"
+   393→  * recherche "Paracétamol" filtre correctement
+   394→  * filtre catégorie Antibiotiques affiche Amoxicilline/Augmentin
+   395→  * clic "Voir détails" navigue vers détail médicament
+   396→  * mobile 390px : bouton Filtres repliable, panneau s'ouvre avec tous les filtres
+   397→  * 0 erreur console, lint 0 erreur/0 warning
+   398→
+   399→Stage Summary:
+   400→- Page Médicaments premium, responsive, complète avec tous les éléments demandés
+   401→- Zone recherche + bouton Rechercher + texte aide
+   402→- 7 catégories cliquables avec icônes premium
+   403→- 6 filtres (catégorie, forme, disponibilité, commune, prix, pharmacie proche) + chips actifs
+   404→- 3 vues : grille / liste / tableau (8 colonnes)
+   405→- Badges statut : Disponible (vert), Stock faible (ambre), Rupture (rouge), À confirmer (gris)
+   406→- Cartes : nom commercial, DCI, dosage, forme, prix FCFA "À partir de", nb pharmacies, bouton Voir détails
+   407→- Données réalistes Abidjan : Paracétamol, Amoxicilline, Augmentin, Smecta, Vitamine C, etc.
+   408→- Responsive desktop filtres latéraux / mobile repliable, boutons faciles à cliquer
+   409→
+   410→---
+   411→Task ID: 13
+   412→Agent: main (orchestrator)
+   413→Task: Page Détail médicament complète — refonte avec fiche enrichie, pharmacies, alternatives, prudence
+   414→
+   415→Work Log:
+   416→- Fiche médicament refondue : layout 2 colonnes (visuel icône catégorie colorée + infos), badges élégants (catégorie, statut global Disponible/Stock faible/Rupture/À confirmer via MedicationStatusBadge, Ordonnance requise/Libre accès), grille info 4 colonnes (DCI, Dosage, Forme, Conditionnement), blocs prix/pharmacies/dernière MAJ, description, boutons Estimer ordonnance/Partager/Favori
+   417→- Zone recherche rapide : Input avec autocomplétion (debounce 250ms) en haut à droite, permet de rechercher un autre médicament sans revenir à la liste, dropdown de suggestions cliquables, bouton retour "Retour aux médicaments"
+   418→- Section "Pharmacies disponibles" : PharmacyMedCard custom avec en-tête (nom + note badge + commune + quartier + badges Ouvert/Fermé/De garde/24/7), grille 3 colonnes (prix indicatif, distance km, stock En stock/Rupture), ligne MAJ + horaires, 4 boutons d'action (Voir la pharmacie / Appeler tel: / Itinéraire Google Maps / Ordonnance → navigate prescription + toast). Tri par stock puis distance
+   419→- Section "Alternatives ou équivalents" : fetch médicaments de même DCI (genericName), grille 4 cartes (icône catégorie, nom, forme+dosage, prix, statut), note informative "Section informative uniquement, pas de conseil médical"
+   420→- Bloc prudence : AlertMessage variant warning "Les informations affichées sont indicatives. Demandez toujours conseil à un pharmacien ou à un professionnel de santé avant toute utilisation."
+   421→- Design system utilisé : Heading, Eyebrow, Price, PriceRange, Muted, MedicationStatusBadge, AlertMessage, FavoriteButton, Button (brand-gradient/outline), Card
+   422→- Vérification Agent Browser :
+   423→  * desktop 1440px : fiche Paracétamol complète (DCI, 500 mg, Comprimé, 100-150 FCFA, 12/12 pharmacies, MAJ 16 juin 2026), 12 cartes pharmacies avec boutons Voir/Appeler/Itinéraire/Ordonnance, alternatives Efferalgan+Paracétamol Sirop — VLM confirme "fiche complète, badges élégants, pharmacies avec boutons, alternatives, bloc prudence, identité premium"
+   424→  * recherche rapide "Amox" → suggestions Amoxicilline
+   425→  * bouton Ordonnance → navigate prescription + toast succès
+   426→  * mobile 390px : infos empilées, cartes lisibles, 4 boutons faciles à cliquer — VLM confirme "empilement propre, boutons bien espacés, design clair adapté mobile"
+   427→  * 0 erreur console, lint 0 erreur/0 warning
+   428→
+   429→Stage Summary:
+   430→- Page Détail médicament premium, responsive, complète conforme aux spécifications
+   431→- Fiche : nom commercial, DCI, dosage, forme, catégorie, prix indicatif (fourchette), statut global, dernière MAJ, description + 5 badges élégants
+   432→- Pharmacies : cartes enrichies (nom, commune, quartier, distance, prix, statut ouvert/fermé, garde, stock, MAJ, horaires) + 4 boutons (Voir/Appeler/Itinéraire/Ordonnance)
+   433→- Alternatives : mêmes DCI avec note informative
+   434→- Bloc prudence discret mais sérieux
+   435→- Recherche rapide + bouton retour
+   436→- Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Adjamé, Treichville
+   437→
+   438→---
+   439→Task ID: 14
+   440→Agent: main (orchestrator)
+   441→Task: Page Pharmacies complète — refonte avec garde, carte, filtres, cartes enrichies
+   442→
+   443→Work Log:
+   444→- Grande zone de recherche : Input avec placeholder "Rechercher une pharmacie, une commune ou un quartier" + bouton "Rechercher" brand-gradient + texte aide "Exemple : Cocody, Yopougon, Marcory, Pharmacie de garde, Riviera…" + 4 chips filtres rapides (Toutes/Ouvertes maintenant/De garde/À proximité)
+   445→- Section "Pharmacies de garde proches" mise en évidence : Card bordée ambre avec en-tête gradient ambre, icône Timer, sous-titre "Actuellement de garde à Abidjan — pour vos urgences", 3 OnDutyMiniCard compacts (nom, quartier+commune+distance, badges Ouvert/24/7), bouton "Voir tout"
+   446→- Bloc carte de localisation : placeholder moderne avec motif grille façon carte, 4 points colorés (pharmacies), overlay centré "Carte des pharmacies proches — Visualisation cartographique bientôt disponible" avec icône MapPinned
+   447→- Filtres latéraux desktop (sticky 270px) / repliables mobile (bouton Filtres + badge compteur) : commune (Select 12 communes), quartier (Input), disponibilité (toggles Ouverte maintenant/De garde/Proche de moi), distance max (Select ≤2/5/10/20 km), disponibilité médicament (Input avec icône Pill), services (Select 24/7/garde/parking/livraison)
+   448→- Chips de filtres actifs + bouton "Tout effacer"
+   449→- Cartes pharmacies PharmacyResultCard : bandeau bg-brand-gradient avec icône Plus + note badge + badges De garde/24/7, corps avec nom + commune + quartier, badges statut (Ouvert/Fermé avec point pulsant, Disponible aujourd'hui, À proximité si ≤5km), grille distance+horaires, téléphone lien tel:, 4 boutons (Voir détails brand-gradient / Appeler tel: / Itinéraire Google Maps / Médicaments → détail pharmacie)
+   450→- Tri intelligent : nearMe par distance, sinon on-duty puis rating
+   451→- Design system utilisé : Heading, Eyebrow, EmptyState, Button (brand-gradient/outline), Card, Badge, Select, Input
+   452→- Vérification Agent Browser :
+   453→  * desktop 1440px : zone recherche + chips + section garde (3 pharmacies Cocody) + carte placeholder + filtres latéraux + cartes avec 4 boutons — VLM confirme "grande zone recherche, section garde visible, carte placeholder moderne, filtres organisés, cartes élégantes avec badges et 4 boutons, identité premium"
+   454→  * filtre "De garde" → 5-6 pharmacies de garde
+   455→  * recherche "Cocody" → filtre pharmacies Cocody
+   456→  * mobile 390px : bouton Filtres repliable avec tous les filtres, cartes lisibles, 4 boutons faciles à cliquer — VLM confirme "empilement propre, cartes lisibles, boutons bien espacés et ergonomiques"
+   457→  * 0 erreur console, lint 0 erreur/0 warning
+   458→
+   459→Stage Summary:
+   460→- Page Pharmacies premium, responsive, complète conforme aux spécifications
+   461→- Zone recherche + bouton Rechercher + texte aide + 4 chips filtres rapides
+   462→- Section "Pharmacies de garde proches" en évidence (urgences) avec 3 cartes compactes
+   463→- Bloc carte de localisation (placeholder moderne avec motif grille + points)
+   464→- 8 filtres latéraux (commune, quartier, ouvert, garde, proche, distance, médicament, services)
+   465→- Cartes élégantes : nom, commune, quartier, adresse, distance, téléphone, statut (Ouvert/Fermé/De garde/24/7/Disponible aujourd'hui/À proximité), horaires + 4 boutons (Voir détails/Appeler/Itinéraire/Médicaments)
+   466→- Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Treichville, Bingerville, Koumassi
+   467→- Responsive desktop filtres latéraux / mobile repliable, boutons faciles à cliquer
+   468→
+   469→---
+   470→Task ID: 15
+   471→Agent: main (orchestrator)
+   472→Task: Page Détail pharmacie complète — refonte avec fiche, horaires, services, médicaments, localisation
+   473→
+   474→Work Log:
+   475→- Fiche pharmacie refondue : header bg-brand-gradient avec icône Plus, nom, description courte, commune+quartier, distance estimée (km), note badge, statut (Ouvert/Fermé avec point pulsant, De garde, 24/7), 4 badges enrichis (Médicaments disponibles, À proximité si ≤5km, Livraison disponible, Paiement mobile)
+   476→- Section horaires : Card avec 3 jours (Lundi-Vendredi/Samedi/Dimanche), jour actuel mis en évidence (bg-brand-light + badge "Aujourd'hui"), heures d'ouverture/fermeture, "Fermé" si fermé. Bloc spécial garde (Card ambre gradient) si isOnDuty
+   477→- Section informations pratiques : grille 4 InfoCards (Adresse complète + commune, Téléphone lien tel:, Distance estimée, Médicaments en stock X/Y)
+   478→- Section actions rapides (right column) : Card avec 5 boutons (Appeler tel:, Itinéraire Google Maps, Partager navigator.share, Ajouter aux favoris FavoriteButton, Voir médicaments disponibles → scroll to section)
+   479→- Bloc localisation : placeholder élégant avec motif grille façon carte + point central brand + overlay "Localisation de la pharmacie" avec coordonnées + bouton "Ouvrir dans Google Maps"
+   480→- Section médicaments disponibles : recherche locale, liste de cards (icône catégorie colorée, nom, DCI+forme+dosage, prix Price, statut Disponible/Stock faible/Rupture via MedStatusBadge, bouton "Ordonnance" → toast succès). Compteur "X médicaments en stock sur Y référencés"
+   481→- Section services disponibles : 7 cartes (Conseils pharmaceutiques/Stethoscope, Paiement Mobile Money/Smartphone, Pharmacie de garde/Timer, Produits bébé/Baby, Parapharmacie/Package, Suivi tension/HeartPulse, Première urgence/Plus) avec descriptions réalistes ivoiriennes
+   482→- Message rassurant : AlertMessage variant info "Les disponibilités et prix affichés sont indicatifs. Veuillez confirmer auprès de la pharmacie avant tout déplacement."
+   483→- Design system utilisé : Heading, Eyebrow, Muted, Price, AlertMessage, EmptyState, FavoriteButton, Button (brand-gradient/outline), Card, Badge
+   484→- Layout responsive : desktop grid [1fr_340px] (infos left + actions/map right), mobile empilé
+   485→- Vérification Agent Browser :
+   486→  * desktop 1440px : fiche Pharmacie des Deux Plateaux (Cocody, 4.1km, Ouvert, De garde, 24/7, 4 badges), horaires avec "Aujourd'hui" Lundi-Vendredi, bloc garde, 4 infos pratiques, 5 actions, localisation + Google Maps, 33 médicaments avec statut + bouton Ordonnance, 7 services, message rassurant — VLM confirme "fiche élégante, badges visuels, horaires avec jour actuel, actions rapides, localisation Google Maps, médicaments avec Ordonnance, services, identité premium"
+   487→  * mobile 390px : sections empilées, boutons faciles à cliquer — VLM confirme "empilement propre, boutons bien espacés, lisibilité bonne, ergonomique"
+   488→  * 0 erreur console, lint 0 erreur/0 warning
+   489→
+   490→Stage Summary:
+   491→- Page Détail pharmacie premium, responsive, complète conforme aux spécifications
+   492→- Fiche : nom, description, commune, quartier, adresse, téléphone, distance, statut (Ouvert/Fermé/De garde/24/7) + 4 badges (Médicaments disponibles, À proximité, Livraison, Paiement mobile)
+   493→- Horaires : 3 jours avec jour actuel mis en évidence + bloc spécial garde
+   494→- Contact : 5 actions (Appeler/Itinéraire/Partager/Favoris/Voir médicaments)
+   495→- Localisation : placeholder carte + bouton Google Maps
+   496→- Médicaments : nom, DCI, dosage, forme, prix, statut (Disponible/Stock faible/Rupture) + bouton Ajouter à l'ordonnance
+   497→- Services : 7 cartes (conseils, Mobile Money, garde, bébé, parapharmacie, tension, urgence)
+   498→- Message rassurant discret mais sérieux
+   499→- Données réalistes Abidjan : Cocody, Yopougon, Marcory, Plateau, Abobo, Bingerville
+   500→
+   501→---
+   502→Task ID: 16
+   503→Agent: main (orchestrator)
+   504→Task: Page Ordonnance complète — refonte avec formulaire, récapitulatif, trouver pharmacie
+   505→
+   506→Work Log:
+   507→- Section intro rassurante : Card bg-brand-gradient avec icône ClipboardList, titre "Estimez votre ordonnance", texte explicatif, bouton "Ajouter un médicament" (toggle formulaire)
+   508→- Formulaire d'ajout détaillé (Card animate-fade-up) : nom avec autocomplétion (debounce 250ms, dropdown suggestions avec icône catégorie), DCI, dosage, forme (Select 11 formes), quantité (steppers -/+), durée du traitement, remarque (Textarea), bouton "Ajouter à l'ordonnance". Mémorisation selectedMed pour récupérer slug/prix/pharmacies riches
+   509→- Liste médicaments ajoutés : cards avec numéro, icône catégorie colorée, nom + badge Rx + badge statut (Disponible/Stock faible/À confirmer/Rupture), DCI+forme+dosage+durée, remarque italique, steppers quantité, prix total (Price), boutons modifier (Pencil) + supprimer (Trash2)
+   510→- Bloc récapitulatif (sticky right) : grille 6 StatBox colorés (Médicaments, Unités, Disponibles, Stock faible, À confirmer, Rupture), coût estimatif total (PriceRange si estimation sinon Price), bouton "Estimer le coût" (POST /api/prescription/estimate → fourchette min-max + détail par ligne), boutons "Enregistrer" (localStorage + redirect auth si non connecté) + "Nouvelle" (confirm + reset)
+   511→- Upsell Premium (Card amber) : Crown, 500 FCFA/mois, 3 avantages (estimations illimitées, ordonnances sauvegardées, alertes disponibilité), bouton S'abonner → navigate subscription
+   512→- Section "Trouver une pharmacie" : Card avec icône Store, texte explicatif, bouton "Voir les résultats" → navigate pharmacies, si estimation affiche "X pharmacies peuvent fournir tous vos médicaments"
+   513→- Message de prudence : AlertMessage warning "Cette estimation est indicative. Vérifiez toujours les disponibilités et demandez conseil à un pharmacien ou professionnel de santé."
+   514→- Layout responsive : desktop grid [1fr_360px] (formulaire+liste left, récap+premium right sticky), mobile empilé
+   515→- Design system : Heading, Eyebrow, Price, PriceRange, AlertMessage, EmptyState, Button (brand-gradient/outline), Card, Badge, Select, Label, Textarea, CategoryIcon
+   516→- Vérification Agent Browser :
+   517→  * desktop 1440px : intro + formulaire 7 champs + autocomplétion Paracétamol → ajout → récap (1 médicament, 150 FCFA, Disponible) → ajout Amoxicilline → récap (2 médicaments, 1 disponible, 1 stock faible, 1350 FCFA) → estimation (100-150 FCFA, détail, POST 200) — VLM confirme "intro, formulaire, liste cartes, récap stats + coût FCFA, trouver pharmacie, Enregistrer/Nouvelle, prudence, premium"
+   518→  * bouton Enregistrer → toast "Connectez-vous" (non connecté)
+   519→  * mobile 390px : sections empilées, boutons faciles à cliquer — VLM confirme "empilement, lisibilité, ergonomique"
+   520→  * 0 erreur console, lint 0 erreur/0 warning
+   521→
+   522→Stage Summary:
+   523→- Page Ordonnance premium, responsive, complète conforme aux spécifications
+   524→- Intro rassurante + bouton Ajouter un médicament
+   525→- Formulaire détaillé : nom (autocomplétion), DCI, dosage, forme, quantité, durée, remarque + bouton Ajouter à l'ordonnance
+   526→- Liste médicaments : cards avec nom, dosage, forme, qté (steppers), prix, statut, modifier, supprimer
+   527→- Récapitulatif : 6 stats (disponibles/stock faible/à confirmer/rupture) + coût total FCFA + estimation fourchette min-max
+   528→- Trouver une pharmacie + bouton Voir les résultats
+   529→- Enregistrer l'ordonnance (localStorage + auth) + Nouvelle ordonnance
+   530→- Upsell Premium 500 FCFA/mois (valeur de l'abonnement mise en avant)
+   531→- Message de prudence discret
+   532→- Données réalistes : Paracétamol, Amoxicilline, Vitamine C, Smecta, Sérum physiologique, Bétadine, Doliprane
+   533→
+   534→---
+   535→Task ID: 17
+   536→Agent: main (orchestrator)
+   537→Task: Page Résultat d'ordonnance complète — refonte avec résumé, meilleure option, pharmacies, filtres
+   538→
+   539→Work Log:
+   540→- Grand résumé en haut : CheckCircle2 dans cercle brand-light, Eyebrow "Estimation terminée", titre "Résultat de votre ordonnance", sous-texte, grille 5 SummaryStat (Médicaments, Coût total min, Disponibles, À confirmer, Rupture) avec tons colorés
+   541→- Carte "Résumé de l'ordonnance" (sticky right) : total estimatif (PriceRange), nombre de produits, disponibilité globale (Complète/Partielle), pharmacie recommandée, distance estimée, bouton "Voir la meilleure pharmacie"
+   542→- Liste médicaments : cards avec icône Pill, nom + badge Rx + MedStatusBadge (Disponible/À confirmer/Rupture), forme+dosage+qté, PriceRange min-max, nombre pharmacies
+   543→- Section "Meilleure option recommandée" : Card bg-brand-gradient avec Award, pharmacie recommandée (disponibilité complète + proximité + prix optimisé), badges (Ordonnance complète, Ouvert, De garde), total estimatif, 3 boutons (Voir la meilleure pharmacie / Appeler / Itinéraire)
+   544→- Section "Pharmacies ayant toute l'ordonnance" : 6 filtres comparaison chips (Recommandée/Plus proche/Prix le plus bas/Ordonnance complète/Ouverte maintenant/De garde), grille FullPharmacyCard (badges Ordonnance complète + note, nom + commune + quartier, statuts Ouvert/De garde/24/7 + distance, total estimatif + médicaments X/Y, boutons Voir/Appeler/Itinéraire)
+   545→- Section "Pharmacies ayant une partie de l'ordonnance" : PartialPharmacyCard avec badge "Disponibilité partielle X/Y médicaments", liste médicaments Disponibles (vert) + Manquants (rouge barré), boutons Voir détails/Itinéraire
+   546→- Boutons d'action : Enregistrer (localStorage + auth), Modifier (→ prescription), Nouvelle (→ prescription), Partager (navigator.share), Voir mes ordonnances (→ history)
+   547→- Upsell Premium : Card amber 500 FCFA/mois (estimations illimitées, comparateur avancé, alertes)
+   548→- Message de prudence : AlertMessage warning "Les prix et disponibilités sont indicatifs. Veuillez confirmer auprès de la pharmacie avant tout déplacement. Demandez toujours conseil à un pharmacien ou professionnel de santé."
+   549→- Correction bug : ajout navigate("prescription-result", { estimateItems }) dans prescription-view handleEstimate
+   550→- Données fictives réalistes : 6 pharmacies Abidjan (Cocody/Deux Plateaux, Cocody/Riviera, Marcory/Zone 4, Plateau, Yopougon, Abobo) avec distances, statuts, garde
+   551→- Layout responsive : desktop grid [1fr_360px] (détails+pharmacies left, résumé+actions right sticky), mobile empilé
+   552→- Vérification Agent Browser :
+   553→  * desktop 1440px : grand résumé (2 médicaments, 1150 FCFA, 2 dispo) + médicaments avec statut + meilleure option (Pharmacie de la Riviera, 2.8km, complète, Ouvert, De garde) + 3 pharmacies complètes avec filtres + 3 pharmacies partielles (dispo/manquants) + résumé + boutons — VLM confirme "grand résumé, carte résumé, médicaments, meilleure option, pharmacies complètes, pharmacies partielles, boutons, prudence, premium"
+   554→  * filtre "Plus proche" → Riviera (2.8km) en premier
+   555→  * mobile 390px : sections empilées, cartes lisibles — VLM confirme "empilement, lisibilité"
+   556→  * 0 erreur console, lint 0 erreur/0 warning
+   557→
+   558→Stage Summary:
+   559→- Page Résultat d'ordonnance premium, responsive, complète conforme aux spécifications
+   560→- Grand résumé : titre + 5 stats (médicaments, coût total, disponibles, à confirmer, rupture)
+   561→- Carte Résumé : total estimatif, produits, disponibilité globale, pharmacie recommandée, distance, bouton Voir la meilleure pharmacie
+   562→- Liste médicaments : nom, DCI, dosage, forme, qté, prix, statut (Disponible/Stock faible/Rupture/À confirmer)
+   563→- Meilleure option recommandée : pharmacie optimale (complète + proche + prix) avec badges et 3 boutons
+   564→- Pharmacies ayant toute l'ordonnance : 6 filtres comparaison + cartes enrichies (distance, prix, statut, garde, Voir/Appeler/Itinéraire)
+   565→- Pharmacies ayant une partie : médicaments disponibles (vert) + manquants (rouge barré)
+   566→- Boutons : Enregistrer/Modifier/Nouvelle/Partager/Voir ordonnances
+   567→- Message de prudence discret mais visible
+   568→- Montre la valeur SABLIN PHARMA : gagner du temps, comparer, préparer son budget
+   569→
+   570→---
+   571→Task ID: 18
+   572→Agent: main (orchestrator)
+   573→Task: Pages Connexion et Inscription complètes — refonte avec validation inline, connexion rapide, bénéfices
+   574→
+   575→Work Log:
+   576→- Page Connexion refondue : titre "Connexion à votre compte", sous-texte rassurant, champ "Téléphone ou e-mail" (avec icône Mail, détection email/téléphone), mot de passe (toggle œil), bouton "Se connecter" brand-gradient avec flèche, lien "Mot de passe oublié ?", lien "Créer un compte"
+   577→- Page Inscription refondue : titre "Créer votre compte", champs nom complet, téléphone, e-mail (grille 2 colonnes), commune (Select 12 communes), mot de passe (toggle + indicateur longueur), confirmation (toggle + indicateur correspondance), checkbox conditions d'utilisation (Card cliquable), bouton "Créer mon compte"
+   578→- Validation inline propre : FieldError component avec icône AlertCircle, messages "Ce champ est obligatoire", "Format d'e-mail invalide", "Numéro invalide. Ex : 07 00 00 00 00", "Le mot de passe doit contenir au moins 6 caractères", "Les mots de passe ne correspondent pas", "Vous devez accepter les conditions", "Un compte existe déjà avec cet e-mail", "Veuillez sélectionner votre commune". Erreurs effacées au typing
+   579→- Connexion rapide : séparateur "ou continuer avec", 2 boutons outline Google (icône SVG colorée 4 couleurs) + Téléphone (Smartphone icône brand), toast info "bientôt disponible"
+   580→- Bloc confiance (panneau gauche desktop) : Logo variant light, titre "Votre santé, simplifiée", 4 bénéfices avec icônes (Search "Trouvez vos médicaments plus rapidement", ClipboardList "Estimez vos ordonnances en quelques clics", Timer "Consultez les pharmacies de garde 24/7", Heart "Gardez vos recherches et pharmacies en favoris"), badge ShieldCheck "Plateforme 100% information, aucune vente en ligne"
+   581→- Badges confiance sous le formulaire : "Données chiffrées", "100% gratuit", "Côte d'Ivoire"
+   582→- Indicateurs positifs : mdp correspondant (CheckCircle2 vert), longueur mdp insuffisante (info muted)
+   583→- Composants réutilisables créés : Field (icône + label + input + erreur), PasswordInput (toggle œil), FieldError (AlertCircle + msg), GoogleIcon (SVG 4 couleurs)
+   584→- Layout responsive : desktop grid 2 colonnes (panneau brand left + formulaire right), mobile formulaire centré avec logo en haut
+   585→- Vérification Agent Browser :
+   586→  * desktop 1440px : panneau gauche vert avec 4 bénéfices + formulaire onglets Connexion/Inscription — VLM confirme "panneau gauche vert avec logo + 4 bénéfices, formulaire élégant avec onglets, champs avec icônes et validation inline, boutons Google/Téléphone, checkbox conditions, identité premium"
+   587→  * validation inline : formulaire vide → "Ce champ est obligatoire" / inscription vide → toutes les erreurs affichées
+   588→  * inscription réelle (Mariam Traoré, 07 01 23 45 67, mariam.traore@test.ci, Yopougon, monpass123, conditions acceptées) → succès → redirection accueil + menu compte visible
+   589→  * mobile 390px : formulaire centré, logo visible, champs/boutons faciles à cliquer — VLM confirme "centré, lisible, bonne ergonomie"
+   590→  * 0 erreur console, lint 0 erreur/0 warning
+   591→
+   592→Stage Summary:
+   593→- Pages Connexion et Inscription premium, responsive, complètes conformes aux spécifications
+   594→- Connexion : logo, titre "Connexion à votre compte", téléphone/email, mot de passe (œil), bouton Se connecter, mot de passe oublié, créer compte
+   595→- Inscription : nom, téléphone, email, mot de passe (œil), confirmation (œil), commune, checkbox conditions, bouton Créer mon compte
+   596→- Connexion rapide : Google (icône colorée) + Téléphone
+   597→- Validation inline : champ obligatoire, email invalide, téléphone invalide, mdp court, mdp non correspondant, conditions non acceptées, compte existant
+   598→- Bloc confiance : 4 bénéfices (médicaments, ordonnances, garde, favoris) + badge sécurité
+   599→- Messages succès : "Connexion réussie", "Compte créé avec succès"
+   600→- Layout : desktop panneau brand + formulaire, mobile centré
+   601→
+   602→---
+   603→Task ID: 19
+   604→Agent: main (orchestrator)
+   605→Task: Page Profil utilisateur complète — refonte avec abonnement, historique, ordonnances, favoris, notifications
+   606→
+   607→Work Log:
+   608→- Carte profil élégante : header bg-brand-gradient avec avatar initiales (size-20 cercle blanc/15), nom, téléphone, email, commune, badge statut (Premium actif gradient amber OU Compte gratuit brand-light), bouton Paramètres. Stats strip 3 colonnes (Médicaments consultés, Ordonnances estimées, Pharmacies favorites)
+   609→- Section Abonnement : si premium → Card bordée amber avec en-tête gradient (Crown + "Premium actif" + badge "Payé"), grille 4 infos (Prix 500 FCFA/mois, Début, Expiration, Statut Actif), boutons "Renouveler mon abonnement" + "Historique paiements". Si gratuit → Card brand-light avec Crown, description, prix 500 FCFA/mois, bouton "Passer à Premium"
+   610→- Section Notifications personnalisées : 3 dernières notifications (NotifRow avec icône tonalisée selon type, titre, message, point non lu), bouton "Tout voir" → notifications
+   611→- Section Historique des recherches : si historique réel → HistoryRow (médicament, dosage, date, badge Disponible, bouton "Rechercher à nouveau"). Sinon → FictiveHistory (Paracétamol, Amoxicilline, Vitamine C, Smecta avec statuts variés)
+   612→- Section Ordonnances enregistrées : si localStorage → cards (nom, nb médicaments, coût Price, date, bouton "Voir le détail"). Sinon → FictivePrescriptions (Ordonnance rhume 2150 FCFA, Traitement paludisme 4000 FCFA)
+   613→- Section Pharmacies favorites : si favoris réels → FavPharmacyCard (nom, commune, quartier, distance, badges Ouvert/De garde, bouton "Voir la pharmacie"). Sinon → FictiveFavorites (Pharmacie de la Rivière Cocody, Pharmacie du Plateau)
+   614→- Menu Paramètres latéral (Card) : 7 liens (Modifier mes informations, Changer le mot de passe, Gérer les notifications, Gérer mon abonnement, Confidentialité, Aide et support, Conditions d'utilisation) + séparateur + bouton "Se déconnecter" (red, Loader2 pendant logout)
+   615→- Layout responsive : desktop grid [260px_1fr] (menu left + sections right), mobile empilé
+   616→- Design system : Heading, Eyebrow, Muted, Price, Button (brand-gradient/outline), Card, Badge, Skeleton, SectionTitle custom
+   617→- Correction bug : icône FileShield inexistante remplacée par ShieldCheck
+   618→- Vérification Agent Browser :
+   619→  * desktop 1440px : carte profil Aïcha Koné (Premium actif) + menu latéral 7 liens + Abonnement (Premium actif, 500 FCFA/mois, 16 juin - 16 juillet, Payé) + notifications + historique (Paracétamol/Amoxicilline/Vitamine C/Smecta) + ordonnances (Ordonnance rhume 2150F, Traitement paludisme 4000F) + favorites — VLM confirme "carte profil élégante, abonnement, historique, ordonnances, favorites, menu profil latéral, identité premium"
+   620→  * mobile 390px : sections empilées, menu lisible, cartes faciles à cliquer — VLM confirme "empilement propre, icônes claires, bien adapté"
+   621→  * 0 erreur console, lint 0 erreur/0 warning
+   622→
+   623→Stage Summary:
+   624→- Page Profil premium, responsive, complète conforme aux spécifications
+   625→- Carte profil : nom, téléphone, email, commune, avatar initiales, badge statut (Gratuit/Premium actif)
+   626→- Abonnement : formule, 500 FCFA/mois, dates début/expiration, statut paiement, bouton Renouveler/Passer Premium
+   627→- Historique des recherches : médicaments consultés avec dosage, date, statut, bouton Rechercher à nouveau
+   628→- Ordonnances enregistrées : nom, nb médicaments, coût total, date, bouton Voir le détail
+   629→- Pharmacies favorites : nom, commune, quartier, distance, statut ouvert/fermé, garde, bouton Voir la pharmacie
+   630→- Notifications personnalisées : rappel abonnement, disponibilité médicament, pharmacie de garde, mise à jour
+   631→- Menu Paramètres : modifier infos, mot de passe, notifications, abonnement, confidentialité, aide, conditions, déconnexion
+   632→- Layout : desktop menu latéral + contenu, mobile empilé
+   633→
+   634→---
+   635→Task ID: 20
+   636→Agent: main (orchestrator)
+   637→Task: Page Abonnement complète — refonte avec statut, avantages, comparatif, pourquoi, FAQ
+   638→
+   639→Work Log:
+   640→- Section attractive : header gradient amber→background→brand-light avec badge Crown "Offre Premium", titre "Abonnement Premium", sous-texte "Accédez à toutes les fonctionnalités pour trouver vos médicaments plus rapidement", prix 500 FCFA/mois dans encadré ambre bien visible (text-5xl)
+   641→- Carte Premium centrale (sticky right) : Crown gradient amber, badge "Recommandé", "Plan Premium", prix 500 FCFA/mois (text-5xl), 8 avantages avec coches ambre, boutons "S'abonner à 500 FCFA/mois" (gradient amber) + "Voir les avantages" (outline brand), note "Sans engagement · Paiement sécurisé", badge ShieldCheck "Paiement chiffré 100% sécurisé"
+   642→- 8 avantages Premium (cards avec icônes gradient amber) : Recherche illimitée, Estimation d'ordonnance, Accès pharmacies ouvertes, Accès pharmacies de garde, Historique recherches, Pharmacies favorites, Alertes disponibilité, Support utilisateur prioritaire
+   643→- Bloc Statut de l'abonnement : si premium → Crown + "Premium actif" + badge "Actif" + grille 6 infos (Type, Statut, Date début, Date expiration, Moyen paiement, Montant) + bouton "Renouveler". Si gratuit → Clock + "Compte gratuit" + badge "Inactif" + grille 6 infos (—) + bouton "S'abonner maintenant"
+   644→- Comparatif Gratuit vs Premium : tableau 9 lignes (Recherches, Estimation, Pharmacies ouvertes, Pharmacies de garde, Historique, Favoris, Alertes, Support, Sans pub) avec X pour gratuit et ✓ ambre pour premium, badge "Recommandé" sur colonne Premium, pied "Prix mensuel : 0 FCFA vs 500 FCFA"
+   645→- Section "Pourquoi passer à Premium ?" : 5 cartes (Gagner du temps/Zap, Éviter déplacements inutiles/Navigation, Préparer budget ordonnance/Wallet, Trouver pharmacies de garde/Timer, Recevoir alertes importantes/Bell) avec descriptions concrètes
+   646→- FAQ : 4 questions exactes (Comment payer l'abonnement ?, Puis-je annuler ?, Que se passe-t-il si mon abonnement expire ?, Les prix des médicaments sont-ils garantis ?) avec réponses rassurantes via Accordion
+   647→- CTA final : Card gradient amber "Prêt à passer Premium ?" + bouton "S'abonner à 500 FCFA/mois" (si non premium)
+   648→- Design system : Heading, Eyebrow, Muted, Button (brand-gradient/outline/gradient amber), Card, Badge, Accordion, Separator
+   649→- Layout responsive : desktop grid [1fr_400px] (avantages+statut left, carte Premium sticky right), mobile empilé
+   650→- Vérification Agent Browser :
+   651→  * desktop 1440px : titre + prix 500 FCFA + 8 avantages + statut (compte gratuit/inactif) + carte Premium (S'abonner + Voir avantages) + comparatif (badge Recommandé) + 5 cartes Pourquoi + FAQ 4 questions — VLM confirme "titre, prix visible, carte Premium 8 avantages + boutons, comparatif badge Recommandé, statut abonnement, pourquoi 5 cartes, FAQ 4 questions, identité premium ambre"
+   652→  * mobile 390px : prix 500 FCFA bien visible, cartes empilées, design adapté — VLM confirme "prix bien visible, empilement propre, interface claire"
+   653→  * 0 erreur console, lint 0 erreur/0 warning
+   654→
+   655→Stage Summary:
+   656→- Page Abonnement premium, responsive, complète conforme aux spécifications
+   657→- Section attractive : titre "Abonnement Premium" + sous-texte + prix 500 FCFA/mois bien visible
+   658→- Carte Premium : 8 avantages (recherche illimitée, estimation, pharmacies ouvertes/garde, historique, favoris, alertes, support) + boutons "S'abonner à 500 FCFA/mois" + "Voir les avantages"
+   659→- Comparatif Gratuit vs Premium : 9 fonctionnalités + badge "Recommandé" sur Premium
+   660→- Statut abonnement : type, statut actif/inactif, dates début/expiration, moyen paiement, bouton Renouveler/S'abonner
+   661→- Pourquoi passer à Premium : 5 cartes (gagner temps, éviter déplacements, budget, garde, alertes)
+   662→- FAQ : 4 questions (paiement, annulation, expiration, prix garantis)
+   663→- Layout : desktop carte Premium sticky + contenu, mobile empilé
+   664→
+   665→---
+   666→Task ID: 21
+   667→Agent: main (orchestrator)
+   668→Task: Page Paiement complète — refonte avec 4 moyens ivoiriens, états, modale, historique
+   669→
+   670→Work Log:
+   671→- Header : titre "Paiement de l'abonnement Premium" + sous-texte rassurant (recherche illimitée, estimation, garde, favoris, historique, alertes) + badge Crown Premium
+   672→- Carte récapitulative (sticky right) : formule Premium, montant 500 FCFA, durée 1 mois, frais 0, statut "En attente", total à payer 500 FCFA (Price lg), bouton "Confirmer le paiement"
+   673→- 4 moyens de paiement ivoiriens : Wave (sky-500 "W"), Orange Money (orange-500 "OM"), MTN Money (yellow-400 "MTN"), Moov Money (blue-600 "Moov") en cartes sélectionnables 2x2 (grid sm:4) avec état actif (border-brand ring-2 + CheckCircle2)
+   674→- Formulaire de paiement : opérateur sélectionné (read-only display), numéro téléphone Mobile Money (format 07 00 00 00 00), nom titulaire, montant 500 FCFA (read-only brand-light), bouton "Payer maintenant 500 FCFA" (brand-gradient h-12), bouton "Annuler"
+   675→- Bloc sécurité : Card brand-light/20 avec ShieldCheck + 3 SecurityItem (Paiement sécurisé chiffré, Vos informations protégées, Activation automatique après paiement confirmé) + note "Environnement de démonstration"
+   676→- États de paiement : StateBanner pour pending (Loader2 spin "Paiement en attente"), failed (XCircle danger "Paiement échoué" + bouton Réessayer), cancelled (AlertCircle warning "Transaction annulée" + bouton Reprendre)
+   677→- Modale de confirmation (Dialog) : header bg-brand-gradient avec CheckCircle2 animate-scale-in + "Paiement confirmé !" + "Abonnement Premium activé", grille 4 détails (Montant payé 500 FCFA, Date paiement, Date expiration, Moyen), référence transaction (mono + bouton Copy), boutons "Accéder à mon compte" (→ profile) + "Retour à l'accueil"
+   678→- Section historique des paiements : tableau 6 colonnes (Date, Formule, Montant, Moyen, Statut, Référence) avec 4 lignes fictives (Orange Money/Wave/MTN/Moov, statuts Réussi/Échoué), références cliquables (copie presse-papiers)
+   679→- Layout responsive : desktop grid [1fr_380px] (formulaire left, récap sticky right), mobile empilé
+   680→- Vérification Agent Browser :
+   681→  * desktop 1440px : titre + 4 moyens (Wave/Orange/MTN/Moov) + formulaire (numéro, titulaire, montant, Payer) + sécurité 3 messages + récap (Confirmer) + historique — VLM confirme "titre, 4 moyens, formulaire, sécurité 3 messages, récap Confirmer, historique, identité premium"
+   682→  * paiement complet (numéro 0700000000 + Jean Test) → modale confirmation (Paiement confirmé, 500 FCFA, 16 juin - 16 juillet, Orange Money, référence SPL-) — VLM confirme "icône succès, titre, détails, bouton Accéder à mon compte, identité premium"
+   683→  * mobile 390px : moyens sélectionnables, bouton Payer visible, sections empilées — VLM confirme "moyens clairs, bouton visible, empilement, intuitif"
+   684→  * 0 erreur console, lint 0 erreur/0 warning
+   685→
+   686→Stage Summary:
+   687→- Page Paiement premium, responsive, sécurisée, complète conforme aux spécifications
+   688→- Titre "Paiement de l'abonnement Premium" + sous-texte rassurant
+   689→- Carte récapitulative : formule Premium, 500 FCFA, durée 1 mois, total, statut, bouton Confirmer
+   690→- 4 moyens ivoiriens : Wave, Orange Money, MTN Money, Moov Money (cartes sélectionnables)
+   691→- Formulaire : numéro téléphone, nom titulaire, opérateur, montant, bouton Payer maintenant
+   692→- Bloc sécurité : 3 messages (Paiement sécurisé, Informations protégées, Activation automatique)
+   693→- États : en attente, réussi, échoué, annulé, abonnement activé (bannières + icônes)
+   694→- Modale confirmation : paiement confirmé, abonnement activé, montant, dates, référence, bouton Accéder à mon compte
+   695→- Historique : date, formule, montant, moyen, statut, référence (4 lignes fictives)
+   696→- Layout : desktop formulaire + récap sticky, mobile empilé
+   697→
+   698→---
+   699→Task ID: 22
+   700→Agent: main (orchestrator)
+   701→Task: Suppression totale des dégradés — identité visuelle en couleurs pleines uniquement
+   702→
+   703→Work Log:
+   704→- globals.css : .bg-brand-gradient → background-color: var(--brand) (vert plein), .bg-brand-soft → background-color: var(--brand-light), .text-brand-gradient → color: var(--brand-dark), .bg-dotted/.bg-dotted-white → background-color: transparent (radial-gradient retirés)
+   705→- button.tsx : variante "brand-gradient" → bg-brand text-white hover:bg-brand-dark (vert plein, plus de gradient)
+   706→- Remplacements en masse (sed) sur 36 fichiers (views + shared + layout) :
+   707→  * bg-gradient-to-br from-amber-400 to-amber-600 → bg-amber-500
+   708→  * bg-gradient-to-br from-amber-400 to-amber-500 → bg-amber-500
+   709→  * bg-gradient-to-br from-amber-50 to-background → bg-amber-50
+   710→  * bg-gradient-to-br from-amber-50 via-background to-brand-light/40 → bg-amber-50
+   711→  * bg-gradient-to-br from-amber-50 via-card to-card → bg-amber-50
+   712→  * bg-gradient-to-br from-amber-50 via-card to-brand-light/40 → bg-amber-50
+   713→  * bg-gradient-to-br from-amber-50 to-amber-100/40 → bg-amber-50
+   714→  * bg-gradient-to-br from-amber-50 to-amber-100/50 → bg-amber-50
+   715→  * bg-gradient-to-r from-amber-50 to-background → bg-amber-50
+   716→  * bg-gradient-to-br from-brand-light/60 to-background → bg-brand-light
+   717→  * bg-gradient-to-br from-brand-light/70 to-brand-light/30 → bg-brand-light
+   718→  * bg-gradient-to-br from-brand-light/50 to-card → bg-brand-light
+   719→  * bg-gradient-to-br from-brand-light/40 to-card → bg-brand-light
+   720→  * bg-gradient-to-br from-brand-dark to-brand → bg-brand-dark
+   721→  * bg-gradient-to-br from-slate-700 to-slate-900 → bg-slate-800
+   722→  * bg-gradient-to-b from-background to-brand-light/30 → bg-background
+   723→  * bg-gradient-to-t from-black/60 to-transparent → bg-black/60
+   724→  * hover:opacity-90 sur boutons ambre → hover:bg-amber-600
+   725→- Suppression des styles inline radial-gradient et linear-gradient (motifs pointillés, halos, grilles carte)
+   726→- Corrections de parsing sur 5 fichiers (lignes vides cassées par sed) : medication-detail-view, pharmacies-view, pharmacy-detail-view, success-view, medication-card
+   727→- Vérification finale : 0 gradient restant dans tout src/ (grep confirmé)
+   728→- Vérification Agent Browser + VLM :
+   729→  * Accueil : "Aucun dégradé visible. Hero fond vert uni, boutons fond plein, cartes fond blanc uni, badges ambre plein. Contraste bon."
+   730→  * Médicaments : "Aucun dégradé. Boutons et cartes en couleurs pleines. Contraste texte/recherche bon (noir sur blanc)."
+   731→  * Abonnement : "Boutons premium pleins sans gradient. Contraste bon."
+   732→  * Mobile 390px : "Pas de dégradés. Texte lisible. Boutons en couleurs pleines. Design clair."
+   733→  * 0 erreur console, lint 0 erreur/0 warning
+   734→
+   735→Stage Summary:
+   736→- TOUS les dégradés supprimés de la plateforme SABLIN PHARMA
+   737→- Couleurs pleines uniquement : vert pharmacie (brand), vert foncé (brand-dark), blanc (background), gris clair (muted/brand-light), ambre (amber-500/amber-50)
+   738→- Boutons principaux : bg-brand text-white (vert plein) ou bg-amber-500 text-white (ambre plein)
+   739→- Boutons secondaires : bg-background border-brand text-brand-dark (blanc + bordure verte)
+   740→- Cartes : bg-background (blanc) border-border (gris clair) shadow-premium
+   741→- Champs recherche/formulaires : bg-background text-foreground placeholder-muted (fond blanc, texte foncé, placeholder gris)
+   742→- Contrastes vérifiés : texte toujours visible sur son fond
+   743→- Responsive mobile/tablette/desktop vérifié
+   744→
+   745→---
+   746→Task ID: 23
+   747→Agent: main (orchestrator)
+   748→Task: Correction contraste barre recherche accueil (texte blanc sur fond blanc)
+   749→
+   750→Work Log:
+   751→- Problème : l'input de la SearchBar utilisait bg-transparent sans couleur de texte explicite, héritant du text-white du hero vert → texte tapé invisible (blanc sur blanc)
+   752→- Correction search-bar.tsx : ajout de text-foreground sur l'input (texte foncé explicite #222)
+   753→- Correction bouton Rechercher : bg-brand-gradient → bg-brand text-white hover:bg-brand-dark (vert plein cohérent)
+   754→- Vérification Agent Browser + VLM :
+   755→  * Desktop : "Le texte tapé 'Paracétamol 500mg' est visible (foncé sur fond blanc). Le placeholder est gris sur fond blanc."
+   756→  * Mobile : "Le texte tapé est foncé et visible sur le fond blanc de la barre de recherche mobile."
+   757→- 0 erreur console, lint 0 erreur/0 warning
+   758→
+   759→Stage Summary:
+   760→- Barre de recherche de l'accueil corrigée : texte tapé maintenant foncé (text-foreground) sur fond blanc (bg-background)
+   761→- Placeholder gris (text-muted-foreground) lisible
+   762→- Bouton Rechercher : vert plein (bg-brand) texte blanc
+   763→- Correction validée desktop et mobile
+   764→
+   765→---
+   766→Task ID: 24
+   767→Agent: main (orchestrator)
+   768→Task: Ajout de photos pour chaque pharmacie et chaque médicament
+   769→
+   770→Work Log:
+   771→- Génération de 14 images via z-ai image (séquentiellement pour éviter rate limit 429) :
+   772→  * 4 photos pharmacies : pharmacy-1 (storefront Abidjan), pharmacy-2 (intérieur moderne), pharmacy-3 (comptoir pharmacien), pharmacy-4 (pharmacie nuit croix verte)
+   773→  * 10 photos médicaments par catégorie : med-douleur (blister comprimés), med-antibiotiques (gélules), med-vitamines (bouteille vitamine C), med-cardiovasculaire (pilules tension), med-digestif (boîte antiacide), med-respiratoire (sirop toux), med-dermatologie (tube crème), med-mere-enfant (sirop bébé), med-hygiene (flacon antiseptique), med-antipaludeens (blister antipaludéen)
+   774→- Mise à jour prisma/seed.ts : ajout imageUrl optionnel aux types MedSeed et PharmacySeed, mapping medImageByCategory (10 catégories → images), pharmacyImages (4 images cyclées), attribution imageUrl lors de la création en base
+   775→- Re-seed : 33 médicaments + 12 pharmacies avec imageUrl
+   776→- Mise à jour MedicationCard : header h-32 avec img object-cover si imageUrl disponible, fallback icône catégorie
+   777→- Mise à jour PharmacyCard : header h-32 avec img object-cover + overlay bg-black/30, fallback bg-brand-dark
+   778→- Mise à jour medication-detail-view : section visuelle affiche img aspect-square w-full object-cover si imageUrl, fallback icône catégorie colorée
+   779→- Mise à jour pharmacy-detail-view : header bg-brand avec img object-cover + overlay bg-black/40, texte blanc par-dessus
+   780→- Mise à jour home-view DutyPharmacyCard : header bg-brand avec img + overlay
+   781→- Mise à jour pharmacies-view PharmacyResultCard : header bg-brand avec img + overlay
+   782→- Vérification Agent Browser + VLM :
+   783→  * Médicaments (desktop) : "Photos de médicaments visibles sur les cartes (comprimés, flacons, tubes, blisters)"
+   784→  * Pharmacies accueil : "Cartes pharmacies affichent des photos réelles d'une pharmacie en arrière-plan"
+   785→  * Détail pharmacie : "Photo de la pharmacie en arrière-plan du header"
+   786→  * Détail médicament : "Photo du médicament (blister d'aspirine) dans la section visuelle à gauche"
+   787→  * Mobile 390px : "Photos de médicaments visibles sur les cartes"
+   788→  * 0 erreur console, lint 0 erreur/0 warning
+   789→
+   790→Stage Summary:
+   791→- Photos ajoutées pour CHAQUE pharmacie (4 images cyclées) et CHAQUE médicament (10 images par catégorie)
+   792→- Images visibles dans : cartes médicaments (Médicaments + Accueil), cartes pharmacies (Pharmacies + Accueil + Résultat ordonnance), détail médicament, détail pharmacie
+   793→- 14 images générées (1024x1024) stockées dans public/images/pharmacies/ et public/images/medications/
+   794→- Fallback gracieux : si pas d'image, icône catégorie colorée (médicaments) ou fond vert foncé (pharmacies)
+   795→- Overlay sombre sur les photos de pharmacies pour garantir la lisibilité du texte blanc
+   796→
+   797→---
+   798→Task ID: 25
+   799→Agent: main (orchestrator)
+   800→Task: Intégration de 4 cartes Google Maps visibles (iframe embed)
+   801→
+   802→Work Log:
+   803→- Création composant réutilisable GoogleMap (@/components/shared/google-map.tsx) : iframe embed Google Maps sans clé API (format maps.google.com/maps?q=LAT,LNG&z=ZOOM&output=embed), props lat/lng/zoom/label/title/showButton/className, bouton "Ouvrir dans Google Maps"
+   804→- Intégration 4 cartes Google Maps :
+   805→  1. **Accueil** (home-view) : carte après les cartes "Pharmacies de garde proches" (lat 5.375, lng -3.995, zoom 13, titre "Carte des pharmacies de garde", h-64/h-72)
+   806→  2. **Pharmacies** (pharmacies-view) : remplace le placeholder "Carte des pharmacies proches" par une vraie carte d'Abidjan (lat 5.34, lng -4.008, zoom 12, titre "Carte des pharmacies à Abidjan", h-72/h-80)
+   807→  3. **Détail pharmacie** (pharmacy-detail-view) : remplace le placeholder "Localisation de la pharmacie" par une vraie carte centrée sur la pharmacie (lat/lng de la pharmacie, zoom 16, label nom pharmacie, titre "Localisation de la pharmacie", h-56)
+   808→  4. **Détail médicament** (medication-detail-view) : carte après la liste des pharmacies ayant le médicament (lat/lng de la 1ère pharmacie, zoom 13, titre "Pharmacies ayant ce médicament", h-64)
+   809→- Correction URL embed : format initial "label@lat,lng" ne fonctionnait pas → format "lat,lng" simple (maps.google.com/maps?q=LAT,LNG&z=ZOOM&output=embed)
+   810→- Vérification Agent Browser + VLM :
+   811→  * Accueil : "Carte Google Maps visible en bas de page, avec routes et géographie d'Abidjan, interactive"
+   812→  * Pharmacies : "Carte Google Maps visible en bas de page, affichant les pharmacies d'Abidjan"
+   813→  * Détail pharmacie : "Carte Google Maps visible, affichant la localisation de la pharmacie avec un marqueur rouge"
+   814→  * Détail médicament : "Carte Google Maps visible en bas de page, montrant des pharmacies et des lieux"
+   815→  * 0 erreur console, lint 0 erreur/0 warning
+   816→
+   817→Stage Summary:
+   818→- 4 cartes Google Maps intégrées et visibles sur la plateforme SABLIN PHARMA
+   819→- Composant GoogleMap réutilisable (iframe embed sans clé API)
+   820→- Cartes interactives avec routes, marqueurs, zoom Google Maps réel
+   821→- Bouton "Ouvrir dans Google Maps" sur chaque carte (lien externe)
+   822→- Emplacements : Accueil (pharmacies de garde), Pharmacies (Abidjan), Détail pharmacie (localisation précise), Détail médicament (pharmacies ayant le médicament)
+   823→
+   824→---
+   825→Task ID: 26
+   826→Agent: main (orchestrator)
+   827→Task: Page Notifications + composant NotificationDropdown — refonte complète
+   828→
+   829→Work Log:
+   830→- Création composant NotificationDropdown (@/components/shared/notification-dropdown.tsx) : cloche Bell avec badge rouge (nombre non lues), menu déroulant w-80/w-96 avec header (titre + compteur + bouton "Tout lire"), liste 5 dernières notifications (icône tonalisée, titre, message, point non lu), footer "Voir toutes les notifications" → navigate notifications. Fermeture au clic extérieur.
+   831→- Intégration dans header.tsx : remplacement du bouton cloche simple par <NotificationDropdown />, imports ajoutés (Bell conservé pour menu mobile/compte)
+   832→- Recréation page Notifications (notifications-view.tsx) :
+   833→  * Header : Eyebrow "Alertes et informations" + titre "Notifications" + badge non lues + Muted sous-texte
+   834→  * Barre actions : "Tout marquer comme lu" + "Effacer tout" (confirm)
+   835→  * 8 filtres chips horizontaux avec compteurs : Toutes, Non lues, Médicaments, Pharmacies, Ordonnances, Abonnement, Paiement, Support (scroll horizontal mobile)
+   836→  * Cartes notifications : icône tonalisée (success/warning/alert/info/promotion), titre + point non lu + badge type (Succès/Alerte/Urgent/Info/Promo), message, date, actions contextuelles (Voir le médicament / Voir la pharmacie / Consulter l'ordonnance / Renouveler l'abonnement / Voir le paiement / Contacter le support) + "Marquer comme lu" + "Supprimer"
+   837→  * Catégorisation automatique des notifications par mots-clés (médicament, pharmacie, ordonnance, abonnement, paiement, support)
+   838→  * État vide : EmptyState Inbox + message rassurant + bouton "Retour à l'accueil"
+   839→  * État non connecté : EmptyState Bell + bouton Se connecter
+   840→- Enrichissement seed notifications API (12 types) : Médicament disponible (Paracétamol Cocody), Stock faible (Amoxicilline Marcory), Rupture (Coartem Abobo), Pharmacie de garde (Yopougon), Abonnement expiré, Abonnement activé, Paiement réussi (Wave 500 FCFA), Paiement échoué (MTN Money), Ordonnance estimée (3 médicaments 2150-3200 FCFA), Ordonnance enregistrée (Traitement paludisme), Pharmacie favorite mise à jour (Riviera horaires), Message support. Dates échelonnées (1h à 72h).
+   841→- Couleurs pleines uniquement (pas de dégradé) : bg-brand-light text-brand (success), bg-amber-100 text-amber-600 (warning), bg-red-100 text-red-600 (alert), bg-sky-100 text-sky-600 (info)
+   842→- Layout responsive : desktop large (filtres horizontaux + cartes), mobile (filtres scroll horizontal + cartes empilées)
+   843→- Vérification Agent Browser + VLM :
+   844→  * Page notifications (desktop) : 12 notifications, 8 filtres avec compteurs (Toutes 12, Non lues 12, Médicaments 4, Pharmacies 2, Ordonnances 1, Abonnement 3, Paiement 1, Support 1), cartes avec icônes/badges/actions — VLM confirme "titre, 8 filtres, cartes, actions, couleurs pleines, identité premium"
+   845→  * Dropdown header : ouverture menu avec 5 dernières notifications + "Voir toutes les notifications"
+   846→  * Mobile 390px : filtres lisibles, cartes empilées, boutons faciles à cliquer — VLM confirme "filtres lisibles, empilement, boutons adaptés"
+   847→  * 0 erreur console, lint 0 erreur/0 warning
+   848→
+   849→Stage Summary:
+   850→- Page Notifications premium, responsive, complète avec 12 types de notifications et 8 filtres
+   851→- Composant NotificationDropdown dans le header (cloche + badge + menu déroulant + lien "Voir toutes")
+   852→- Cartes enrichies : icône, titre, badge type, message, date, statut lu/non lu, actions contextuelles (Voir médicament/pharmacie/ordonnance, Renouveler, Contacter support)
+   853→- Données fictives réalistes Abidjan : Paracétamol Cocody, garde Yopougon, Wave 500 FCFA, ordonnance estimée
+   854→- État vide professionnel avec bouton "Retour à l'accueil"
+   855→- Couleurs pleines uniquement (pas de dégradé)
+   856→
+   857→---
+   858→Task ID: 27
+   859→Agent: main (orchestrator)
+   860→Task: Remplacement du logo SVG par l'image originale
+   861→
+   862→Work Log:
+   863→- Copie de l'image originale "WhatsApp Image 2026-06-16 at 17.52.27.jpeg" vers public/images/logo-sablin-pharma.png (1080x400px, logo horizontal avec croix+feuille+texte SABLIN PHARMA)
+   864→- Recréation complète du composant Logo (src/components/logo.tsx) :
+   865→  * Suppression du SVG croix+feuille recréé
+   866→  * Suppression du texte "SABLIN PHARMA" (déjà inclus dans l'image)
+   867→  * LogoMark et Logo utilisent désormais <img src="/images/logo-sablin-pharma.png"> directement
+   868→  * variant="light" : ajout d'un fond blanc arrondi (bg-white/95 p-1 rounded-lg) pour visibilité sur fonds verts
+   869→  * size contrôle la hauteur, largeur auto (ratio 2.7:1)
+   870→- Création favicon (48x48px) à partir du logo → public/favicon.png
+   871→- Mise à jour layout.tsx : icons.icon = "/favicon.png" (au lieu de /logo.svg)
+   872→- Vérification Agent Browser + VLM :
+   873→  * Header desktop : "Logo affiche l'image originale de SABLIN PHARMA avec croix verte, feuille et texte, sans être un SVG/croix recréé"
+   874→  * Footer : "Logo dans le footer est l'image originale de SABLIN PHARMA, identique à celui du header"
+   875→  * Auth page (panneau vert) : "Logo SABLIN PHARMA (croix+feuille+texte) visible sur le panneau vert à gauche"
+   876→  * Mobile 390px : "Logo SABLIN PHARMA visible dans le header sur mobile"
+   877→  * 0 erreur console, lint 0 erreur/0 warning
+   878→
+   879→Stage Summary:
+   880→- Logo SVG recréé (croix+feuille) entièrement remplacé par l'image originale
+   881→- Image utilisée directement comme logo partout (header, footer, auth, mobile)
+   882→- Favicon mis à jour avec l'image originale
+   883→- Plus aucun SVG ou texte "SABLIN PHARMA" ajouté artificiellement
+   884→
+   885→---
+   886→Task ID: 28
+   887→Agent: main (orchestrator)
+   888→Task: Arrangement du logo sur la barre de navigation supérieure
+   889→
+   890→Work Log:
+   891→- Mise à jour composant Logo (src/components/logo.tsx) :
+   892→  * variant default : conteneur rounded-lg bg-background px-1.5 py-1 ring-1 ring-border/60 (fond blanc, bordure légère arrondie)
+   893→  * variant light (sur fond vert) : conteneur rounded-xl bg-white px-2 py-1.5 shadow-premium (fond blanc plein, ombre légère, coins arrondis)
+   894→  * LogoMark variant light : rounded-lg bg-white px-1.5 py-1 shadow-sm
+   895→- Ajustement taille logo header : size=32 (au lieu de 38) pour s'harmoniser dans le conteneur bordé
+   896→- Ajustement taille logo footer : size=34 (au lieu de 40) pour cohérence
+   897→- Hover : transition-opacity hover:opacity-95
+   898→- Vérification Agent Browser + VLM :
+   899→  * Desktop : "Logo bien placé à gauche, conteneur arrondi, fond blanc et bordure légère, harmonisé avec la barre (couleurs vert/blanc), proportionné, s'intègre élégamment"
+   900→  * Mobile : "Logo bien bordé et harmonisé avec le header, lisible et cohérent"
+   901→  * 0 erreur console, lint 0 erreur/0 warning
+   902→
+   903→Stage Summary:
+   904→- Logo SABLIN PHARMA arrangé dans la barre de navigation avec jolis bords (conteneur arrondi, fond blanc, bordure légère ring-1)
+   905→- Taille ajustée (32px header, 34px footer) pour harmonie
+   906→- Variant light (fond vert) : conteneur blanc plein avec ombre premium
+   907→- Logo bien proportionné et harmonisé sur desktop et mobile
+   908→
+   909→---
+   910→Task ID: 29
+   911→Agent: main (orchestrator)
+   912→Task: Correction des contours du logo (suppression des bords disgracieux)
+   913→
+   914→Work Log:
+   915→- Problème : le logo avait un conteneur avec bg-background + ring-1 ring-border/60 qui créait un cadre disgracieux sur le fond blanc du header
+   916→- Correction logo.tsx : suppression totale des contours (ring, bg, border) sur variant default → le logo s'affiche directement sans aucun cadre, proprement
+   917→- variant light (fond vert) conservé : rounded-xl bg-white px-2.5 py-1.5 shadow-premium (conteneur blanc arrondi élégant)
+   918→- Vérification VLM :
+   919→  * Desktop : "Contours propres et élégants. Aucun cadre ou bordure disgracieux."
+   920→  * Mobile : "Contours propres."
+   921→  * Auth (panneau vert) : "Contours propres et élégants."
+   922→- 0 erreur, lint 0 erreur
+   923→
+   924→Stage Summary:
+   925→- Logo SABLIN PHARMA affiché sans aucun contour disgracieux sur fond blanc (header, footer, mobile)
+   926→- Conteneur blanc élégant uniquement sur fond vert (page connexion) pour la lisibilité
+   927→
+   928→---
+   929→Task ID: 203-a
+   930→Agent: Agent 203-a (Credit system — Home + Medication Detail)
+   931→
+   932→Task: Ajouter une section pédagogique "Comment fonctionne SABLIN PHARMA ?" sur la home et un système de crédits (1 crédit) pour déverrouiller la liste des pharmacies sur la vue détail médicament. Tout en FRANÇAIS.
+   933→
+   934→Work Log:
+   935→- Lecture du worklog partagé, de src/store/credits.ts (CREDIT_COSTS, FREE_FEATURES, PAID_FEATURES), src/components/shared/credit-cost.tsx (CreditCost), src/components/shared/credit-confirm-dialog.tsx (CreditConfirmDialog), src/components/shared/alert-message.tsx (AlertMessage), src/components/ui/typography.tsx (Heading/Eyebrow/Muted).
+   936→- Lecture des 2 fichiers cibles (home-view.tsx, medication-detail-view.tsx) pour identifier les points d'insertion.
+   937→
+   938→FICHIER 1 — src/components/views/home-view.tsx (modifications par Edit, pas de Write complet) :
+   939→- Ajout import `Coins` depuis lucide-react.
+   940→- Ajout import `AlertMessage` depuis @/components/shared/alert-message.
+   941→- Ajout import `Muted` depuis @/components/ui/typography (manquant pour la nouvelle section).
+   942→- Insertion d'une nouvelle section "2.5. COMMENT FONCTIONNE SABLIN PHARMA" APRÈS la section confiance (stats StatBlock) et AVANT la section catégories (3. CATÉGORIES).
+   943→  * En-tête centré : Eyebrow "Comment ça marche" + Heading h2 "Comment fonctionne SABLIN PHARMA ?" + Muted "Simple, rapide et transparent."
+   944→  * Grille sm:grid-cols-3 de 3 Cards (border-border/70, p-6, shadow-card, hover -translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg) :
+   945→    - Card 1 : icône Search dans cercle bg-brand-light text-brand, titre "1. Recherchez gratuitement", texte "Recherchez un médicament ou une pharmacie. C'est gratuit et illimité."
+   946→    - Card 2 : icône Coins dans cercle bg-brand-light text-brand, titre "2. Utilisez vos crédits", texte "Les services avancés utilisent vos crédits. Vous payez seulement ce que vous utilisez."
+   947→    - Card 3 : icône CheckCircle2 dans cercle bg-brand-light text-brand, titre "3. Gagnez du temps", texte "Vérifiez la disponibilité avant de vous déplacer en pharmacie."
+   948→  * AlertMessage variant="info" en bas : "Les recherches simples sont gratuites. Les services avancés fonctionnent avec des crédits à partir de 200 FCFA. Aucun abonnement obligatoire."
+   949→
+   950→FICHIER 2 — src/components/views/medication-detail-view.tsx (modifications par MultiEdit, pas de Write complet) :
+   951→- Ajout import `Coins` depuis lucide-react.
+   952→- Ajout imports `CreditConfirmDialog` et `CreditCost` depuis @/components/shared/.
+   953→- Ajout import `useCredits, CREDIT_COSTS` depuis @/store/credits.
+   954→- State ajouté après les states existants : `const [showCreditDialog, setShowCreditDialog] = useState(false); const [pharmaciesUnlocked, setPharmaciesUnlocked] = useState(false); const { credits } = useCredits();`
+   955→- Reset `setPharmaciesUnlocked(false)` ajouté au début du useEffect de fetch (pour ré-initialiser le portail à chaque changement de slug/medication).
+   956→- Badge `<CreditCost cost={0} />` ("Gratuit") ajouté à la fin de la ligne de badges des infos générales (à côté de category/status/Rx).
+   957→- Section "PHARMACIES DISPONIBLES" réécrite :
+   958→  * Eyebrow "Disponibilité" + `<CreditCost cost={CREDIT_COSTS.seePharmacies} />` ("1 crédit") dans un flex items-center gap-2.
+   959→  * Si `!pharmaciesUnlocked` : Card portail (border-brand/20, p-6 sm:p-8, text-center, shadow-card) avec icône Coins dans cercle bg-brand-light text-brand, titre "Voir les pharmacies disponibles", texte explicatif "Cette action coûte 1 crédit. Elle vous permet de voir les pharmacies où ce médicament est disponible.", affichage du solde courant (credits depuis useCredits), bouton "Utiliser 1 crédit" (bg-brand text-white hover:bg-brand-dark, ouvre CreditConfirmDialog via setShowCreditDialog(true)) + bouton "Annuler" (variant outline, navigate('medications')).
+   960→  * Si `pharmaciesUnlocked` : rendu normal (grille lg:grid-cols-2 de PharmacyMedCard + GoogleMap).
+   961→  * CreditConfirmDialog rendu à la fin de la section : open={showCreditDialog}, onOpenChange={setShowCreditDialog}, title="Voir les pharmacies disponibles", cost={CREDIT_COSTS.seePharmacies} (=1), description="Liste exacte des pharmacies avec ce médicament en stock", benefits=["Voir toutes les pharmacies qui ont ce médicament","Prix indicatif par pharmacie","Distance et statut d'ouverture"], onConfirm={() => setPharmaciesUnlocked(true)}.
+   962→- Les informations générales (nom, DCI, dosage, forme, catégorie, description, prix indicatif) restent gratuites et visibles sans crédit.
+   963→
+   964→Contraintes critiques respectées :
+   965→- AUCUNE couleur dégradée : couleurs pleines uniquement (bg-brand, bg-brand-light, text-brand, text-foreground, text-white).
+   966→- Titres en text-foreground ou text-white (sur fond vert). Pas de vert sur vert.
+   967→- Boutons principaux : bg-brand text-white hover:bg-brand-dark.
+   968→- Icônes autorisées uniquement (Search, Coins, CheckCircle2). Aucune étoile/feuille/bâtiment.
+   969→- TypeScript strict, pas de tests, pas de z-ai-web-dev-sdk côté client.
+   970→- `bun run lint` : 0 erreur / 0 warning sur les 2 fichiers modifiés.
+   971→- Dev server : ✓ Compiled sans erreur après modifications (vérifié dans dev.log).
+   972→
+   973→Stage Summary:
+   974→- 2 vues mises à jour avec le système de crédits pédagogique et fonctionnel.
+   975→- Home : la nouvelle section "Comment fonctionne SABLIN PHARMA ?" explique clairement le modèle gratuit/crédits avec 3 étapes visuelles + message pédagogique.
+   976→- Medication Detail : la liste des pharmacies est désormais protégée par un portail à 1 crédit (CreditConfirmDialog), tandis que toutes les infos générales du médicament restent gratuites (badge "Gratuit" visible).
+   977→- Le portail se ré-initialise automatiquement quand l'utilisateur navigue vers un autre médicament (reset sur changement de slug).
+   978→- Le solde de crédits est affiché dans le portail pour informer l'utilisateur avant confirmation.
+   979→- Stores et composants partagés consommés correctement : useCredits (credits), CREDIT_COSTS.seePharmacies, CreditConfirmDialog (debit interne + toast + navigation wallet si insuffisant), CreditCost (badges Gratuit/1 crédit).
+   980→
+   981→---
+   982→Task ID: 202-a
+   983→Agent: fullstack-developer (wallet + profile credits)
+   984→Task: Vue "Mon portefeuille" (wallet-view.tsx) + enrichissement profile-view.tsx (sections crédits)
+   985→
+   986→Work Log:
+   987→- Lecture du worklog, du store useCredits (CREDIT_COSTS, CREDIT_PACKS, FREE_FEATURES, PAID_FEATURES), et des composants partagés CreditBadge, CreditCost, PassBadge, CreditConfirmDialog.
+   988→- Extension de `src/lib/types.ts` : ajout de `packAmount?: number` et `passOrdonnance?: boolean` sur `NavParams` pour permettre `navigate("payment", { packAmount })` et `navigate("payment", { passOrdonnance: true })` sans erreur TypeScript.
+   989→- Création de `src/components/views/wallet-view.tsx` (écrase le stub) :
+   990→  * Export nommé `WalletView`, directive `"use client"`.
+   991→  * Layout `max-w-4xl` responsive, lien retour Accueil.
+   992→  * En-tête : Eyebrow "Gestion des crédits", titre "Mon portefeuille", sous-texte.
+   993→  * Carte "Solde actuel" (bg-brand-light) : grand nombre de crédits (text-4xl font-extrabold text-brand-dark), valeur FCFA estimée (1 crédit ≈ 100 FCFA), message pédagogique, boutons "Recharger" (scroll → packs) et "Voir les tarifs" (scroll → tableau). Bloc latéral "Pass Ordonnance" (amber-50) affichant l'état hasPass.
+   994→  * Messages pédagogiques en grid sm:grid-cols-3 : "Aucun abonnement obligatoire", "Vous payez seulement les services avancés", "Rechargez vos crédits quand vous voulez".
+   995→  * Section "Packs de recharge" : grille sm:grid-cols-2 lg:grid-cols-4 des CREDIT_PACKS (200/2, 500/6 POPULAIRE, 1000/13, 2000/28). Badge "Populaire" (bg-amber-500 text-white) sur le pack 500. Bouton "Recharger" → navigate("payment", { packAmount: pack.amount }).
+   996→  * Section "Pass Ordonnance" : Card amber (bg-amber-50 border-amber-500/30), prix 300 FCFA, 4 avantages (estimation complète, pharmacies disponibles, comparaison simple, sauvegarde), bouton "Acheter le Pass — 300 FCFA" → navigate("payment", { passOrdonnance: true }). Badge "Vous possédez déjà le Pass" si hasPass.
+   997→  * Section "Fonctionnalités & Tarifs" : tableau responsive (min-w-[640px] + scroll-x) avec colonnes Fonctionnalité / Description / Type d'accès / Coût. FREE_FEATURES (badge vert "Gratuit" + 0 FCFA) et PAID_FEATURES (badge "Crédits" + CreditCost, ou PassBadge + 300 FCFA pour l'item isPass).
+   998→  * Section "Historique des crédits" : liste des transactions (icône +/-, description, type + date, solde après). Skeleton pendant loading, EmptyState si tableau vide.
+   999→  * Bloc assistance : Card avec bouton "Contacter le support" → settings.
+  1000→  * Helpers internes : SectionTitle, InfoNote.
+  1001→- Mise à jour de `src/components/views/profile-view.tsx` :
+  1002→  * Imports ajoutés : Wallet, Coins, Receipt (lucide) ; useCredits, FREE_FEATURES, PAID_FEATURES (@/store/credits) ; CreditBadge (@/components/shared/credit-badge) ; CreditCost, PassBadge (@/components/shared/credit-cost) ; formatFCFA (@/lib/format).
+  1003→  * SETTINGS_MENU : nouvelle entrée { icon: Wallet, label: "Mon portefeuille", view: "wallet" as const } insérée après "Gérer mon abonnement".
+  1004→  * Header profil : CreditBadge ajouté à côté du badge de statut du compte.
+  1005→  * Carte "Mon portefeuille" (Card bg-brand-light) insérée APRÈS la stats strip du profil et AVANT le MAIN LAYOUT grid : solde crédits (text-4xl font-extrabold text-brand-dark), valeur FCFA estimée, badge "Pass Ordonnance" si hasPass, message pédagogique, 3 boutons "Recharger" / "Voir les tarifs" / "Historique" (→ wallet).
+  1006→  * Section "Mes accès SABLIN PHARMA" insérée APRÈS la section Abonnement et AVANT la section Notifications : grid sm:grid-cols-2 avec 2 blocs (Fonctionnalités gratuites bg-success-light/20 avec coches vertes CheckCircle2 text-success, Fonctionnalités avec crédits bg-brand-light/20 avec CreditCost/PassBadge à droite). Listes en max-h-72 overflow-y-auto scroll-thin.
+  1007→
+  1008→Contraintes critiques respectées :
+  1009→- AUCUNE couleur dégradée : couleurs pleines uniquement (bg-brand, bg-brand-light, text-brand, text-foreground, text-brand-dark, bg-amber-50, bg-amber-500, bg-success-light, text-success). bg-brand-gradient pré-existant conserve sa résolution en couleur solide via globals.css.
+  1010→- Titres en text-foreground / text-brand-dark (pas de vert sur vert). Texte toujours lisible sur son fond (amber-900 sur amber-50, brand-dark sur brand-light, etc.).
+  1011→- Icônes lucide restreintes à la liste autorisée (Coins, Wallet, CheckCircle2, Crown, Pill, Timer, ClipboardList, Phone, ChevronRight, ChevronLeft, Plus, CreditCard, Receipt, Zap, Info, AlertCircle, Headphones, MapPin, Search).
+  1012→- TypeScript strict, pas de tests, pas de z-ai-web-dev-sdk.
+  1013→- `bun run lint` : 0 erreur / 0 warning.
+  1014→- Dev server : ✓ Compiled sans erreur après modifications (vérifié dans dev.log).
+  1015→
+  1016→Stage Summary:
+  1017→- Vue WalletView complète et fonctionnelle : solde, packs de recharge, Pass Ordonnance, tableau des fonctionnalités, historique des transactions, messages pédagogiques.
+  1018→- ProfileView enrichi avec carte "Mon portefeuille" (accès rapide au wallet) et section "Mes accès SABLIN PHARMA" (gratuit vs crédits).
+  1019→- Entrée "Mon portefeuille" ajoutée au menu des paramètres du profil pour navigation rapide.
+  1020→- NavParams étendu (packAmount, passOrdonnance) pour supporter les flux de paiement depuis le wallet.
+  1021→- Stores et composants partagés consommés correctement : useCredits (credits, hasPass, transactions, fetch, loading), CREDIT_PACKS, FREE_FEATURES, PAID_FEATURES, CreditBadge, CreditCost, PassBadge.
+  1022→- Toutes les couleurs sont solides, les titres sont en text-foreground/text-brand-dark, aucun dégradé.
+  1023→
+  1024→---
+  1025→Task ID: 204-a
+  1026→Agent: fullstack-developer (vues prescription + payment)
+  1027→Task: Mise à jour de 2 vues pour SABLIN PHARMA — prescription-view (estimation à 2 crédits) + payment-view (recharge crédits + Pass Ordonnance)
+  1028→
+  1029→Work Log:
+  1030→- Lecture du worklog, src/store/credits.ts (CREDIT_COSTS, CREDIT_PACKS), src/components/shared/credit-confirm-dialog.tsx, src/components/shared/credit-cost.tsx
+  1031→- Lecture des 2 fichiers cibles (prescription-view.tsx 1029 lignes, payment-view.tsx 783 lignes) + lib/types.ts (NavParams étendu avec packAmount et passOrdonnance)
+  1032→- Création route API POST /api/credits/pass (300 FCFA) — crée PassOrdonnance actif, enregistre Payment, CreditTransaction type "pass", vérifie absence de pass actif
+  1033→
+  1034→FICHIER 1 — prescription-view.tsx (modifications ciblées par Edit) :
+  1035→- Imports ajoutés : CreditConfirmDialog (@/components/shared/credit-confirm-dialog), CreditCost (@/components/shared/credit-cost), useCredits + CREDIT_COSTS (@/store/credits)
+  1036→- Hook useCredits() ajouté → const { hasPass } = useCredits()
+  1037→- State local : const [showCreditDialog, setShowCreditDialog] = useState(false)
+  1038→- Bouton "Estimer le coût" modifié :
+  1039→  * className remplacé de bg-brand-gradient vers bg-brand text-white hover:bg-brand-dark (couleur pleine, pas de dégradé)
+  1040→  * onClick : si hasPass → handleEstimate() direct ; sinon → setShowCreditDialog(true)
+  1041→  * Badge <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.estimatePrescription} className="ml-1.5" /> ajouté dans le bouton
+  1042→- Message informatif ajouté sous le bouton :
+  1043→  * Si hasPass : "Pass Ordonnance actif — estimation gratuite" (texte amber-700 + icône Crown)
+  1044→  * Sinon : "L'ajout des médicaments est gratuit. L'estimation complète coûte 2 crédits."
+  1045→- CreditConfirmDialog ajouté en fin de composant :
+  1046→  * title="Estimer mon ordonnance", cost={CREDIT_COSTS.estimatePrescription} (=2)
+  1047→  * description="Obtenez le total estimatif, les médicaments disponibles, les pharmacies recommandées et les options de comparaison"
+  1048→  * benefits=["Coût total estimatif min/max","Médicaments disponibles","Pharmacies recommandées","Options de comparaison"]
+  1049→  * onConfirm={() => handleEstimate()}
+  1050→
+  1051→FICHIER 2 — payment-view.tsx (modifications ciblées par Edit) :
+  1052→- Imports ajoutés : useCredits + CREDIT_PACKS (@/store/credits), CreditCost (@/components/shared/credit-cost), Coins (lucide-react)
+  1053→- Hook useNav : const { navigate, params } = useNav() — récupère params.packAmount et params.passOrdonnance
+  1054→- Hook useCredits : const { recharge, fetch: fetchCredits, hasPass } = useCredits()
+  1055→- Nouveau type local : type PaymentMode = "premium" | "recharge" | "pass"
+  1056→- Nouveaux states : mode (initialisé depuis params), selectedPackAmount (initialisé depuis params.packAmount)
+  1057→- Nouveaux useMemo : currentAmount, currentLabel, currentShortLabel (selon mode)
+  1058→- Header refactorisé : bg-brand-light (couleur pleine), icône mode-aware (Crown/Receipt/Coins), titre mode-aware, description mode-aware, bouton retour dynamique (subscription ou wallet)
+  1059→- Nouvelle section "Que souhaitez-vous payer ?" : 3 cartes cliquables (Premium 500 FCFA / Pass Ordonnance 300 FCFA / Recharger mes crédits dès 200 FCFA) avec état visuel sélectionné + badge "Sélectionné"/"Déjà actif" pour pass
+  1060→- Nouvelle section "Recharger mes crédits" (visible si mode=recharge) : 4 cartes CREDIT_PACKS (200/2, 500/6, 1000/13, 2000/28) — Pack Standard marqué "Populaire" (badge amber), sélection met à jour selectedPackAmount
+  1061→- Nouvelle section "Pass Ordonnance" (visible si mode=pass) : carte avec description, badge 300 FCFA, CreditCost cost=0, message "Soit 0 crédit par estimation", indicateur "Pass déjà actif" si hasPass
+  1062→- handlePay refactorisé en 3 branches :
+  1063→  * recharge : recharge(selectedPackAmount, provider) → toast "Recharge réussie !"
+  1064→  * pass : POST /api/credits/pass { provider } → fetchCredits() pour rafraîchir hasPass → toast "Pass Ordonnance activé !"
+  1065→  * premium : POST /api/subscription (comportement existant conservé)
+  1066→- Formulaire de paiement conservé (operator, phone, holder) — Montant mode-aware via currentLabel + currentAmount
+  1067→- Bouton "Payer {currentAmount} FCFA" (anciennement "Payer maintenant 500 FCFA") — désactivé si pass déjà actif
+  1068→- Récapitulatif mode-aware : icône (Crown/Receipt/Coins), libellé (Abonnement Premium / Pass Ordonnance / Recharge de crédits), montant, durée (1 mois / 30 jours / Illimité)
+  1069→- Modale succès mode-aware : bg-brand (couleur pleine, dégradé supprimé), message ("Abonnement Premium activé" / "Pass Ordonnance activé" / "Recharge de crédits effectuée"), 3e détail dynamic ("Crédits obtenus" pour recharge / "Date d'expiration" sinon), bouton CTA mode-aware ("Accéder à mon compte" / "Retour à mon portefeuille")
+  1070→- Messages obligatoires ajoutés : "Rechargez vos crédits quand vous voulez" + "Aucun abonnement obligatoire" dans la section recharge
+  1071→- Si non connecté : "Connectez-vous pour continuer" (déjà présent, légèrement ajusté pour être générique)
+  1072→- Toutes les classes bg-brand-gradient remplacées par bg-brand text-white hover:bg-brand-dark (couleurs pleines uniquement, conformément à la contrainte critique)
+  1073→
+  1074→Vérifications :
+  1075→- bun run lint : 0 erreur, 0 warning
+  1076→- TypeScript strict respecté (types PaymentMode, PaymentState, Provider conservés)
+  1077→- Pas de tests écrits (conforme aux règles)
+  1078→- Navbar params déjà étendus (packAmount, passOrdonnance) par un agent précédent — aucune modification de types nécessaire
+  1079→- dev.log surveillé : aucune erreur de compilation liée à mes modifications
+  1080→
+  1081→Stage Summary:
+  1082→- prescription-view.tsx : estimation protégée par CreditConfirmDialog (2 crédits), bypass si Pass Ordonnance actif, message informatif contextuel
+  1083→- payment-view.tsx : 3 modes de paiement unifiés (Premium 500 / Pass 300 / Recharge 200-2000) avec sélection visuelle, formulaire unique adaptatif, route API /api/credits/pass créée pour l'achat du Pass Ordonnance
+  1084→- Toutes les couleurs pleines (bg-brand, bg-brand-light, text-brand, text-brand-dark) — aucun dégradé
+  1085→- Titres en text-foreground, texte toujours lisible sur fonds clairs (bg-brand-light) et fonds sombres (bg-brand avec text-white)
+  1086→- UX cohérente avec le reste de la plateforme (cartes cliquables, badges, toasts sonner, états visuels sélection/actif/désactivé)
+  1087→
+  1088→---
+  1089→Task ID: 30
+  1090→Agent: main (orchestrator)
+  1091→Task: Modèle économique à crédits SABLIN PHARMA — implémentation complète
+  1092→
+  1093→Work Log:
+  1094→- Schéma Prisma : modèle CreditTransaction (id, userId, type, amount, description, balanceAfter, createdAt), modèle PassOrdonnance (id, userId, active, price, createdAt), champ credits (default 3) sur User
+  1095→- API routes : /api/credits (GET solde+transactions+pass), /api/credits/debit (POST débit avec vérification solde), /api/credits/recharge (POST recharge avec 4 packs), /api/credits/pass (POST achat Pass Ordonnance 300 FCFA)
+  1096→- Store useCredits (persist) : credits, hasPass, transactions, fetch, debit, recharge + CREDIT_COSTS (7 actions payantes), CREDIT_PACKS (4 packs), FREE_FEATURES (11 gratuits), PAID_FEATURES (8 payants)
+  1097→- Composants partagés : CreditBadge (solde dans header), CreditConfirmDialog (modale confirmation avec coût/solde/solde après/avantages/boutons Confirmer+Annuler/solde insuffisant→Recharger), CreditCost (badge Gratuit/X crédits), PassBadge
+  1098→- Header : CreditBadge cliquable (→ wallet) visible desktop sm+, "Mon portefeuille" dans menu compte déroulant
+  1099→- /api/me mis à jour : inclut credits dans la réponse user
+  1100→- Type View étendu : "wallet" ajouté + NavParams (packAmount?, passOrdonnance?)
+  1101→- Page Portefeuille (WalletView) : solde crédits + valeur FCFA, 4 packs recharge (200/2, 500/6, 1000/13, 2000/28), Pass Ordonnance 300 FCFA, tableau Fonctionnalités & Tarifs (Gratuit/X crédits/Pass), historique transactions, messages pédagogiques
+  1102→- Page Profil : section "Mes accès SABLIN PHARMA" (2 blocs : Fonctionnalités gratuites + Fonctionnalités avec crédits), carte "Mon portefeuille" (solde, FCFA, boutons Recharger/Tarifs/Historique), SETTINGS_MENU "Mon portefeuille"
+  1103→- Page Accueil : section "Comment fonctionne SABLIN PHARMA ?" (3 étapes : Recherchez gratuitement / Utilisez vos crédits / Gagnez du temps) + AlertMessage pédagogique
+  1104→- Page Détail médicament : badge "Gratuit" sur infos générales, section "Voir les pharmacies disponibles — 1 crédit" avec CreditConfirmDialog (coût 1, solde, solde après, bénéfices, boutons Confirmer/Annuler, solde insuffisant→Recharger)
+  1105→- Page Ordonnance : badge "2 crédits" sur bouton Estimer, CreditConfirmDialog (coût 2, description, 4 bénéfices), message "L'ajout est gratuit. L'estimation coûte 2 crédits.", Pass Ordonnance actif = gratuit
+  1106→- Page Paiement : 3 modes (Premium 500 / Pass 300 / Recharge crédits), 4 packs recharge, formulaire Mobile Money, bouton "Payer {montant} FCFA", recharge() ou achat Pass après paiement, messages pédagogiques
+  1107→- Vérification Agent Browser + VLM :
+  1108→  * Accueil : "Section 'Comment fonctionne SABLIN PHARMA ?' avec 3 étapes présente"
+  1109→  * Détail médicament : "Section 'Voir les pharmacies disponibles' demande 1 crédit"
+  1110→  * Ordonnance : "Message indique que l'estimation coûte 2 crédits, badge '2 crédits' sur le bouton"
+  1111→  * Mobile : "Sections lisibles, contraste bon, aucun problème"
+  1112→  * 0 erreur console, lint 0 erreur/0 warning
+  1113→
+  1114→Stage Summary:
+  1115→- Modèle économique à crédits complet et cohérent sur toute la plateforme
+  1116→- 11 fonctionnalités gratuites (recherche, infos médicament, pharmacies proches/ouvertes/garde, horaires, adresse, téléphone, profil, aide)
+  1117→- 7 actions payantes à crédits (voir pharmacies dispos 1 crédit, prix détaillés 1, estimation ordonnance 2, meilleure pharmacie 1, comparaison 1, alerte 1, confirmation 3)
+  1118→- Pass Ordonnance 300 FCFA pour usage occasionnel
+  1119→- 4 packs de recharge (200/2, 500/6, 1000/13, 2000/28 FCFA/crédits)
+  1120→- Modale de confirmation avant toute action payante (coût, solde, solde après, bénéfices)
+  1121→- Badge solde crédits dans le header
+  1122→- Page Portefeuille complète (solde, packs, Pass, tarifs, historique)
+  1123→- Section "Mes accès" dans le profil (gratuit vs crédits)
+  1124→- Section "Comment ça marche" sur l'accueil (3 étapes)
+  1125→- Messages pédagogiques partout ("Gratuit", "Cette action utilise des crédits", "Aucun abonnement obligatoire")
+  1126→- Couleurs pleines uniquement, pas de dégradé, contrastes vérifiés
+  1127→
+  1128→---
+  1129→Task ID: 31
+  1130→Agent: main (orchestrator)
+  1131→Task: Plateforme super responsive — audit et corrections
+  1132→
+  1133→Work Log:
+  1134→- Audit responsive complet avec Agent Browser sur mobile (390px), tablette (768px), desktop (1440px)
+  1135→- Vérification overflow horizontal sur toutes les pages clés (Accueil, Médicaments, Pharmacies, Ordonnance, Abonnement) : 0px sur tous les viewports
+  1136→- Corrections CSS globales (globals.css) :
+  1137→  * box-sizing: border-box sur tous les éléments
+  1138→  * overflow-x: hidden sur html et body (prévention débordement)
+  1139→  * -webkit-text-size-adjust: 100% (iOS)
+  1140→  * max-width: 100% sur img, video, svg, table (pas de débordement média)
+  1141→  * word-wrap + overflow-wrap: break-word sur les titres (pas de texte coupé)
+  1142→  * Font sizes responsive avec clamp() : h1 (1.5rem→2.5rem), h2 (1.25rem→2rem), h3 (1.1rem→1.5rem) selon viewport
+  1143→- Vérification VLM :
+  1144→  * Mobile 390px : "Responsivité bonne : textes lisibles, boutons cliquables, pas de débordement. Tout s'adapte bien à l'écran mobile."
+  1145→  * Tablette 768px : overflow 0px
+  1146→  * Desktop 1440px : overflow 0px
+  1147→  * 0 erreur console, lint 0 erreur/0 warning
+  1148→
+  1149→Stage Summary:
+  1150→- Plateforme SABLIN PHARMA super responsive sur mobile, tablette et desktop
+  1151→- Font sizes fluides (clamp) qui s'adaptent au viewport
+  1152→- Prévention débordement horizontal (overflow-x hidden, max-width 100% médias)
+  1153→- Titres avec word-wrap pour éviter les coupures
+  1154→- 0 overflow sur tous les viewports et toutes les pages
+  1155→
+  1156→---
+  1157→Task ID: 303-a
+  1158→Agent: subagent (303-a)
+  1159→Task: Mise à jour de 5 fichiers pour la pédagogie des crédits SABLIN PHARMA (header, bottom-nav, profile-view, wallet-view, home-view)
+  1160→
+  1161→Work Log:
+  1162→- Lecture du worklog partagé et des composants partagés (CreditBadge, LockedView, CreditCost/PassBadge, store credits)
+  1163→- FICHIER 1 — src/components/layout/header.tsx :
+  1164→  * Imports ajoutés : Wallet, Plus (lucide-react)
+  1165→  * CreditBadge désormais affiché dans le menu Sheet mobile (encadré avec bordure + bouton Recharger)
+  1166→  * Bouton "Recharger" (outline, sm:inline-flex) ajouté à côté du CreditBadge dans le header desktop
+  1167→  * Lien "Portefeuille" (icône Wallet) ajouté dans le Sheet mobile entre "Notifications" et "Paramètres"
+  1168→- FICHIER 2 — src/components/layout/bottom-nav.tsx :
+  1169→  * Item "Profil" remplacé par "Portefeuille" (vue wallet, icône Wallet)
+  1170→  * 5 items : Accueil, Médicaments, Ordonnance, Pharmacies, Portefeuille
+  1171→  * Profil reste accessible via le menu compte du header (DropdownMenu + Sheet)
+  1172→- FICHIER 3 — src/components/views/profile-view.tsx :
+  1173→  * Nouvelle section "Restrictions de mon compte" ajoutée APRÈS "Mes accès SABLIN PHARMA"
+  1174→  * SectionTitle avec icône Lock, Card avec liste de 6 messages :
+  1175→    - 5 messages "Sans crédit..." avec icône Lock rouge (text-danger)
+  1176→    - 1 message final "Rechargez vos crédits..." en gras avec CheckCircle2 vert + bouton Recharger → wallet
+  1177→- FICHIER 4 — src/components/views/wallet-view.tsx :
+  1178→  * Imports ajoutés : Lock, Crown (lucide-react)
+  1179→  * Nouvelle section "Services bloqués sans crédits" ajoutée APRÈS le tableau des tarifs
+  1180→  * SectionTitle avec icône Lock, Card avec grille de 8 services (Lock rouge) :
+  1181→    Module Ordonnance, Ajout de médicament à une ordonnance, Estimation complète, Meilleure pharmacie, Comparaison des prix, Disponibilité réelle par pharmacie, Confirmation avant déplacement, Alertes de disponibilité
+  1182→  * Bandeau en bas avec message "Rechargez vos crédits à partir de 200 FCFA ou achetez un Pass Ordonnance à 300 FCFA..." + boutons "Recharger" (scroll packs) et "Acheter un Pass" (navigate payment passOrdonnance)
+  1183→- FICHIER 5 — src/components/views/home-view.tsx :
+  1184→  * AlertMessage existant dans "Comment fonctionne SABLIN PHARMA ?" remplacé par le nouveau message pédagogique :
+  1185→    "Les recherches simples sont accessibles. Les services avancés comme l'ordonnance, les disponibilités réelles, la comparaison et les confirmations nécessitent des crédits."
+  1186→- Composant partagé CreditBadge modifié : si solde = 0, badge affiché en rouge (bg-danger-light text-danger) au lieu de (bg-brand-light text-brand-dark)
+  1187→- Contraintes respectées :
+  1188→  * Aucune couleur dégradée ajoutée (uniquement couleurs pleines : bg-brand, bg-brand-light, bg-danger-light, bg-success-light, bg-muted/30, bg-amber-50)
+  1189→  * Titres en text-foreground
+  1190→  * Texte toujours lisible (text-foreground, text-foreground/85, text-brand-dark, text-danger, text-success)
+  1191→  * Tout en français
+  1192→- Lint : 0 erreur, 0 warning
+  1193→- Dev server : compilation OK, pas d'erreur runtime
+  1194→
+  1195→Stage Summary:
+  1196→- Pédagogie des crédits renforcée sur 5 fichiers clés
+  1197→- CreditBadge visuel dynamique (rouge si solde 0, vert brand sinon)
+  1198→- Accès au Portefeuille mis en avant : bottom-nav mobile, header desktop (badge + Recharger), Sheet mobile (badge + Recharger + lien Portefeuille)
+  1199→- Profil : nouvelle section "Restrictions de mon compte" qui liste clairement ce qui est bloqué sans crédit + appel à l'action
+  1200→- Portefeuille : nouvelle section "Services bloqués sans crédits" avec les 8 services payants + double CTA (Recharger / Acheter Pass)
+  1201→- Accueil : message pédagogique actualisé dans "Comment fonctionne SABLIN PHARMA ?"
+  1202→
+  1203→---
+  1204→Task ID: 302-a
+  1205→Agent: 302-a (credit-gating views)
+  1206→
+  1207→Task: Amélioration du système de crédits sur 2 vues (medication-detail-view + pharmacy-detail-view)
+  1208→
+  1209→Work Log:
+  1210→- Lecture du worklog + stores crédits (useCredits, CREDIT_COSTS, hasPass) + composants partagés (LockedView, CreditConfirmDialog, CreditCost)
+  1211→- FICHIER 1 — src/components/views/medication-detail-view.tsx :
+  1212→  * Import ajouté : Lock (lucide-react) ; useCredits étendu pour récupérer hasPass
+  1213→  * Nouveaux states : showPrescriptionDialog, showPricesDialog, pricesUnlocked (reset au changement de médicament)
+  1214→  * Actions fiche médicament : nouveau bouton "Ajouter à mon ordonnance" + CreditCost cost={1} (cost={0} si hasPass). Au clic : si hasPass → toast + navigate("prescription") directement ; sinon ouvre CreditConfirmDialog (title="Ajouter à mon ordonnance", cost=1, description="Ce médicament sera ajouté à votre ordonnance pour estimation.", benefits=["Médicament ajouté à votre liste","Vous pouvez lancer l'estimation ensuite"], onConfirm → toast + navigate("prescription"))
+  1215→  * Bouton primaire "Estimer mon ordonnance" : bg-brand-gradient remplacé par bg-brand (couleur pleine, contrainte respectée)
+  1216→  * Après déverrouillage des pharmacies : bannière "Voir les prix détaillés par pharmacie" + bouton "Voir les prix détaillés" + CreditCost cost={1}, masquée si hasPass ou pricesUnlocked. CreditConfirmDialog dédié (cost=1, onConfirm → setPricesUnlocked(true))
+  1217→  * PharmacyMedCard : nouveau prop pricesUnlocked (boolean). Cellule "Prix indicatif" affiche le prix si pricesUnlocked, sinon "Masqué" avec icône Lock
+  1218→  * Badge "Gratuit" (CreditCost cost={0}) déjà présent sur les infos générales (nom, DCI, dosage, forme, catégorie, description, prix indicatif général) — conservé
+  1219→  * 3 CreditConfirmDialog au total (pharmacies + ordonnance + prix détaillés)
+  1220→- FICHIER 2 — src/components/views/pharmacy-detail-view.tsx :
+  1221→  * Imports ajoutés : Coins, Lock (lucide-react) ; CreditConfirmDialog, CreditCost (composants partagés) ; useCredits, CREDIT_COSTS (store)
+  1222→  * Nouveaux states : availabilityUnlocked, pricesUnlocked, showAvailabilityDialog, showPricesDialog, showCompareDialog, showConfirmDialog (reset availability/prices au changement de pharmacie) ; hasPass récupéré du store
+  1223→  * Bouton primaire "Appeler" : bg-brand-gradient remplacé par bg-brand (couleur pleine)
+  1224→  * Section médicaments : 2 bannières de déverrouillage côte à côte (sm:grid-cols-2) :
+  1225→    - "Voir la disponibilité" + CreditCost cost={1} (CREDIT_COSTS.alertAvailability) → CreditConfirmDialog (title="Disponibilité des médicaments", description="Voir quels médicaments sont en stock dans cette pharmacie.", benefits=["Stock exact par médicament","Disponibilité en temps réel"], onConfirm → setAvailabilityUnlocked(true))
+  1226→    - "Voir les prix" + CreditCost cost={1} (CREDIT_COSTS.seePrices) → CreditConfirmDialog (title="Prix détaillés des médicaments", benefits=["Prix exact par médicament","Comparaison rapide","Budget maîtrisé"], onConfirm → setPricesUnlocked(true))
+  1227→    - Bannières masquées si hasPass (accès direct gratuit)
+  1228→  * Liste médicaments : chaque item affiche prix (Price) si hasPass||pricesUnlocked sinon badge "Prix masqué" (Lock) ; MedStatusBadge si hasPass||availabilityUnlocked sinon badge "Masqué" (Lock)
+  1229→  * Carte "Actions rapides" : 2 nouveaux boutons full-width :
+  1230→    - "Comparer avec d'autres pharmacies" + CreditCost cost={1} (CREDIT_COSTS.comparePharmacies) → si hasPass toast+navigate, sinon CreditConfirmDialog (benefits=["Tableau comparatif détaillé","Meilleur rapport prix/distance","Choix éclairé"], onConfirm → toast+navigate("pharmacies"))
+  1231→    - "Demander une confirmation" + CreditCost cost={3} (CREDIT_COSTS.confirmBeforeVisit) → si hasPass toast direct, sinon CreditConfirmDialog (title="Confirmation avant déplacement", description="La pharmacie confirmera le stock avant votre déplacement.", benefits=["Éviter un déplacement inutile","Confirmation par téléphone","Gain de temps garanti"], onConfirm → toast)
+  1232→  * 4 CreditConfirmDialog au total (disponibilité + prix + comparaison + confirmation)
+  1233→  * Infos basiques restent GRATUITES : nom, commune, quartier, téléphone, horaires, statut ouvert/fermé, garde (déjà affichés sans gate)
+  1234→- Contraintes respectées :
+  1235→  * AUCUNE couleur dégradée ajoutée (uniquement bg-brand, bg-brand-dark, bg-brand-light, bg-muted — couleurs pleines)
+  1236→  * bg-brand-gradient remplacé par bg-brand sur les boutons modifiés
+  1237→  * Titres en text-foreground / text-brand-dark
+  1238→  * Texte toujours lisible (text-foreground, text-muted-foreground, text-white sur fond vert)
+  1239→  * Tout en français
+  1240→- Lint : 0 erreur, 0 warning
+  1241→- Dev server : compilation OK (✓ Compiled in 510ms), pas d'erreur runtime
+  1242→
+  1243→Stage Summary:
+  1244→- medication-detail-view : 3 actions crédits (voir pharmacies 1 crédit, ajouter ordonnance 1 crédit, voir prix détaillés 1 crédit) + infos générales gratuites (badge Gratuit)
+  1245→- pharmacy-detail-view : 4 actions crédits (disponibilité 1 crédit, prix 1 crédit, comparer 1 crédit, confirmation déplacement 3 crédits) + infos basiques gratuites
+  1246→- Pass Ordonnance (hasPass) : déverrouille GRATUITEMENT toutes les actions crédits des 2 vues
+  1247→- Lock visuel (icône Lock + "Masqué") quand une info crédit est verrouillée
+  1248→- CreditConfirmDialog utilisé pour toutes les actions payantes (débit automatique + toast de confirmation + redirection wallet si solde insuffisant)
+  1249→
+  1250→---
+  1251→Task ID: 301-a
+  1252→Agent: prescription-credits-refactor (views Ordonnance)
+  1253→Task: Verrouillage par crédits/Pass des vues Ordonnance (prescription-view + prescription-result-view)
+  1254→
+  1255→Work Log:
+  1256→- Lecture du worklog + 4 fichiers partagés (useCredits/CREDIT_COSTS, LockedView, CreditConfirmDialog, CreditCost) avant intervention
+  1257→- Source de vérité : useCredits expose `credits` (number) et `hasPass` (boolean) ; CREDIT_COSTS.bestPharmacy=1, comparePharmacies=1, confirmBeforeVisit=3, estimatePrescription=2
+  1258→
+  1259→FICHIER 1 — src/components/views/prescription-view.tsx (Edit ciblé)
+  1260→- Import ajouté : LockedView depuis @/components/shared/locked-view
+  1261→- useCredits : déstructuration étendue à { credits, hasPass } (auparavant seulement hasPass)
+  1262→- Nouveau state : showAddDialog (modale ajout médicament)
+  1263→- Refactor handleSubmit : extraction de performAdd() (logique d'ajout effective) + handleSubmit intercepte la soumission
+  1264→  * Si editingSlug (modification) ou hasPass → performAdd() direct (gratuit)
+  1265→  * Sinon → setShowAddDialog(true) → CreditConfirmDialog cost=1 → onConfirm=performAdd
+  1266→- Nouveau bloc en tête de return : {credits === 0 && !hasPass && <LockedView title="Le service Ordonnance nécessite des crédits ou un Pass Ordonnance actif" message="L'ajout de médicaments et l'estimation d'ordonnance sont des services avancés qui nécessitent des crédits." cost={1} backLabel="Retour à l'accueil" backView="home" />}
+  1267→- Tout le reste du rendu encapsulé dans {credits !== 0 || hasPass ? (<> ... </>) : null}
+  1268→- Bouton submit "Ajouter à l'ordonnance" :
+  1269→  * Label dynamique : "Ajouter à l'ordonnance" (Pass actif ou édition) / "Ajouter à l'ordonnance — 1 crédit" (!hasPass, ajout)
+  1270→  * Badge CreditCost ajouté (cost = hasPass ? 0 : 1) sur ajout seulement (pas sur "Modifier")
+  1271→  * Classe solid color : bg-brand text-white hover:bg-brand-dark (pas de dégradé)
+  1272→- Bouton "Estimer le coût" :
+  1273→  * Label dynamique : "Estimer le coût" (Pass actif) / "Estimer le coût — 2 crédits" (!hasPass)
+  1274→  * Badge CreditCost conservé (cost = hasPass ? 0 : CREDIT_COSTS.estimatePrescription)
+  1275→- Message informatif sous le bouton Estimer :
+  1276→  * hasPass → "Pass Ordonnance actif — actions gratuites" (text-amber-700, icône Crown)
+  1277→  * !hasPass → "L'ajout d'un médicament coûte 1 crédit. L'estimation complète coûte 2 crédits."
+  1278→- Nouveau CreditConfirmDialog ajouté en fin de composant :
+  1279→  * title="Ajouter ce médicament" cost={1}
+  1280→  * description="Cette action coûte 1 crédit. Elle vous permet d'ajouter ce médicament à votre ordonnance."
+  1281→  * benefits=["Ajouter le médicament à votre liste", "Modifier la quantité et la durée", "Supprimer gratuitement à tout moment"]
+  1282→  * onConfirm=performAdd
+  1283→- L'édition d'un médicament existant (editingSlug) reste gratuite (pas de dialog) — seuls les nouveaux ajouts sont payants
+  1284→
+  1285→FICHIER 2 — src/components/views/prescription-result-view.tsx (Edit ciblé)
+  1286→- Imports ajoutés : LockedView, CreditConfirmDialog, CreditCost, useCredits + CREDIT_COSTS
+  1287→- useCredits : { hasPass } ajouté au composant principal
+  1288→- Nouveau type local PaidAction = "bestPharmacy" | "compare" | "confirm"
+  1289→- Nouvelle constante PAID_ACTION_CONFIG : table de configuration des 3 actions payantes (title, cost depuis CREDIT_COSTS, description, benefits)
+  1290→- Nouveau state : paidAction (PaidAction | null) — un seul dialog partagé pour les 3 actions
+  1291→- Nouvelles fonctions :
+  1292→  * performPaidAction(action) : bestPharmacy → navigate pharmacy-detail / compare → scroll vers #pharmacies-complete + toast / confirm → toast de confirmation
+  1293→  * handlePaidAction(action) : if hasPass → performPaidAction direct / sinon → setPaidAction(action) (ouvre dialog)
+  1294→- useEffect modifié : si !items.length, ne navigue plus vers "prescription" — à la place setLoading(false) + setEstimate(null) (le rendu gère l'affichage via LockedView)
+  1295→- Nouveau early-return (après tous les hooks) : if (!estimateItems || estimateItems.length === 0) → <LockedView title="Résultat indisponible" message="Veuillez utiliser 2 crédits ou un Pass Ordonnance pour lancer l'estimation complète." cost={2} backLabel="Retour à l'ordonnance" backView="prescription" />
+  1296→- id="pharmacies-complete" ajouté à la section "Pharmacies ayant toute l'ordonnance" (cible du scroll pour l'action "Comparer les prix")
+  1297→- 2 boutons "Voir la meilleure pharmacie" (carte best option + carte résumé) refactorisés :
+  1298→  * onClick → handlePaidAction("bestPharmacy") au lieu de navigate direct
+  1299→  * Label : "Meilleure pharmacie" (hasPass) / "Meilleure pharmacie — 1 crédit" (!hasPass)
+  1300→  * Badge CreditCost (cost = hasPass ? 0 : CREDIT_COSTS.bestPharmacy)
+  1301→  * Classe solid color bg-brand text-white hover:bg-brand-dark
+  1302→- Message "Pass Ordonnance actif — actions gratuites" ajouté sous le bouton Meilleure pharmacie du résumé (uniquement si hasPass)
+  1303→- Nouvelle carte "Actions avancées" insérée entre le résumé et la carte "Action buttons" :
+  1304→  * Header avec icône Zap (bg-brand-light)
+  1305→  * Description contextuelle (gratuit si Pass, sinon pédagogique)
+  1306→  * Bouton "Comparer les prix — 1 crédit" (CreditCost) → handlePaidAction("compare")
+  1307→  * Bouton "Confirmation pharmacie — 3 crédits" (CreditCost) → handlePaidAction("confirm")
+  1308→  * Labels dynamiques : sans "— N crédits" si hasPass
+  1309→- Nouveau CreditConfirmDialog partagé en fin de composant :
+  1310→  * open={paidAction !== null}
+  1311→  * onOpenChange reset paidAction à null si fermeture
+  1312→  * title/cost/description/benefits alimentés dynamiquement depuis PAID_ACTION_CONFIG[paidAction]
+  1313→  * onConfirm → performPaidAction(paidAction)
+  1314→
+  1315→CONTRAINTES RESPECTÉES
+  1316→- AUCUNE couleur dégradée ajoutée : toutes les nouvelles classes utilisent bg-brand text-white hover:bg-brand-dark, bg-brand-light, text-brand, text-brand-dark (couleurs pleines)
+  1317→- .bg-brand-gradient existant conservé tel quel : vérifié dans globals.css, la classe porte un nom trompeur mais rend en réalité une couleur pleine (background-color: var(--brand), commentaire "Brand solid colors (NO gradients)")
+  1318→- Titres en text-foreground (h1/h2/h3 du formulaire, "Actions avancées", "Résumé de l'ordonnance")
+  1319→- Texte toujours lisible : blanc sur fond brand, text-foreground sur fond clair, text-muted-foreground pour le secondaire
+  1320→
+  1321→Vérifications :
+  1322→- bun run lint : 0 erreur, 0 warning
+  1323→- tsc --noEmit : aucune nouvelle erreur sur les 2 fichiers modifiés (erreurs préexistantes sur autres fichiers non touchés)
+  1324→- dev.log surveillé : compilation OK, aucune erreur liée aux modifications
+  1325→- Pas de tests écrits (conforme aux règles)
+  1326→- Hooks rules respectées : tous les useState/useEffect/useMemo appelés avant tout return conditionnel
+  1327→
+  1328→Stage Summary:
+  1329→- prescription-view.tsx : accès Ordonnance verrouillé si credits===0 && !hasPass (LockedView) ; ajout médicament = 1 crédit via CreditConfirmDialog (gratuit si Pass ou édition) ; estimation = 2 crédits (déjà en place) ; labels "— 1 crédit" / "— 2 crédits" affichés si !hasPass ; message "Pass Ordonnance actif — actions gratuites" si hasPass
+  1330→- prescription-result-view.tsx : LockedView "Résultat indisponible" cost=2 si !estimateItems ou items vides ; 3 actions avancées payantes (Meilleure pharmacie 1 crédit / Comparer les prix 1 crédit / Confirmation pharmacie 3 crédits) avec CreditCost visible et dialog de confirmation ; gratuites si hasPass ; 1 seul CreditConfirmDialog partagé avec contenu dynamique
+  1331→- Couleurs pleines uniquement, contrastes préservés, texte lisible partout
+  1332→- UX cohérente : pédagogie des coûts visible sur chaque bouton, comportement attendu prévisible (Pass = gratuit, credits = dialog de confirmation puis débit)
+  1333→
+  1334→---
+  1335→Task ID: 32
+  1336→Agent: main (orchestrator)
+  1337→Task: Harmonisation règles d'accès strictes basées sur les crédits
+  1338→
+  1339→Work Log:
+  1340→- Création composant LockedView (@/components/shared/locked-view.tsx) : page verrouillée professionnelle avec icône cadenas, titre, message, coût nécessaire, solde actuel, boutons "Recharger maintenant" + "Acheter un Pass Ordonnance — 300 FCFA", message "Aucun crédit ne sera débité sans confirmation"
+  1341→- Mise à jour CreditConfirmDialog : ajout bouton "Acheter un Pass Ordonnance — 300 FCFA" quand solde insuffisant, texte "Solde insuffisant" en rouge, boutons Confirmer/Annuler en flex-row
+  1342→- Module Ordonnance verrouillé (prescription-view.tsx) :
+  1343→  * Si credits===0 && !hasPass → LockedView "Le service Ordonnance nécessite des crédits ou un Pass Ordonnance actif"
+  1344→  * Ajout médicament = 1 crédit (CreditConfirmDialog, sauf si hasPass)
+  1345→  * Estimation = 2 crédits (CreditConfirmDialog, sauf si hasPass)
+  1346→  * Boutons avec coûts visibles : "Ajouter à l'ordonnance — 1 crédit", "Estimer le coût — 2 crédits"
+  1347→  * Pass actif : actions gratuites, message "Pass Ordonnance actif — actions gratuites"
+  1348→- Résultat ordonnance verrouillé (prescription-result-view.tsx) :
+  1349→  * Si !estimateItems → LockedView "Résultat indisponible. Veuillez utiliser 2 crédits ou un Pass Ordonnance"
+  1350→  * Actions avancées payantes : Meilleure pharmacie 1 crédit, Comparer les prix 1 crédit, Confirmation pharmacie 3 crédits
+  1351→  * Pass actif : actions gratuites
+  1352→- Détail médicament (medication-detail-view.tsx) :
+  1353→  * Infos générales gratuites (badge "Gratuit")
+  1354→  * Voir pharmacies disponibles = 1 crédit (déjà existant)
+  1355→  * Voir prix détaillés par pharmacie = 1 crédit (nouveau, state pricesUnlocked)
+  1356→  * Bouton "Ajouter à mon ordonnance — 1 crédit" (CreditConfirmDialog, sauf si hasPass)
+  1357→- Détail pharmacie (pharmacy-detail-view.tsx) :
+  1358→  * Infos basiques gratuites (nom, commune, quartier, téléphone, horaires, statut, garde)
+  1359→  * Voir disponibilité = 1 crédit (state availabilityUnlocked)
+  1360→  * Voir prix = 1 crédit (state pricesUnlocked)
+  1361→  * Comparer avec autres pharmacies = 1 crédit
+  1362→  * Demander confirmation = 3 crédits
+  1363→- Header : badge crédits visible desktop + mobile (Sheet), bouton "Recharger" rapide, badge rouge si 0 crédit, "Portefeuille" dans menu mobile
+  1364→- BottomNav : "Profil" remplacé par "Portefeuille" (icône Wallet), 5 items : Accueil, Médicaments, Ordonnance, Pharmacies, Portefeuille
+  1365→- Profil : section "Restrictions de mon compte" (5 messages "Sans crédit..." + bouton Recharger)
+  1366→- Wallet : section "Services bloqués sans crédits" (8 services listés avec icône Lock)
+  1367→- Accueil : message pédagogique "Les recherches simples sont accessibles. Les services avancés nécessitent des crédits."
+  1368→- Régénération Prisma client (CreditTransaction, PassOrdonnance)
+  1369→- Vérification Agent Browser :
+  1370→  * Utilisateur avec 0 crédit → page Ordonnance verrouillée (LockedView avec boutons Recharger + Pass) — VLM confirme "Page verrouillée avec message, boutons Recharger et Pass présents"
+  1371→  * Mobile : page verrouillée lisible et adaptée
+  1372→  * 0 erreur console, lint 0 erreur/0 warning
+  1373→
+  1374→Stage Summary:
+  1375→- Règles d'accès strictes basées sur les crédits implémentées sur toute la plateforme
+  1376→- Module Ordonnance bloqué si 0 crédit et 0 Pass (LockedView professionnelle)
+  1377→- Ajout médicament = 1 crédit, Estimation = 2 crédits, Meilleure pharmacie = 1, Comparaison = 1, Confirmation = 3
+  1378→- Pass Ordonnance (300 FCFA) = toutes actions gratuites pour une session
+  1379→- Détail médicament : pharmacies 1 crédit, prix 1 crédit, ajouter ordonnance 1 crédit
+  1380→- Détail pharmacie : disponibilité 1 crédit, prix 1 crédit, comparaison 1 crédit, confirmation 3 crédits
+  1381→- Modale confirmation obligatoire avant toute action payante (coût, solde, solde après, bénéfices)
+  1382→- Solde insuffisant → modale avec boutons Recharger + Pass + Annuler
+  1383→- Navigation : Portefeuille dans bottom-nav, header avec badge crédits + Recharger
+  1384→- Profil : section restrictions, Wallet : services bloqués
+  1385→- Couleurs pleines, pas de dégradé, contrastes vérifiés
+  1386→
+  1387→---
+  1388→Task ID: 33
+  1389→Agent: main (orchestrator)
+  1390→Task: Textes super responsive — anti-débordement
+  1391→
+  1392→Work Log:
+  1393→- Correction StatBlock : suppression de `truncate` sur le label (coupait "Pharmacies pa...", "Médicaments r...") → texte complet visible
+  1394→- CSS global (globals.css) : ajout `overflow-wrap: break-word; word-wrap: break-word` sur p, span, li, td, th, label, button, a pour empêcher tout débordement de texte
+  1395→- Vérification Agent Browser mobile 390px :
+  1396→  * Accueil : "Les textes ne débordent pas, ne sont pas coupés. Bien formatés, tous les éléments visibles et lisibles."
+  1397→  * Médicaments + Pharmacies : "Aucun débordement ou coupure de texte. Textes bien affichés et adaptés au mobile."
+  1398→  * Overflow horizontal : 0px
+  1399→  * 0 erreur console, lint 0 erreur/0 warning
+  1400→
+  1401→Stage Summary:
+  1402→- Tous les textes de la plateforme sont super responsive et ne débordent plus
+  1403→- Règle CSS globale anti-débordement sur tous les éléments texte
+  1404→- StatBlock corrigé (labels complets visibles)
+  1405→- 0 overflow horizontal sur mobile
+  1406→
+  1407→---
+  1408→Task ID: 34
+  1409→Agent: main (orchestrator)
+  1410→Task: Fix textes débordant de leur cadre UI
+  1411→
+  1412→Work Log:
+  1413→- Audit mobile 390px complet (Accueil, Médicaments, Pharmacies, Ordonnance, Portefeuille) avec VLM
+  1414→- Overflow horizontal réel : 0px sur toutes les pages
+  1415→- Ajout de `break-words` sur tous les paragraphes `leading-relaxed` dans toutes les vues (home, medication-detail, pharmacy-detail, prescription, subscription, wallet, profile, notifications) pour garantir qu'aucun mot long ne déborde de son cadre
+  1416→- Vérification finale : "Aucun texte ne dépasse son cadre. Les éléments sont bien ajustés."
+  1417→- 0 overflow horizontal, lint 0 erreur, 0 erreur console
+  1418→
+  1419→Stage Summary:
+  1420→- Tous les textes de la plateforme restent dans leur cadre UI, même sur mobile
+  1421→- break-words ajouté globalement sur les paragraphes longs
+  1422→- 0 débordement horizontal confirmé
+  1423→
+  1424→---
+  1425→Task ID: 402-a
+  1426→Agent: 402-a (credit-gating pharmacy contact)
+  1427→
+  1428→Task: Verrouiller les contacts pharmacie (téléphone, WhatsApp, conseil, confirmations) sur 3 fichiers
+  1429→
+  1430→Work Log:
+  1431→- Lecture du worklog + 4 fichiers de référence (credits.ts, locked-contact.tsx, credit-confirm-dialog.tsx, credit-cost.tsx)
+  1432→- FICHIER 1 — src/components/views/pharmacy-detail-view.tsx (Edit)
+  1433→  - Imports : ajouté `MessageCircle`, `Lightbulb` (lucide-react) ; `LockedContact` (shared)
+  1434→  - States : `contactUnlocked`, `whatsappUnlocked` (reset au changement de slug) + 5 nouveaux states de dialog (`showContactDialog`, `showWhatsappDialog`, `showAdviceDialog`, `showConfirmPriceDialog`, `showConfirmFullDialog`)
+  1435→  - Variables dérivées : `whatsappHref` (wa.me/), `phoneDisplay`, `contactVisible = contactUnlocked || hasPass`, `whatsappVisible = whatsappUnlocked || hasPass`
+  1436→  - InfoCard "Téléphone" remplacée par une Card custom contenant `LockedContact type="phone" cost=1` quand verrouillé ; affiche le numéro complet + bouton Appeler (tel:) quand débloqué
+  1437→  - Actions rapides :
+  1438→    * Bouton "Appeler" conditionnel — si !contactVisible : bouton "Appeler — 1 crédit" (ouvre showContactDialog) ; si contactVisible : lien tel:
+  1439→    * Bouton "WhatsApp" conditionnel — si !whatsappVisible : bouton "WhatsApp — 1 crédit" (ouvre showWhatsappDialog) ; si whatsappVisible : lien wa.me
+  1440→    * Bouton "Demander conseil — 2 crédits" (Lightbulb, advicePharmacy)
+  1441→    * Bouton "Confirmer disponibilité — 3 crédits" (CheckCircle2, confirmAvailability) — renommé depuis "Demander une confirmation"
+  1442→    * Bouton "Confirmer prix — 3 crédits" (Coins, confirmPrice)
+  1443→    * Bouton "Confirmation complète — 4 crédits" (CheckCircle2, confirmFull)
+  1444→    * Boutons gratuits conservés : Itinéraire, Partager, Favori (col-span-2), Voir médicaments, Comparer
+  1445→  - 6 CreditConfirmDialog au total (availability, prices, compare, confirmAvailability, contact, whatsapp, advice, confirmPrice, confirmFull) — titres/descriptions/benefits conformes au cahier des charges
+  1446→  - hasPass → tous les contacts/actions sont gratuits (toast direct, pas de dialog)
+  1447→- FICHIER 2 — src/components/shared/pharmacy-card.tsx (Edit)
+  1448→  - Imports : `Lock`, `Phone` (lucide-react) ; `CreditCost` (shared) ; `Navigation` retiré (inutilisé)
+  1449→  - PharmacyCard : badge "Contact verrouillé" + "Voir contact — 1 crédit" en bas de la card (aucun numéro, aucun lien tel:)
+  1450→  - PharmacyRow : ligne "Contact verrouillé — 1 crédit" sous l'adresse (aucun numéro, aucun lien tel:)
+  1451→  - Carte entière cliquable → navigue vers pharmacy-detail (où le déblocage se fait)
+  1452→- FICHIER 3 — src/components/views/pharmacies-view.tsx (Edit)
+  1453→  - Imports : `Lock` (lucide-react) ; `CreditCost` (shared)
+  1454→  - PharmacyResultCard : remplacement du lien téléphone `<a href={tel:}>` par un bandeau "Contact verrouillé — Voir contact 1 crédit" ; bouton "Appeler" (tel:) remplacé par bouton "Voir contact" qui navigue vers pharmacy-detail ; plus aucun phoneHref/tel: dans la carte
+  1455→  - OnDutyMiniCard : ajout d'un mini-badge "Contact — 1 crédit" à côté des badges Ouvert/24-7
+  1456→  - Aucun numéro de téléphone, aucun lien tel: dans ces 2 composants
+  1457→
+  1458→Contraintes respectées:
+  1459→- AUCUNE couleur dégradée (couleurs pleines bg-brand, bg-brand-dark, bg-muted, bg-brand-light)
+  1460→- Titres en text-foreground / text-brand-dark
+  1461→- Texte toujours lisible (text-muted-foreground pour secondaire)
+  1462→- Aucun numéro de téléphone visible avant déblocage (remplacé par "Contact verrouillé")
+  1463→- Aucun lien tel: ou wa.me généré avant paiement (uniquement dans branches conditionnelles `contactVisible` / `whatsappVisible`)
+  1464→- hasPass désactive tous les paywalls (contacts visibles, boutons directs, pas de dialog)
+  1465→- Tout en français
+  1466→
+  1467→Vérifications:
+  1468→- `bun run lint` : 0 erreur, 0 warning
+  1469→- Dev server : compilation OK, `/api/pharmacies/pharmacie-d-angre` 200
+  1470→
+  1471→---
+  1472→Task ID: 35
+  1473→Agent: main (orchestrator)
+  1474→Task: Verrouillage strict des contacts pharmacies avec crédits
+  1475→
+  1476→Work Log:
+  1477→- Store credits.ts mis à jour : CREDIT_COSTS étendu avec seeContact(1), callPharmacy(1), whatsappPharmacy(1), advicePharmacy(2), confirmAvailability(3), confirmPrice(3), confirmFull(4). FREE_FEATURES mis à jour (suppression "Voir l'adresse et le téléphone", ajout "Voir le nom, commune et quartier"). PAID_FEATURES étendu avec 7 nouveaux services de contact.
+  1478→- Composant LockedContact créé (@/components/shared/locked-contact.tsx) : affiche "Contact verrouillé" avec icône cadenas + bouton "Voir contact — 1 crédit" quand verrouillé, ou valeur + bouton action + badge "Débloqué" quand débloqué. Types: phone, whatsapp, advice, confirmAvailability, confirmPrice, confirmFull.
+  1479→- Détail pharmacie (pharmacy-detail-view.tsx) : 
+  1480→  * Téléphone masqué → LockedContact type="phone" cost=1 (contactUnlocked state)
+  1481→  * Bouton Appeler verrouillé → "Appeler — 1 crédit" si !contactUnlocked
+  1482→  * Bouton WhatsApp → "WhatsApp — 1 crédit" (whatsappUnlocked state)
+  1483→  * Bouton "Demander conseil — 2 crédits" (CreditConfirmDialog)
+  1484→  * Bouton "Confirmer disponibilité — 3 crédits" (CreditConfirmDialog)
+  1485→  * Bouton "Confirmer prix — 3 crédits" (CreditConfirmDialog)
+  1486→  * Bouton "Confirmation complète — 4 crédits" (CreditConfirmDialog)
+  1487→  * 9 CreditConfirmDialog au total
+  1488→  * hasPass → tous contacts gratuits
+  1489→  * Aucun numéro tel: ou wa.me dans le HTML avant déblocage
+  1490→- PharmacyCard : bandeau "Contact verrouillé — Voir contact 1 crédit", aucun tel: généré
+  1491→- PharmacyRow : ligne "Contact verrouillé — 1 crédit"
+  1492→- Pharmacies-view (PharmacyResultCard, OnDutyMiniCard) : téléphone masqué, "Voir contact" à la place
+  1493→- Wallet : section "Services de contact pharmacie" (7 services avec coûts), section "Services bloqués" étendue avec contacts
+  1494→- Profil : section "Restrictions" étendue avec 3 nouvelles restrictions (contacts, appeler, conseil)
+  1495→- Header : badge "0 crédit" visible en rouge + bouton "Recharger"
+  1496→- Vérification Agent Browser (utilisateur 0 crédit) :
+  1497→  * Page Pharmacies : "Numéros masqués, badges 'Contact 1 crédit' présents"
+  1498→  * Header : badge "0 crédit" + bouton "Recharger" visibles
+  1499→  * Aucun lien tel: visible dans les cartes
+  1500→  * 0 erreur console, lint 0 erreur/0 warning
+  1501→
+  1502→Stage Summary:
+  1503→- Tous les contacts pharmacies (téléphone, WhatsApp, appel, conseil, confirmations) sont verrouillés sans crédits
+  1504→- Aucun numéro de téléphone visible avant déblocage (1 crédit)
+  1505→- Aucun lien tel: ou wa.me généré avant paiement
+  1506→- Modale de confirmation obligatoire avant chaque déblocage (coût, solde, solde après, bénéfices)
+  1507→- Pass Ordonnance = tous contacts gratuits
+  1508→- 7 services de contact payants (1/1/1/2/3/3/4 crédits)
+  1509→- Wallet, Profil, header mis à jour avec les nouvelles restrictions
+  1510→
+  1511→---
+  1512→Task ID: 36
+  1513→Agent: main (orchestrator)
+  1514→Task: Application du verrouillage contacts sur TOUTE la plateforme
+  1515→
+  1516→Work Log:
+  1517→- Audit complet de tous les liens tel: non verrouillés via grep
+  1518→- 3 emplacements corrigés :
+  1519→  1. home-view DutyPharmacyCard : remplacement lien tel: par "Contact verrouillé" avec icône Lock
+  1520→  2. medication-detail-view PharmacyMedCard : remplacement bouton "Appeler" (tel:) par "Contact — 1 crédit" (navigation vers pharmacy-detail)
+  1521→  3. prescription-result-view FullPharmacyCard : remplacement bouton tel: par icône Lock (navigation vers pharmacy-detail)
+  1522→  4. prescription-result-view Meilleure option : remplacement bouton "Appeler" (tel:) par "Contact — 1 crédit" (navigation vers pharmacy-detail)
+  1523→- Le seul lien tel: restant est le support SABLIN dans le footer (tel:+2250700000000) — pas un contact pharmacie
+  1524→- Vérification Agent Browser (utilisateur 0 crédit connecté) :
+  1525→  * Page Accueil : 0 lien tel: pharmacie, "Contact verrouillé" présent dans DutyPharmacyCard
+  1526→  * Page Pharmacies : 0 lien tel: pharmacie, badges "1 crédit" présents
+  1527→  * Page Détail médicament : 0 lien tel: pharmacie (section pharmacies verrouillée)
+  1528→  * 0 erreur console, lint 0 erreur/0 warning
+  1529→
+  1530→Stage Summary:
+  1531→- Verrouillage des contacts pharmacies appliqué sur TOUTE la plateforme
+  1532→- Aucun lien tel: de pharmacie non verrouillé dans tout le code
+  1533→- Seul lien tel: restant = support SABLIN (footer, pas une pharmacie)
+  1534→- 3 emplacements corrigés (home-view, medication-detail-view, prescription-result-view x2)
+  1535→

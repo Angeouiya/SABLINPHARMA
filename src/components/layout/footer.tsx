@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone, MessageCircle, Crown, ChevronRight } from "lucide-react";
+import { Phone, MessageCircle, Coins, ChevronRight } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { useNav } from "@/store/nav";
 import type { View } from "@/lib/types";
@@ -63,8 +63,8 @@ export function Footer() {
               <li><button onClick={() => go("notifications")} className="hover:text-brand">Notifications</button></li>
               <li><button onClick={() => go("settings")} className="hover:text-brand">Paramètres</button></li>
               <li>
-                <button onClick={() => go("subscription")} className="inline-flex items-center gap-1 hover:text-brand">
-                  <Crown className="size-3.5 text-amber-500" /> Premium
+                <button onClick={() => go("wallet")} className="inline-flex items-center gap-1 hover:text-brand">
+                  <Coins className="size-3.5 " /> Crédits
                 </button>
               </li>
             </ul>
@@ -74,7 +74,7 @@ export function Footer() {
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row">
           <p>© {new Date().getFullYear()} SABLIN PHARMA — Côte d&apos;Ivoire. Plateforme d&apos;information. Aucune vente en ligne.</p>
           <div className="flex items-center gap-4">
-            <button onClick={() => go("subscription")} className="inline-flex items-center gap-1 hover:text-brand">
+            <button onClick={() => go("wallet")} className="inline-flex items-center gap-1 hover:text-brand">
               Mentions légales <ChevronRight className="size-3" />
             </button>
             <span>·</span>

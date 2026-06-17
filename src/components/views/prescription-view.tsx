@@ -974,7 +974,7 @@ export function PrescriptionView() {
             </div>
           </Card>
 
-          {/* Premium upsell */}
+          {/* Credits upsell */}
           {!premium && (
             <Card className="overflow-hidden border-amber-500/30 py-0">
               <div className="bg-amber-50 p-4">
@@ -983,7 +983,7 @@ export function PrescriptionView() {
                     <Crown className="size-5" />
                   </span>
                   <div>
-                    <p className="text-sm font-bold text-foreground">Passez Premium</p>
+                    <p className="text-sm font-bold text-foreground">Rechargez vos crédits</p>
                     <p className="text-[11px] text-muted-foreground">500 FCFA / mois</p>
                   </div>
                 </div>
@@ -1003,7 +1003,7 @@ export function PrescriptionView() {
                   className="mt-3 w-full bg-amber-500 text-white hover:bg-amber-600"
                   onClick={() => navigate("subscription")}
                 >
-                  <Crown className="size-3.5" /> S&apos;abonner
+                  <Crown className="size-3.5" /> Recharger
                 </Button>
               </div>
             </Card>

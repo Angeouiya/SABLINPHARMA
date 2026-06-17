@@ -1,0 +1,1123 @@
+     1→"use client";
+     2→
+     3→import { useState, useMemo, useEffect } from "react";
+     4→import {
+     5→  ChevronLeft,
+     6→  ChevronRight,
+     7→  CreditCard,
+     8→  Smartphone,
+     9→  Lock,
+    10→  ShieldCheck,
+    11→  Loader2,
+    12→  CheckCircle2,
+    13→  Crown,
+    14→  XCircle,
+    15→  AlertCircle,
+    16→  Clock,
+    17→  Zap,
+    18→  Receipt,
+    19→  Copy,
+    20→  ArrowRight,
+    21→  Coins,
+    22→} from "lucide-react";
+    23→import { toast } from "sonner";
+    24→import { Button } from "@/components/ui/button";
+    25→import { Card } from "@/components/ui/card";
+    26→import { Badge } from "@/components/ui/badge";
+    27→import { Input } from "@/components/ui/input";
+    28→import { Label } from "@/components/ui/label";
+    29→import { Separator } from "@/components/ui/separator";
+    30→import {
+    31→  Dialog,
+    32→  DialogContent,
+    33→  DialogHeader,
+    34→  DialogTitle,
+    35→} from "@/components/ui/dialog";
+    36→import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
+    37→import { CreditCost } from "@/components/shared/credit-cost";
+    38→import { useNav } from "@/store/nav";
+    39→import { useAuth } from "@/store/auth";
+    40→import { useCredits, CREDIT_PACKS } from "@/store/credits";
+    41→import { formatFCFA, formatDate } from "@/lib/format";
+    42→import { cn } from "@/lib/utils";
+    43→
+    44→type Provider = "wave" | "orange" | "mtn" | "moov";
+    45→type PaymentState = "idle" | "pending" | "success" | "failed" | "cancelled";
+    46→
+    47→const PROVIDERS: {
+    48→  id: Provider;
+    49→  label: string;
+    50→  short: string;
+    51→  bgClass: string;
+    52→  textClass: string;
+    53→  desc: string;
+    54→}[] = [
+    55→  {
+    56→    id: "wave",
+    57→    label: "Wave",
+    58→    short: "W",
+    59→    bgClass: "bg-sky-500",
+    60→    textClass: "text-white",
+    61→    desc: "Transfert instantané, sans frais",
+    62→  },
+    63→  {
+    64→    id: "orange",
+    65→    label: "Orange Money",
+    66→    short: "OM",
+    67→    bgClass: "bg-orange-500",
+    68→    textClass: "text-white",
+    69→    desc: "Orange Money, partout en CI",
+    70→  },
+    71→  {
+    72→    id: "mtn",
+    73→    label: "MTN Money",
+    74→    short: "MTN",
+    75→    bgClass: "bg-yellow-400",
+    76→    textClass: "text-black",
+    77→    desc: "MTN MoMo, rapide et sûr",
+    78→  },
+    79→  {
+    80→    id: "moov",
+    81→    label: "Moov Money",
+    82→    short: "Moov",
+    83→    bgClass: "bg-blue-600",
+    84→    textClass: "text-white",
+    85→    desc: "Moov Money, facile et fiable",
+    86→  },
+    87→];
+    88→
+    89→const PRICE = 500;
+    90→const PASS_PRICE = 300;
+    91→type PaymentMode = "premium" | "recharge" | "pass";
+    92→
+    93→// Fictive payment history
+    94→const PAYMENT_HISTORY = [
+    95→  {
+    96→    date: "2026-06-16",
+    97→    formule: "Premium mensuel",
+    98→    montant: 500,
+    99→    moyen: "Orange Money",
+   100→    statut: "success" as const,
+   101→    reference: "SPL-202606161435",
+   102→  },
+   103→  {
+   104→    date: "2026-05-16",
+   105→    formule: "Premium mensuel",
+   106→    montant: 500,
+   107→    moyen: "Wave",
+   108→    statut: "success" as const,
+   109→    reference: "SPL-202605160912",
+   110→  },
+   111→  {
+   112→    date: "2026-04-16",
+   113→    formule: "Premium mensuel",
+   114→    montant: 500,
+   115→    moyen: "MTN Money",
+   116→    statut: "success" as const,
+   117→    reference: "SPL-202604161820",
+   118→  },
+   119→  {
+   120→    date: "2026-03-16",
+   121→    formule: "Premium mensuel",
+   122→    montant: 500,
+   123→    moyen: "Moov Money",
+   124→    statut: "failed" as const,
+   125→    reference: "SPL-202603161104",
+   126→  },
+   127→];
+   128→
+   129→export function PaymentView() {
+   130→  const { navigate, params } = useNav();
+   131→  const { user, premium, setPremium, fetchMe } = useAuth();
+   132→  const { recharge, fetch: fetchCredits, hasPass } = useCredits();
+   133→
+   134→  // Mode dérivé des params (wallet → payment) ou du state local
+   135→  const [mode, setMode] = useState<PaymentMode>(
+   136→    params.packAmount ? "recharge" : params.passOrdonnance ? "pass" : "premium"
+   137→  );
+   138→  const [selectedPackAmount, setSelectedPackAmount] = useState<number>(
+   139→    params.packAmount ?? 500
+   140→  );
+   141→
+   142→  const [provider, setProvider] = useState<Provider>("orange");
+   143→  const [phone, setPhone] = useState("");
+   144→  const [holderName, setHolderName] = useState(user?.name ?? "");
+   145→  const [state, setState] = useState<PaymentState>("idle");
+   146→  const [showSuccess, setShowSuccess] = useState(false);
+   147→  const [transactionRef, setTransactionRef] = useState("");
+   148→  const [paymentDate, setPaymentDate] = useState("");
+   149→  const [expiryDate, setExpiryDate] = useState("");
+   150→
+   151→  const formattedPhone = useMemo(() => {
+   152→    const digits = phone.replace(/\D/g, "").slice(0, 10);
+   153→    return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
+   154→  }, [phone]);
+   155→
+   156→  // Montant et libellé dynamiques selon le mode
+   157→  const currentAmount = useMemo(() => {
+   158→    if (mode === "recharge") return selectedPackAmount;
+   159→    if (mode === "pass") return PASS_PRICE;
+   160→    return PRICE;
+   161→  }, [mode, selectedPackAmount]);
+   162→
+   163→  const currentLabel = useMemo(() => {
+   164→    if (mode === "recharge") {
+   165→      const pack = CREDIT_PACKS.find((p) => p.amount === selectedPackAmount);
+   166→      return pack ? `${pack.label} (${pack.credits} crédits)` : "Recharge de crédits";
+   167→    }
+   168→    if (mode === "pass") return "Pass Ordonnance";
+   169→    return "Abonnement Premium · 1 mois";
+   170→  }, [mode, selectedPackAmount]);
+   171→
+   172→  const currentShortLabel = useMemo(() => {
+   173→    if (mode === "recharge") return "Recharge de crédits";
+   174→    if (mode === "pass") return "Pass Ordonnance";
+   175→    return "Abonnement Premium";
+   176→  }, [mode]);
+   177→
+   178→  // Not connected
+   179→  if (!user) {
+   180→    return (
+   181→      <div className="mx-auto flex min-h-[60vh] w-full max-w-md items-center px-4 py-12">
+   182→        <Card className="w-full border-border/70 p-8 text-center shadow-premium">
+   183→          <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand-light text-brand">
+   184→            <Lock className="size-7" />
+   185→          </span>
+   186→          <h1 className="mt-5 text-xl font-extrabold text-foreground sm:text-2xl">
+   187→            Connectez-vous pour continuer
+   188→          </h1>
+   189→          <p className="mt-2 text-sm text-muted-foreground">
+   190→            Vous devez être connecté pour effectuer un paiement sur SABLIN PHARMA.
+   191→          </p>
+   192→          <Button
+   193→            className="mt-6 w-full bg-brand text-white hover:bg-brand-dark"
+   194→            size="lg"
+   195→            onClick={() => navigate("auth", { authMode: "login" })}
+   196→          >
+   197→            Se connecter
+   198→          </Button>
+   199→        </Card>
+   200→      </div>
+   201→    );
+   202→  }
+   203→
+   204→  const handlePay = async () => {
+   205→    // Validation
+   206→    const digits = phone.replace(/\D/g, "");
+   207→    if (digits.length !== 10) {
+   208→      toast.error("Numéro de téléphone invalide", {
+   209→        description: "Saisissez un numéro ivoirien à 10 chiffres (07 XX XX XX XX).",
+   210→      });
+   211→      return;
+   212→    }
+   213→    if (holderName.trim().length < 3) {
+   214→      toast.error("Nom du titulaire manquant", {
+   215→        description: "Saisissez le nom du titulaire du compte.",
+   216→      });
+   217→      return;
+   218→    }
+   219→
+   220→    setState("pending");
+   221→    try {
+   222→      if (mode === "recharge") {
+   223→        const result = await recharge(selectedPackAmount, provider);
+   224→        if (!result.success) {
+   225→          throw new Error(result.error ?? "Échec de la recharge");
+   226→        }
+   227→        const ref = `SPL-RECHARGE-${Date.now()}`;
+   228→        const now = new Date();
+   229→        setTransactionRef(ref);
+   230→        setPaymentDate(now.toISOString());
+   231→        setExpiryDate("");
+   232→        setState("success");
+   233→        setShowSuccess(true);
+   234→        toast.success("Recharge réussie !", {
+   235→          description: `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits ajoutés à votre compte.`,
+   236→        });
+   237→      } else if (mode === "pass") {
+   238→        const res = await fetch("/api/credits/pass", {
+   239→          method: "POST",
+   240→          headers: { "Content-Type": "application/json" },
+   241→          body: JSON.stringify({ provider }),
+   242→        });
+   243→        if (!res.ok) {
+   244→          const data = await res.json().catch(() => null);
+   245→          throw new Error(data?.error ?? "Échec de l'achat du Pass");
+   246→        }
+   247→        await fetchCredits();
+   248→        const ref = `SPL-PASS-${Date.now()}`;
+   249→        const now = new Date();
+   250→        const exp = new Date();
+   251→        exp.setDate(exp.getDate() + 30);
+   252→        setTransactionRef(ref);
+   253→        setPaymentDate(now.toISOString());
+   254→        setExpiryDate(exp.toISOString());
+   255→        setState("success");
+   256→        setShowSuccess(true);
+   257→        toast.success("Pass Ordonnance activé !", {
+   258→          description: "Vos estimations d'ordonnance sont désormais gratuites.",
+   259→        });
+   260→      } else {
+   261→        // Premium (comportement existant)
+   262→        const res = await fetch("/api/subscription", {
+   263→          method: "POST",
+   264→          headers: { "Content-Type": "application/json" },
+   265→          body: JSON.stringify({
+   266→            method: "mobile_money",
+   267→            provider,
+   268→          }),
+   269→        });
+   270→
+   271→        if (!res.ok) {
+   272→          const data = await res.json().catch(() => null);
+   273→          throw new Error(data?.error ?? "Échec du paiement");
+   274→        }
+   275→
+   276→        const result = await res.json();
+   277→        const ref = `SPL-${Date.now()}`;
+   278→        const now = new Date();
+   279→        const exp = new Date();
+   280→        exp.setMonth(exp.getMonth() + 1);
+   281→
+   282→        setTransactionRef(ref);
+   283→        setPaymentDate(now.toISOString());
+   284→        setExpiryDate(exp.toISOString());
+   285→        setPremium(true);
+   286→        await fetchMe();
+   287→        setState("success");
+   288→        setShowSuccess(true);
+   289→        toast.success("Paiement réussi ! Abonnement Premium activé", {
+   290→          description: "Bienvenue dans l'expérience Premium SABLIN PHARMA.",
+   291→        });
+   292→        void result;
+   293→      }
+   294→    } catch (err) {
+   295→      setState("failed");
+   296→      const msg = err instanceof Error ? err.message : "Erreur inconnue";
+   297→      toast.error("Paiement échoué", { description: msg });
+   298→    }
+   299→  };
+   300→
+   301→  const handleCancel = () => {
+   302→    setState("cancelled");
+   303→    toast.info("Transaction annulée", {
+   304→      description: "Vous pouvez réessayer à tout moment.",
+   305→    });
+   306→  };
+   307→
+   308→  const resetState = () => {
+   309→    setState("idle");
+   310→    setPhone("");
+   311→  };
+   312→
+   313→  return (
+   314→    <div className="flex flex-col">
+   315→      {/* ============ HEADER ============ */}
+   316→      <section className="bg-brand-light">
+   317→        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+   318→          <button
+   319→            onClick={() => navigate(mode === "premium" ? "subscription" : "wallet")}
+   320→            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
+   321→          >
+   322→            <ChevronLeft className="size-4" />
+   323→            {mode === "premium" ? "Abonnement" : "Mon portefeuille"}
+   324→          </button>
+   325→
+   326→          <div className="mt-5 flex flex-wrap items-center gap-3">
+   327→            <span className="flex size-12 items-center justify-center rounded-2xl bg-brand text-white shadow-premium">
+   328→              {mode === "premium" ? (
+   329→                <Crown className="size-6" />
+   330→              ) : mode === "pass" ? (
+   331→                <Receipt className="size-6" />
+   332→              ) : (
+   333→                <Coins className="size-6" />
+   334→              )}
+   335→            </span>
+   336→            <div>
+   337→              <Eyebrow className="text-brand-dark">Paiement sécurisé</Eyebrow>
+   338→              <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-foreground sm:text-3xl">
+   339→                {mode === "premium"
+   340→                  ? "Paiement de l'abonnement Premium"
+   341→                  : mode === "pass"
+   342→                    ? "Achat du Pass Ordonnance"
+   343→                    : "Recharge de vos crédits"}
+   344→              </h1>
+   345→            </div>
+   346→          </div>
+   347→          <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
+   348→            {mode === "premium" ? (
+   349→              <>
+   350→                Activez votre accès aux fonctionnalités avancées : recherche illimitée,
+   351→                estimation d&apos;ordonnance, pharmacies de garde, favoris, historique et
+   352→                alertes. Simple, rapide et sécurisé.
+   353→              </>
+   354→            ) : mode === "pass" ? (
+   355→              <>
+   356→                Profitez d&apos;estimations d&apos;ordonnance gratuites pendant 30 jours.
+   357→                Idéal pour un usage occasionnel sans engagement.
+   358→              </>
+   359→            ) : (
+   360→              <>
+   361→                Rechargez vos crédits quand vous voulez. Aucun abonnement obligatoire —
+   362→                vous payez uniquement ce que vous consommez.
+   363→              </>
+   364→            )}
+   365→          </p>
+   366→        </div>
+   367→      </section>
+   368→
+   369→      <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+   370→        {/* ============ SÉLECTION DU MODE ============ */}
+   371→        <section className="mb-6">
+   372→          <div className="mb-3 flex items-center gap-2">
+   373→            <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   374→              <Zap className="size-4" />
+   375→            </span>
+   376→            <h2 className="text-base font-bold text-foreground">
+   377→              Que souhaitez-vous payer ?
+   378→            </h2>
+   379→          </div>
+   380→          <div className="grid gap-3 sm:grid-cols-3">
+   381→            {/* Premium card */}
+   382→            <button
+   383→              type="button"
+   384→              onClick={() => setMode("premium")}
+   385→              className={cn(
+   386→                "flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all",
+   387→                mode === "premium"
+   388→                  ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+   389→                  : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
+   390→              )}
+   391→              aria-pressed={mode === "premium"}
+   392→            >
+   393→              <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
+   394→                <Crown className="size-4" />
+   395→              </span>
+   396→              <div>
+   397→                <p className="text-sm font-bold text-foreground">Abonnement Premium</p>
+   398→                <p className="text-[11px] text-muted-foreground">Accès complet · 1 mois</p>
+   399→              </div>
+   400→              <p className="mt-1 text-base font-extrabold text-brand-dark">{formatFCFA(PRICE)}</p>
+   401→              {mode === "premium" && (
+   402→                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand">
+   403→                  <CheckCircle2 className="size-3" /> Sélectionné
+   404→                </span>
+   405→              )}
+   406→            </button>
+   407→
+   408→            {/* Pass Ordonnance card */}
+   409→            <button
+   410→              type="button"
+   411→              onClick={() => setMode("pass")}
+   412→              disabled={hasPass}
+   413→              className={cn(
+   414→                "flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all",
+   415→                mode === "pass"
+   416→                  ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+   417→                  : "border-border/70 hover:border-brand/30 hover:bg-accent/30",
+   418→                hasPass && "opacity-60"
+   419→              )}
+   420→              aria-pressed={mode === "pass"}
+   421→            >
+   422→              <span className="flex size-9 items-center justify-center rounded-xl bg-brand text-white">
+   423→                <Receipt className="size-4" />
+   424→              </span>
+   425→              <div>
+   426→                <p className="text-sm font-bold text-foreground">Pass Ordonnance</p>
+   427→                <p className="text-[11px] text-muted-foreground">Estimations gratuites · 30 jours</p>
+   428→              </div>
+   429→              <p className="mt-1 text-base font-extrabold text-brand-dark">{formatFCFA(PASS_PRICE)}</p>
+   430→              {hasPass ? (
+   431→                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-success">
+   432→                  <CheckCircle2 className="size-3" /> Déjà actif
+   433→                </span>
+   434→              ) : mode === "pass" ? (
+   435→                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand">
+   436→                  <CheckCircle2 className="size-3" /> Sélectionné
+   437→                </span>
+   438→              ) : null}
+   439→            </button>
+   440→
+   441→            {/* Recharge card */}
+   442→            <button
+   443→              type="button"
+   444→              onClick={() => setMode("recharge")}
+   445→              className={cn(
+   446→                "flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all",
+   447→                mode === "recharge"
+   448→                  ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+   449→                  : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
+   450→              )}
+   451→              aria-pressed={mode === "recharge"}
+   452→            >
+   453→              <span className="flex size-9 items-center justify-center rounded-xl bg-brand text-white">
+   454→                <Coins className="size-4" />
+   455→              </span>
+   456→              <div>
+   457→                <p className="text-sm font-bold text-foreground">Recharger mes crédits</p>
+   458→                <p className="text-[11px] text-muted-foreground">Sans engagement · À la carte</p>
+   459→              </div>
+   460→              <p className="mt-1 text-base font-extrabold text-brand-dark">
+   461→                dès {formatFCFA(CREDIT_PACKS[0].amount)}
+   462→              </p>
+   463→              {mode === "recharge" && (
+   464→                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand">
+   465→                  <CheckCircle2 className="size-3" /> Sélectionné
+   466→                </span>
+   467→              )}
+   468→            </button>
+   469→          </div>
+   470→        </section>
+   471→
+   472→        {/* ============ SECTION RECHARGER MES CRÉDITS (visible si mode=recharge) ============ */}
+   473→        {mode === "recharge" && (
+   474→          <section className="mb-6">
+   475→            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+   476→              <div className="mb-4 flex items-center gap-2">
+   477→                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   478→                  <Coins className="size-4" />
+   479→                </span>
+   480→                <div>
+   481→                  <h2 className="text-base font-bold text-foreground">Recharger mes crédits</h2>
+   482→                  <p className="text-[11px] text-muted-foreground">
+   483→                    Rechargez vos crédits quand vous voulez. Aucun abonnement obligatoire.
+   484→                  </p>
+   485→                </div>
+   486→              </div>
+   487→
+   488→              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+   489→                {CREDIT_PACKS.map((pack) => {
+   490→                  const active = selectedPackAmount === pack.amount;
+   491→                  return (
+   492→                    <button
+   493→                      key={pack.amount}
+   494→                      type="button"
+   495→                      onClick={() => setSelectedPackAmount(pack.amount)}
+   496→                      className={cn(
+   497→                        "relative flex flex-col items-center gap-1 rounded-xl border p-3 text-center transition-all",
+   498→                        active
+   499→                          ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+   500→                          : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
+   501→                      )}
+   502→                      aria-pressed={active}
+   503→                    >
+   504→                      {pack.popular && (
+   505→                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold text-white">
+   506→                          Populaire
+   507→                        </span>
+   508→                      )}
+   509→                      <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
+   510→                        <Coins className="size-4" />
+   511→                      </span>
+   512→                      <p className="text-sm font-extrabold text-foreground">
+   513→                        {pack.credits} crédits
+   514→                      </p>
+   515→                      <p className="text-[11px] text-muted-foreground">{pack.label}</p>
+   516→                      <p className="mt-1 text-sm font-bold text-brand-dark">
+   517→                        {formatFCFA(pack.amount)}
+   518→                      </p>
+   519→                      {active && (
+   520→                        <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-bold text-brand">
+   521→                          <CheckCircle2 className="size-3" /> Choisi
+   522→                        </span>
+   523→                      )}
+   524→                    </button>
+   525→                  );
+   526→                })}
+   527→              </div>
+   528→            </Card>
+   529→          </section>
+   530→        )}
+   531→
+   532→        {/* ============ SECTION PASS ORDONNANCE (visible si mode=pass) ============ */}
+   533→        {mode === "pass" && (
+   534→          <section className="mb-6">
+   535→            <Card className="border-brand/20 p-5 shadow-premium sm:p-6">
+   536→              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+   537→                <div className="flex items-start gap-3">
+   538→                  <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand text-white">
+   539→                    <Receipt className="size-6" />
+   540→                  </span>
+   541→                  <div>
+   542→                    <div className="flex items-center gap-2">
+   543→                      <h2 className="text-base font-bold text-foreground">Pass Ordonnance</h2>
+   544→                      <Badge className="border-0 bg-brand text-white">
+   545→                        {formatFCFA(PASS_PRICE)}
+   546→                      </Badge>
+   547→                    </div>
+   548→                    <p className="mt-1 max-w-md text-sm text-muted-foreground">
+   549→                      Profitez d&apos;estimations d&apos;ordonnance gratuites et illimitées
+   550→                      pendant 30 jours. Idéal pour un usage occasionnel sans souscrire à
+   551→                      l&apos;abonnement Premium.
+   552→                    </p>
+   553→                    {hasPass && (
+   554→                      <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-success-light px-2 py-0.5 text-[11px] font-bold text-success">
+   555→                        <CheckCircle2 className="size-3" /> Pass déjà actif sur votre compte
+   556→                      </p>
+   557→                    )}
+   558→                  </div>
+   559→                </div>
+   560→                <div className="shrink-0 text-right">
+   561→                  <CreditCost cost={0} />
+   562→                  <p className="mt-1 text-[11px] text-muted-foreground">
+   563→                    Soit 0 crédit par estimation
+   564→                  </p>
+   565→                </div>
+   566→              </div>
+   567→            </Card>
+   568→          </section>
+   569→        )}
+   570→
+   571→        {/* ============ PAYMENT STATE BANNERS ============ */}
+   572→        {state === "pending" && (
+   573→          <StateBanner
+   574→            icon={Loader2}
+   575→            iconClass="animate-spin text-brand"
+   576→            title="Paiement en attente"
+   577→            message="Veuillez patienter pendant le traitement de votre paiement..."
+   578→            tone="info"
+   579→          />
+   580→        )}
+   581→        {state === "failed" && (
+   582→          <StateBanner
+   583→            icon={XCircle}
+   584→            iconClass="text-danger"
+   585→            title="Paiement échoué"
+   586→            message="Le paiement n'a pas pu aboutir. Vérifiez votre solde et réessayez."
+   587→            tone="danger"
+   588→            action={{ label: "Réessayer", onClick: resetState }}
+   589→          />
+   590→        )}
+   591→        {state === "cancelled" && (
+   592→          <StateBanner
+   593→            icon={AlertCircle}
+   594→            iconClass="text-warning-foreground"
+   595→            title="Transaction annulée"
+   596→            message="Vous avez annulé la transaction. Vous pouvez réessayer quand vous voulez."
+   597→            tone="warning"
+   598→            action={{ label: "Reprendre", onClick: resetState }}
+   599→          />
+   600→        )}
+   601→
+   602→        <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_380px] lg:gap-8">
+   603→          {/* LEFT — Payment form */}
+   604→          <div className="space-y-6">
+   605→            {/* Moyens de paiement */}
+   606→            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+   607→              <div className="mb-4 flex items-center gap-2">
+   608→                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   609→                  <Smartphone className="size-4" />
+   610→                </span>
+   611→                <h2 className="text-base font-bold text-foreground">
+   612→                  Choisissez votre moyen de paiement
+   613→                </h2>
+   614→              </div>
+   615→
+   616→              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+   617→                {PROVIDERS.map((p) => {
+   618→                  const active = provider === p.id;
+   619→                  return (
+   620→                    <button
+   621→                      key={p.id}
+   622→                      type="button"
+   623→                      onClick={() => setProvider(p.id)}
+   624→                      className={cn(
+   625→                        "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-all",
+   626→                        active
+   627→                          ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
+   628→                          : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
+   629→                      )}
+   630→                      aria-pressed={active}
+   631→                    >
+   632→                      <span
+   633→                        className={cn(
+   634→                          "flex size-11 items-center justify-center rounded-xl text-xs font-extrabold shadow-sm",
+   635→                          p.bgClass,
+   636→                          p.textClass
+   637→                        )}
+   638→                      >
+   639→                        {p.short}
+   640→                      </span>
+   641→                      <span className="text-[11px] font-bold leading-tight text-foreground">
+   642→                        {p.label}
+   643→                      </span>
+   644→                      {active && (
+   645→                        <CheckCircle2 className="size-3.5 text-brand" />
+   646→                      )}
+   647→                    </button>
+   648→                  );
+   649→                })}
+   650→              </div>
+   651→            </Card>
+   652→
+   653→            {/* Formulaire de paiement */}
+   654→            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+   655→              <div className="mb-4 flex items-center gap-2">
+   656→                <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
+   657→                  <CreditCard className="size-4" />
+   658→                </span>
+   659→                <h2 className="text-base font-bold text-foreground">
+   660→                  Informations de paiement
+   661→                </h2>
+   662→              </div>
+   663→
+   664→              <div className="space-y-4">
+   665→                {/* Opérateur sélectionné (read-only display) */}
+   666→                <div className="space-y-1.5">
+   667→                  <Label>Opérateur sélectionné</Label>
+   668→                  <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+   669→                    <span
+   670→                      className={cn(
+   671→                        "flex size-7 items-center justify-center rounded-lg text-[10px] font-extrabold",
+   672→                        PROVIDERS.find((p) => p.id === provider)?.bgClass,
+   673→                        PROVIDERS.find((p) => p.id === provider)?.textClass
+   674→                      )}
+   675→                    >
+   676→                      {PROVIDERS.find((p) => p.id === provider)?.short}
+   677→                    </span>
+   678→                    <span className="text-sm font-semibold text-foreground">
+   679→                      {PROVIDERS.find((p) => p.id === provider)?.label}
+   680→                    </span>
+   681→                    <span className="ml-auto text-xs text-muted-foreground">
+   682→                      {PROVIDERS.find((p) => p.id === provider)?.desc}
+   683→                    </span>
+   684→                  </div>
+   685→                </div>
+   686→
+   687→                {/* Numéro de téléphone */}
+   688→                <div className="space-y-1.5">
+   689→                  <Label htmlFor="phone">
+   690→                    Numéro de téléphone Mobile Money <span className="text-destructive">*</span>
+   691→                  </Label>
+   692→                  <div className="relative">
+   693→                    <Smartphone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+   694→                    <Input
+   695→                      id="phone"
+   696→                      inputMode="tel"
+   697→                      placeholder="07 00 00 00 00"
+   698→                      value={formattedPhone}
+   699→                      onChange={(e) => setPhone(e.target.value)}
+   700→                      className="h-11 pl-9 text-base tracking-wide"
+   701→                      maxLength={19}
+   702→                      disabled={state === "pending"}
+   703→                    />
+   704→                  </div>
+   705→                  <p className="text-xs text-muted-foreground">
+   706→                    Saisissez le numéro ivoirien lié à votre compte{" "}
+   707→                    {PROVIDERS.find((p) => p.id === provider)?.label}.
+   708→                  </p>
+   709→                </div>
+   710→
+   711→                {/* Nom du titulaire */}
+   712→                <div className="space-y-1.5">
+   713→                  <Label htmlFor="holder">
+   714→                    Nom du titulaire <span className="text-destructive">*</span>
+   715→                  </Label>
+   716→                  <Input
+   717→                    id="holder"
+   718→                    placeholder="Nom complet du titulaire"
+   719→                    value={holderName}
+   720→                    onChange={(e) => setHolderName(e.target.value)}
+   721→                    className="h-11"
+   722→                    disabled={state === "pending"}
+   723→                  />
+   724→                </div>
+   725→
+   726→                {/* Montant (read-only) */}
+   727→                <div className="space-y-1.5">
+   728→                  <Label>Montant à payer</Label>
+   729→                  <div className="flex items-center justify-between rounded-lg border border-brand/20 bg-brand-light/30 px-3 py-2.5">
+   730→                    <span className="text-sm text-muted-foreground">{currentLabel}</span>
+   731→                    <Price amount={currentAmount} size="md" variant="brand" />
+   732→                  </div>
+   733→                </div>
+   734→
+   735→                {/* Bouton Payer maintenant */}
+   736→                <Button
+   737→                  className="h-12 w-full bg-brand text-base font-semibold text-white shadow-premium hover:bg-brand-dark"
+   738→                  onClick={handlePay}
+   739→                  disabled={state === "pending" || (mode === "pass" && hasPass)}
+   740→                >
+   741→                  {state === "pending" ? (
+   742→                    <>
+   743→                      <Loader2 className="size-4 animate-spin" />
+   744→                      Traitement en cours…
+   745→                    </>
+   746→                  ) : mode === "pass" && hasPass ? (
+   747→                    <>Pass déjà actif</>
+   748→                  ) : (
+   749→                    <>
+   750→                      <Lock className="size-4" />
+   751→                      Payer {formatFCFA(currentAmount)}
+   752→                    </>
+   753→                  )}
+   754→                </Button>
+   755→
+   756→                <Button
+   757→                  variant="ghost"
+   758→                  className="w-full text-muted-foreground"
+   759→                  onClick={handleCancel}
+   760→                  disabled={state === "pending"}
+   761→                >
+   762→                  Annuler
+   763→                </Button>
+   764→              </div>
+   765→            </Card>
+   766→
+   767→            {/* Bloc sécurité */}
+   768→            <Card className="border-brand/20 bg-brand-light/20 p-5">
+   769→              <div className="flex items-center gap-2">
+   770→                <ShieldCheck className="size-5 text-brand" />
+   771→                <h3 className="text-sm font-bold text-foreground">
+   772→                  Paiement sécurisé et protégé
+   773→                </h3>
+   774→              </div>
+   775→              <ul className="mt-3 space-y-2">
+   776→                <SecurityItem text="Paiement sécurisé — toutes les transactions sont chiffrées." />
+   777→                <SecurityItem text="Vos informations sont protégées et ne sont jamais partagées." />
+   778→                <SecurityItem text="Activation automatique après paiement confirmé." />
+   779→              </ul>
+   780→              <p className="mt-3 rounded-lg bg-background/60 px-3 py-2 text-[11px] text-muted-foreground">
+   781→                Environnement de démonstration — aucun débit réel n&apos;est effectué.
+   782→              </p>
+   783→            </Card>
+   784→          </div>
+   785→
+   786→          {/* RIGHT — Récapitulatif (sticky) */}
+   787→          <div className="lg:sticky lg:top-24 lg:self-start">
+   788→            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+   789→              <div className="flex items-center gap-2">
+   790→                <Receipt className="size-4 text-brand" />
+   791→                <h2 className="text-base font-bold text-foreground">
+   792→                  Récapitulatif
+   793→                </h2>
+   794→              </div>
+   795→
+   796→              <div className="mt-4 flex items-start gap-3 rounded-xl bg-brand-light/40 p-4">
+   797→                <span
+   798→                  className={cn(
+   799→                    "flex size-10 items-center justify-center rounded-xl text-white",
+   800→                    mode === "premium" ? "bg-amber-500" : "bg-brand"
+   801→                  )}
+   802→                >
+   803→                  {mode === "premium" ? (
+   804→                    <Crown className="size-5" />
+   805→                  ) : mode === "pass" ? (
+   806→                    <Receipt className="size-5" />
+   807→                  ) : (
+   808→                    <Coins className="size-5" />
+   809→                  )}
+   810→                </span>
+   811→                <div className="flex-1">
+   812→                  <p className="text-sm font-bold text-foreground">{currentShortLabel}</p>
+   813→                  <p className="text-xs text-muted-foreground">
+   814→                    {mode === "premium"
+   815→                      ? "Formule mensuelle · Activation immédiate"
+   816→                      : mode === "pass"
+   817→                        ? "Validité 30 jours · Activation immédiate"
+   818→                        : `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits · Activation immédiate`}
+   819→                  </p>
+   820→                </div>
+   821→                <Badge className="border-0 bg-success text-white">
+   822→                  <CheckCircle2 className="size-3" /> À payer
+   823→                </Badge>
+   824→              </div>
+   825→
+   826→              <div className="mt-4 space-y-2 text-sm">
+   827→                <div className="flex justify-between">
+   828→                  <span className="text-muted-foreground">Formule</span>
+   829→                  <span className="font-semibold text-foreground">{currentShortLabel}</span>
+   830→                </div>
+   831→                <div className="flex justify-between">
+   832→                  <span className="text-muted-foreground">Montant</span>
+   833→                  <span className="font-semibold text-foreground">{formatFCFA(currentAmount)}</span>
+   834→                </div>
+   835→                <div className="flex justify-between">
+   836→                  <span className="text-muted-foreground">Durée</span>
+   837→                  <span className="font-semibold text-foreground">
+   838→                    {mode === "premium" ? "1 mois" : mode === "pass" ? "30 jours" : "Illimité"}
+   839→                  </span>
+   840→                </div>
+   841→                <div className="flex justify-between">
+   842→                  <span className="text-muted-foreground">Frais</span>
+   843→                  <span className="font-semibold text-foreground">0 FCFA</span>
+   844→                </div>
+   845→                <div className="flex justify-between">
+   846→                  <span className="text-muted-foreground">Statut</span>
+   847→                  <span className="font-semibold text-foreground">En attente</span>
+   848→                </div>
+   849→              </div>
+   850→
+   851→              <Separator className="my-4" />
+   852→
+   853→              <div className="flex items-baseline justify-between">
+   854→                <span className="text-base font-bold text-foreground">Total à payer</span>
+   855→                <Price amount={currentAmount} size="lg" variant="brand" />
+   856→              </div>
+   857→
+   858→              <Button
+   859→                className="mt-4 w-full bg-brand text-white hover:bg-brand-dark"
+   860→                size="lg"
+   861→                onClick={handlePay}
+   862→                disabled={state === "pending" || (mode === "pass" && hasPass)}
+   863→              >
+   864→                {state === "pending" ? (
+   865→                  <>
+   866→                    <Loader2 className="size-4 animate-spin" /> Traitement…
+   867→                  </>
+   868→                ) : mode === "pass" && hasPass ? (
+   869→                  <>Pass déjà actif</>
+   870→                ) : (
+   871→                  <>
+   872→                    <Lock className="size-4" /> Payer {formatFCFA(currentAmount)}
+   873→                  </>
+   874→                )}
+   875→              </Button>
+   876→
+   877→              <Button
+   878→                variant="ghost"
+   879→                className="mt-2 w-full text-muted-foreground"
+   880→                onClick={() => navigate(mode === "premium" ? "subscription" : "wallet")}
+   881→                disabled={state === "pending"}
+   882→              >
+   883→                <ChevronLeft className="size-4" /> {mode === "premium" ? "Modifier l'offre" : "Retour au portefeuille"}
+   884→              </Button>
+   885→            </Card>
+   886→          </div>
+   887→        </div>
+   888→
+   889→        {/* ============ HISTORIQUE DES PAIEMENTS ============ */}
+   890→        <section className="mt-12">
+   891→          <div className="mb-4 flex items-center gap-2.5">
+   892→            <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
+   893→              <Receipt className="size-5" />
+   894→            </span>
+   895→            <div>
+   896→              <Eyebrow>Transparence</Eyebrow>
+   897→              <Heading level="h2">Historique des paiements</Heading>
+   898→            </div>
+   899→          </div>
+   900→
+   901→          <Card className="overflow-hidden border-border/70 py-0 shadow-card">
+   902→            <div className="overflow-x-auto scroll-thin">
+   903→              <table className="w-full min-w-[640px] text-left text-sm">
+   904→                <thead className="border-b border-border/60 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+   905→                  <tr>
+   906→                    <th className="px-5 py-3.5 font-semibold">Date</th>
+   907→                    <th className="px-5 py-3.5 font-semibold">Formule</th>
+   908→                    <th className="px-5 py-3.5 font-semibold">Montant</th>
+   909→                    <th className="px-5 py-3.5 font-semibold">Moyen</th>
+   910→                    <th className="px-5 py-3.5 font-semibold">Statut</th>
+   911→                    <th className="px-5 py-3.5 font-semibold">Référence</th>
+   912→                  </tr>
+   913→                </thead>
+   914→                <tbody className="divide-y divide-border/50">
+   915→                  {PAYMENT_HISTORY.map((row, i) => (
+   916→                    <tr key={i} className="transition-colors hover:bg-accent/30">
+   917→                      <td className="px-5 py-3.5 text-muted-foreground">
+   918→                        {formatDate(row.date)}
+   919→                      </td>
+   920→                      <td className="px-5 py-3.5 font-semibold text-foreground">
+   921→                        {row.formule}
+   922→                      </td>
+   923→                      <td className="px-5 py-3.5 font-bold text-brand-dark">
+   924→                        {formatFCFA(row.montant)}
+   925→                      </td>
+   926→                      <td className="px-5 py-3.5 text-muted-foreground">{row.moyen}</td>
+   927→                      <td className="px-5 py-3.5">
+   928→                        {row.statut === "success" ? (
+   929→                          <span className="inline-flex items-center gap-0.5 rounded-full bg-success-light px-2 py-0.5 text-[10px] font-bold text-success">
+   930→                            <CheckCircle2 className="size-2.5" /> Réussi
+   931→                          </span>
+   932→                        ) : (
+   933→                          <span className="inline-flex items-center gap-0.5 rounded-full bg-danger-light px-2 py-0.5 text-[10px] font-bold text-danger">
+   934→                            <XCircle className="size-2.5" /> Échoué
+   935→                          </span>
+   936→                        )}
+   937→                      </td>
+   938→                      <td className="px-5 py-3.5">
+   939→                        <button
+   940→                          onClick={() => {
+   941→                            navigator.clipboard?.writeText(row.reference);
+   942→                            toast.success("Référence copiée");
+   943→                          }}
+   944→                          className="inline-flex items-center gap-1 font-mono text-xs text-brand hover:underline"
+   945→                        >
+   946→                          {row.reference}
+   947→                          <Copy className="size-3" />
+   948→                        </button>
+   949→                      </td>
+   950→                    </tr>
+   951→                  ))}
+   952→                </tbody>
+   953→              </table>
+   954→            </div>
+   955→          </Card>
+   956→        </section>
+   957→      </div>
+   958→
+   959→      {/* ============ MODALE DE CONFIRMATION ============ */}
+   960→      <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+   961→        <DialogContent className="max-w-md border-brand/30 p-0">
+   962→          <DialogHeader className="sr-only">
+   963→            <DialogTitle>Paiement confirmé</DialogTitle>
+   964→          </DialogHeader>
+   965→          <div className="overflow-hidden rounded-xl">
+   966→            {/* Header succès */}
+   967→            <div className="relative flex flex-col items-center bg-brand px-6 py-8 text-center text-white">
+   968→              <span className="relative flex size-16 items-center justify-center rounded-full bg-white/15 ring-8 ring-white/10 animate-scale-in">
+   969→                <CheckCircle2 className="size-9 text-white" />
+   970→              </span>
+   971→              <h2 className="relative mt-4 text-xl font-extrabold">
+   972→                Paiement confirmé !
+   973→              </h2>
+   974→              <p className="relative mt-1 text-sm text-white/85">
+   975→                {mode === "premium"
+   976→                  ? "Abonnement Premium activé avec succès"
+   977→                  : mode === "pass"
+   978→                    ? "Pass Ordonnance activé avec succès"
+   979→                    : "Recharge de crédits effectuée avec succès"}
+   980→              </p>
+   981→            </div>
+   982→
+   983→            {/* Détails */}
+   984→            <div className="space-y-3 p-6">
+   985→              <div className="grid grid-cols-2 gap-3">
+   986→                <DetailItem label="Montant payé" value={formatFCFA(currentAmount)} />
+   987→                <DetailItem label="Date de paiement" value={paymentDate ? formatDate(paymentDate) : "—"} />
+   988→                <DetailItem
+   989→                  label={mode === "recharge" ? "Crédits obtenus" : "Date d'expiration"}
+   990→                  value={
+   991→                    mode === "recharge"
+   992→                      ? `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits`
+   993→                      : expiryDate
+   994→                        ? formatDate(expiryDate)
+   995→                        : "—"
+   996→                  }
+   997→                />
+   998→                <DetailItem label="Moyen de paiement" value={PROVIDERS.find((p) => p.id === provider)?.label ?? "—"} />
+   999→              </div>
+  1000→
+  1001→              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+  1002→                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+  1003→                  Référence de transaction
+  1004→                </p>
+  1005→                <div className="mt-0.5 flex items-center justify-between">
+  1006→                  <span className="font-mono text-sm font-bold text-foreground">
+  1007→                    {transactionRef}
+  1008→                  </span>
+  1009→                  <button
+  1010→                    onClick={() => {
+  1011→                      navigator.clipboard?.writeText(transactionRef);
+  1012→                      toast.success("Référence copiée");
+  1013→                    }}
+  1014→                    className="text-brand hover:underline"
+  1015→                  >
+  1016→                    <Copy className="size-3.5" />
+  1017→                  </button>
+  1018→                </div>
+  1019→              </div>
+  1020→
+  1021→              <Button
+  1022→                className="w-full bg-brand text-white hover:bg-brand-dark"
+  1023→                size="lg"
+  1024→                onClick={() => {
+  1025→                  setShowSuccess(false);
+  1026→                  navigate(mode === "premium" ? "profile" : "wallet");
+  1027→                }}
+  1028→              >
+  1029→                {mode === "premium" ? (
+  1030→                  <>Accéder à mon compte <ArrowRight className="size-4" /></>
+  1031→                ) : (
+  1032→                  <>Retour à mon portefeuille <ArrowRight className="size-4" /></>
+  1033→                )}
+  1034→              </Button>
+  1035→              <Button
+  1036→                variant="ghost"
+  1037→                className="w-full text-muted-foreground"
+  1038→                onClick={() => {
+  1039→                  setShowSuccess(false);
+  1040→                  navigate("home");
+  1041→                }}
+  1042→              >
+  1043→                Retour à l&apos;accueil
+  1044→              </Button>
+  1045→            </div>
+  1046→          </div>
+  1047→        </DialogContent>
+  1048→      </Dialog>
+  1049→    </div>
+  1050→  );
+  1051→}
+  1052→
+  1053→/* ============================================================
+  1054→   StateBanner — bannière d'état de paiement
+  1055→   ============================================================ */
+  1056→function StateBanner({
+  1057→  icon: Icon,
+  1058→  iconClass,
+  1059→  title,
+  1060→  message,
+  1061→  tone,
+  1062→  action,
+  1063→}: {
+  1064→  icon: typeof Loader2;
+  1065→  iconClass: string;
+  1066→  title: string;
+  1067→  message: string;
+  1068→  tone: "info" | "danger" | "warning" | "success";
+  1069→  action?: { label: string; onClick: () => void };
+  1070→}) {
+  1071→  const tones = {
+  1072→    info: "border-brand/30 bg-brand-light/30 text-brand-dark",
+  1073→    danger: "border-danger/30 bg-danger-light text-danger",
+  1074→    warning: "border-warning/30 bg-warning-light text-warning-foreground",
+  1075→    success: "border-success/30 bg-success-light text-success",
+  1076→  };
+  1077→  return (
+  1078→    <div className={cn("flex items-center gap-3 rounded-xl border p-4", tones[tone])}>
+  1079→      <Icon className={cn("size-6 shrink-0", iconClass)} />
+  1080→      <div className="flex-1">
+  1081→        <p className="text-sm font-bold">{title}</p>
+  1082→        <p className="text-xs opacity-90">{message}</p>
+  1083→      </div>
+  1084→      {action && (
+  1085→        <Button
+  1086→          size="sm"
+  1087→          variant="outline"
+  1088→          className="border-current"
+  1089→          onClick={action.onClick}
+  1090→        >
+  1091→          {action.label}
+  1092→        </Button>
+  1093→      )}
+  1094→    </div>
+  1095→  );
+  1096→}
+  1097→
+  1098→/* ============================================================
+  1099→   SecurityItem — élément de la liste sécurité
+  1100→   ============================================================ */
+  1101→function SecurityItem({ text }: { text: string }) {
+  1102→  return (
+  1103→    <li className="flex items-start gap-2 text-xs text-foreground/80">
+  1104→      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-brand" />
+  1105→      <span>{text}</span>
+  1106→    </li>
+  1107→  );
+  1108→}
+  1109→
+  1110→/* ============================================================
+  1111→   DetailItem — détail dans la modale de confirmation
+  1112→   ============================================================ */
+  1113→function DetailItem({ label, value }: { label: string; value: string }) {
+  1114→  return (
+  1115→    <div className="rounded-lg border border-border/50 bg-background px-3 py-2">
+  1116→      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+  1117→        {label}
+  1118→      </p>
+  1119→      <p className="mt-0.5 text-sm font-semibold text-foreground">{value}</p>
+  1120→    </div>
+  1121→  );
+  1122→}
+  1123→

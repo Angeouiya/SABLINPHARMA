@@ -274,7 +274,7 @@ export function SettingsView() {
                           {row.premiumLocked && (
                             <Badge className="border-0 bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
                               <Crown className="mr-1 size-3" />
-                              Premium
+                              Crédits
                             </Badge>
                           )}
                         </div>
@@ -303,7 +303,7 @@ export function SettingsView() {
                 <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   <Crown className="size-3.5" />
                   Les alertes de prix sur vos favoris sont activées avec
-                  Premium.
+                  Crédits.
                 </p>
               )}
             </CardContent>
@@ -463,14 +463,14 @@ export function SettingsView() {
             </CardContent>
           </Card>
 
-          {/* 4. Abonnement */}
+          {/* 4. Portefeuille */}
           <Card className="border-border/70 shadow-premium">
             <CardHeader className="flex flex-row items-center gap-3 px-6 pt-6">
               <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
                 <Crown className="size-4" />
               </span>
               <CardTitle className="text-base font-bold text-foreground">
-                Abonnement
+                Portefeuille
               </CardTitle>
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-2">
@@ -482,11 +482,11 @@ export function SettingsView() {
                     </span>
                     <div className="flex-1">
                       <p className="text-sm font-extrabold text-amber-900">
-                        Premium actif
+                        Crédits actif
                       </p>
                       <p className="text-xs text-amber-800/80">
                         Merci de votre confiance ! Profitez de toutes les
-                        fonctionnalités Premium.
+                        fonctionnalités Crédits.
                       </p>
                     </div>
                     <CheckCircle2 className="size-5 text-amber-600" />
@@ -505,7 +505,7 @@ export function SettingsView() {
                     <div className="flex items-center gap-2">
                       <Crown className="size-4 text-amber-600" />
                       <p className="text-sm font-bold text-amber-900">
-                        Passez à Premium
+                        Passez à Crédits
                       </p>
                     </div>
                     <p className="mt-1 text-xs leading-relaxed text-amber-800/80">
@@ -519,7 +519,7 @@ export function SettingsView() {
                     onClick={() => navigate("subscription")}
                   >
                     <Crown className="size-4" />
-                    Découvrir Premium
+                    Découvrir Crédits
                   </Button>
                 </div>
               )}

@@ -1532,3 +1532,146 @@ Stage Summary:
 - Aucun lien tel: de pharmacie non verrouillé dans tout le code
 - Seul lien tel: restant = support SABLIN (footer, pas une pharmacie)
 - 3 emplacements corrigés (home-view, medication-detail-view, prescription-result-view x2)
+
+---
+Task ID: 503-a
+Agent: subagent (modifications SABLIN PHARMA — suppression du mode Premium)
+
+Task: Supprimer le mode "Premium" (500 FCFA/mois) et toute mention d'abonnement/premium/subscription sur 3 fichiers, en gardant uniquement "Recharger mes crédits" et "Pass Ordonnance".
+
+Work Log:
+- Lecture préalable de /home/z/my-project/worklog.md (contexte des tâches précédentes)
+- FICHIER 1 — src/components/views/payment-view.tsx (Edit/MultiEdit) :
+  * Supprimé l'import `Crown`, `ChevronRight`, `Clock` et `useEffect` (inutilisés)
+  * Supprimé la constante `PRICE = 500` (prix de l'abonnement premium)
+  * Type `PaymentMode` réduit à `"recharge" | "pass"` (supprimé `"premium"`)
+  * Hook `useAuth` : retiré `premium, setPremium, fetchMe` (plus besoin)
+  * `useState(mode)` : initialisé sur `"pass"` si `params.passOrdonnance`, sinon `"recharge"` (plus de `"premium"` par défaut)
+  * `currentAmount`, `currentLabel`, `currentShortLabel` : supprimé la branche premium
+  * `handlePay` : supprimé la branche `else` (appel POST /api/subscription) — ne reste que /api/credits/recharge (via store) et /api/credits/pass
+  * Header : titre fixe "Paiement" (au lieu de "Paiement de l'abonnement Premium"), bouton retour → "wallet", description sans mention abonnement
+  * Sélecteur de mode : 2 cartes (Pass Ordonnance + Recharger mes crédits) au lieu de 3 (supprimé la carte "Abonnement Premium")
+  * Section Pass Ordonnance : description mise à jour ("sans recharger vos crédits" au lieu de "sans souscrire à l'abonnement Premium")
+  * Section Recharge : description simplifiée ("à la carte" au lieu de "Aucun abonnement obligatoire")
+  * Récapitulatif (sticky) : supprimé la branche premium (icône, sous-titre, durée "1 mois")
+  * Bouton retour du récap : "Retour au portefeuille" (toujours view wallet)
+  * Modale de succès : sous-titre simplifié (2 cas au lieu de 3), bouton "Retour à mon portefeuille"
+  * PAYMENT_HISTORY : remplacé les 4 lignes "Premium mensuel" par des lignes crédits/Pass (Pack Standard, Pass Ordonnance, Pack Découverte, Pack Plus)
+- FICHIER 2 — src/app/api/notifications/route.ts (Edit) :
+  * Supprimé les 4 notifications liées à l'abonnement : "Abonnement bientôt expiré", "Abonnement activé", "Paiement réussi (Abonnement renouvelé)", "Paiement échoué"
+  * Ajouté 6 notifications crédits : "Recharge réussie" (success, link wallet, icon CheckCircle2), "Crédits utilisés" (info, link wallet, icon Coins), "Solde faible" (warning, link wallet, icon AlertTriangle), "Pass Ordonnance activé" (success, link wallet, icon Receipt), "Contact pharmacie débloqué" (success, link pharmacies, icon CheckCircle2), "Estimation ordonnance débloquée" (success, link prescription, icon CheckCircle2)
+  * Conservé les 8 notifications non-liées à l'abonnement (médicament disponible, stock faible, rupture, pharmacie de garde, ordonnance estimée, ordonnance enregistrée, pharmacie favorite, message support)
+- FICHIER 3 — src/components/views/notifications-view.tsx (MultiEdit) :
+  * Imports lucide : remplacé `Crown` par `Coins` + `Receipt`
+  * Map ICONS : remplacé `Crown` par `Coins` + `Receipt` (pour rendre les nouvelles icônes de notifications)
+  * Type `FilterKey` : `"subscription"` → `"credits"`
+  * Tableau FILTERS : ligne "Abonnement" (Crown) → "Crédits" (Coins)
+  * `categorizeNotification` : remplacé `abonnement|premium` par `crédit|recharge|pass|solde` ; ajouté "estimation" aux mots-clés ordonnance
+  * `LINK_VIEWS` : remplacé `"subscription"` par `"wallet"`
+  * `getAction` : cas "subscription" → "credits" avec label "Recharger mes crédits" (view wallet) ; cas "payment" : "Voir le paiement" → "Voir le portefeuille" (view wallet)
+  * `counts` (Record<FilterKey, number>) : clé `subscription` → `credits`
+  * EmptyState non-connecté : "offres Premium" → "l'état de vos crédits"
+  * Muted header : "abonnement, paiements" → "crédits, paiements"
+- Vérification : `bun run lint` → 0 erreur, 0 warning
+- Vérification dev.log : toutes les routes API répondent 200, aucune runtime error après les modifs
+- Contraintes respectées : aucune couleur dégradée (couleurs pleines conservées), aucune mention "Premium"/"Abonnement"/"500 FCFA/mois"/"S'abonner"/"Renouveler"/"subscription" dans le texte utilisateur des 3 fichiers (reste uniquement la classe CSS `shadow-premium` qui est un utilitaire d'ombre défini dans globals.css, indépendant du concept d'abonnement)
+
+Stage Summary:
+- 3 fichiers modifiés avec succès pour SABLIN PHARMA
+- Le mode Premium (500 FCFA/mois) est entièrement supprimé du parcours de paiement
+- La page paiement ne propose plus que 2 modes : Recharger mes crédits (packs 200/500/1000/2000) et Pass Ordonnance (300 FCFA)
+- Le titre de la page est désormais "Paiement"
+- Les notifications sont recentrées sur les crédits (recharge, solde, pass, débloquages) au lieu de l'abonnement
+- La vue notifications utilise un filtre "Crédits" (avec icône Coins) au lieu de "Abonnement" (Crown)
+- Toutes les actions de notifications pointent vers le portefeuille (view "wallet") au lieu de la vue "subscription"
+- Lint propre, dev server sans erreur
+
+---
+Task ID: 501-a
+Agent: subagent (modifications SABLIN PHARMA — home-view + profile-view, suppression du mode Premium)
+
+Task: Modifier 2 fichiers (home-view.tsx + profile-view.tsx) pour supprimer toutes les mentions Premium/Abonnement/500 FCFA/mois et les remplacer par le système de crédits SABLIN + Pass Ordonnance. Couleurs pleines uniquement (aucune couleur dégradée).
+
+Work Log:
+- Lecture préalable de /home/z/my-project/worklog.md (contexte des tâches précédentes 1 → 503-a)
+- Lecture complète de src/components/views/home-view.tsx (699 lignes) et profile-view.tsx (983 lignes) + stores (auth, credits, nav) + composants partagés (credit-cost, credit-badge) + types (View, NavParams)
+- FICHIER 1 — src/components/views/home-view.tsx (Edit/MultiEdit) :
+  * Imports lucide : supprimé `Crown`, ajouté `Wallet` ; ajouté `import { CreditCost, PassBadge } from "@/components/shared/credit-cost"`
+  * Hero (bouton secondaire) : "Estimer mon ordonnance" → "Acheter un Pass Ordonnance" avec `navigate("payment", { passOrdonnance: true })` (couleurs pleines amber au lieu de blanc/10)
+  * Section "Comment fonctionne SABLIN PHARMA ?" : 3 textes mis à jour
+    - Étape 1 : "Recherchez gratuitement des informations simples." (icône Search conservée)
+    - Étape 2 : "Utilisez vos crédits pour débloquer les services avancés." (icône Coins conservée)
+    - Étape 3 : titre "Gagnez du temps" → "Rechargez vos crédits", icône CheckCircle2 → Wallet, texte "Rechargez à partir de 200 FCFA ou achetez un Pass Ordonnance à 300 FCFA."
+  * Section 5 "ESTIMATION ORDONNANCE + PREMIUM" entièrement remplacée par "ORDONNANCE AVEC CRÉDITS + CRÉDITS SABLIN" :
+    - Carte gauche "Ordonnance avec crédits" (bg-brand-light, icône ClipboardList sur bg-brand solide, eyebrow "Services avancés") avec liste CreditCost :
+      · Accès au module Ordonnance → PassBadge
+      · Ajouter un médicament → CreditCost cost=1
+      · Estimation complète → CreditCost cost=2
+      · Meilleure pharmacie → CreditCost cost=1
+      · Comparaison prix/distance → CreditCost cost=1
+      · Confirmation avant déplacement → CreditCost cost=3
+      Boutons : "Recharger mes crédits" (bg-brand solide → wallet) + "Acheter un Pass Ordonnance — 300 FCFA" (outline amber → payment?passOrdonnance=true)
+    - Carte droite "Crédits SABLIN" (bg-background, icône Wallet sur bg-brand solide, eyebrow "Crédits prépayés") avec liste points clés (Sans engagement mensuel, Crédits sur tous services, Recharge dès 200 FCFA, Pass à 300 FCFA)
+      Boutons identiques à la carte gauche
+  * Aucune mention "Premium", "Abonnement", "500 FCFA/mois", "Estimation gratuite", "Commencer l'estimation", "Recommandé", "S'abonner" restante
+  * Aucune couleur dégradée ajoutée (uniquement `bg-brand`, `bg-brand-light`, `bg-amber-50/100/500` couleurs pleines) ; `bg-brand-gradient` est défini en CSS comme couleur solide (var(--brand)) donc conforme
+- FICHIER 2 — src/components/views/profile-view.tsx (Edit/MultiEdit) :
+  * Imports lucide : supprimé `Crown`, `RotateCcw`, `CreditCard` ; supprimé `useEffect` (remplacé par lazy initializer useState)
+  * Type import : supprimé `Subscription` du type import (`import type { FavoriteItem, HistoryItem, AppNotification }`)
+  * SETTINGS_MENU : supprimé la ligne "Gérer mon abonnement" (CreditCard, view subscription) — ne reste que "Mon portefeuille" (Wallet, view wallet)
+  * Hook useAuth : retiré `premium` (plus utilisé) — `const { user, logout } = useAuth()`
+  * Supprimé `subscription` state + `loading` state ; useEffect supprimé (fetch /api/me pour subscription)
+  * `savedPrescriptions` : migré vers `useState` avec lazy initializer SSR-safe (typeof window check) — évite le lint react-hooks/set-state-in-effect
+  * Supprimé `accountStatus` constant (premium ? Premium actif : Compte gratuit)
+  * En-tête profil : badge accountStatus supprimé, remplacé par `<CreditBadge />` + `<PassBadge />` si hasPass
+  * Carte "Mon portefeuille" mise à jour :
+    - Bouton "Recharger" → "Recharger mes crédits" (navigate wallet)
+    - Bouton "Voir les tarifs" remplacé par "Acheter un Pass Ordonnance" (outline amber, navigate payment?passOrdonnance=true)
+    - Bouton "Historique" conservé (navigate wallet)
+    - Message : "Les recherches simples sont gratuites. Les services avancés utilisent vos crédits." → "Rechargez vos crédits ou achetez un Pass Ordonnance pour débloquer les services avancés."
+  * Section "ABONNEMENT" (avec Crown, 500 FCFA/mois, Premium actif, Renouveler, Passer à Premium) ENTIÈLEMENT SUPPRIMÉE — la première section de contenu est désormais "Mes accès SABLIN PHARMA"
+  * Composant `SubInfo` (info d'abonnement) supprimé (n'était plus utilisé)
+  * Type du composant `SectionTitle` : `icon: typeof Crown` → `icon: typeof Wallet`
+  * Aucune mention "Premium", "Abonnement", "500 FCFA/mois", "Renouveler", "S'abonner", "subscription", "Crown", "Compte gratuit" (badge) restante dans le texte utilisateur
+- Vérification lint : `bun run lint` → 0 erreur, 0 warning (après correction du react-hooks/set-state-in-effect via lazy initializer)
+- Vérification dev.log : toutes les routes API répondent 200 (api/categories, medications, pharmacies, me, notifications), compiles réussies, aucune runtime error
+- Contraintes respectées : aucune couleur dégradée (couleurs pleines bg-brand, bg-brand-light, bg-amber-* uniquement), aucune mention interdite dans le texte utilisateur, tout en français
+
+Stage Summary:
+- 2 fichiers modifiés avec succès pour SABLIN PHARMA
+- home-view.tsx : nouvelle section "Ordonnance avec crédits" (liste CreditCost + PassBadge) + "Crédits SABLIN" à la place de Estimation+Premium ; hero button remplacé par "Acheter un Pass Ordonnance" ; section "Comment fonctionne" mise à jour (étape 3 → Rechargez vos crédits)
+- profile-view.tsx : section Abonnement supprimée, carte Mon portefeuille enrichie (bouton Pass Ordonnance + message), badge accountStatus remplacé par CreditBadge + PassBadge conditionnel, SETTINGS_MENU nettoyé (plus de "Gérer mon abonnement"), useEffect fetch /api/me supprimé (lazy initializer pour savedPrescriptions)
+- Mode Premium (500 FCFA/mois) totalement absent de ces 2 vues
+- Lint propre, dev server sans erreur
+
+---
+Task ID: 37
+Agent: main (orchestrator)
+Task: Suppression totale du modèle Premium/Abonnement — modèle crédits uniquement
+
+Work Log:
+- Audit complet grep de toutes les mentions "Premium", "Abonnement", "500 FCFA/mois", "S'abonner", "Estimation gratuite", "Commencer l'estimation", "Recommandé", "Renouveler"
+- Header : boutons "Premium · 500 F" et "Premium" supprimés, remplacés par badge crédits + bouton "Recharger", menu compte avec solde crédits au lieu de "Premium actif", menu mobile "Recharger mes crédits" au lieu de "Passer Premium"
+- Footer : "Premium" remplacé par "Crédits", Crown remplacé par Coins
+- Home-view : section "Abonnement Premium" supprimée → remplacée par "Crédits SABLIN", section "Estimation gratuite" supprimée → remplacée par "Ordonnance avec crédits", bouton hero "Estimer mon ordonnance" → "Acheter un Pass Ordonnance", section "Comment fonctionne" mise à jour
+- Profile-view : section "Abonnement" supprimée, badge "Premium actif" remplacé par badge crédits, SETTINGS_MENU "Gérer mon abonnement" supprimé, carte portefeuille mise à jour
+- Payment-view : mode "Premium 500 FCFA/mois" supprimé, 2 modes restants (Recharge crédits + Pass Ordonnance), titre "Paiement" (pas "Paiement de l'abonnement Premium"), historique paiements mis à jour
+- Notifications API : notifications abonnement supprimées (Abonnement expiré, Abonnement activé, Passez Premium), remplacées par notifications crédits (Recharge réussie, Crédits utilisés, Solde faible, Pass activé, Contact débloqué, Estimation débloquée)
+- Notifications view : filtre "Abonnement" → "Crédits", actions "Renouveler l'abonnement" → "Recharger mes crédits"
+- Subscription-view : toutes mentions Premium/Abonnement/500 FCFA/mois/S'abonner remplacées par Crédits/Portefeuille/Recharger
+- Success-view : "Abonnement Premium" → "Recharge de crédits"
+- Settings-view : "Premium" → "Crédits", "Abonnement" → "Portefeuille"
+- Design-system-view : mentions Premium/Abonnement remplacées
+- Prescription-view + prescription-result-view : "Passez Premium" → "Rechargez vos crédits", "S'abonner" → "Recharger"
+- Vérification finale : 0 mention Premium/Abonnement/500 FCFA/mois/S'abonner/Estimation gratuite dans tout le code
+- Lint 0 erreur, 0 erreur console
+
+Stage Summary:
+- Modèle Premium/Abonnement entièrement supprimé de la plateforme
+- Modèle économique officiel : 1) fonctions simples gratuites, 2) crédits SABLIN, 3) Pass Ordonnance 300 FCFA, 4) aucun abonnement mensuel
+- Header : badge crédits + bouton Recharger (pas de Premium)
+- Accueil : sections "Crédits SABLIN" et "Ordonnance avec crédits" (pas de Premium ni estimation gratuite)
+- Profil : portefeuille crédits (pas d'abonnement)
+- Paiement : recharge crédits + Pass Ordonnance uniquement (pas d'abonnement 500 FCFA/mois)
+- Notifications : crédits/Pass (pas d'abonnement)
+- 0 mention interdite dans tout le code source

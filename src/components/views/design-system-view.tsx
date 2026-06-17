@@ -213,7 +213,7 @@ const SECTIONS = [
   { id: "stats", label: "Statistiques" },
   { id: "alertes", label: "Alertes" },
   { id: "etats", label: "États" },
-  { id: "abonnement", label: "Abonnement" },
+  { id: "abonnement", label: "Portefeuille" },
   { id: "tableau", label: "Tableau" },
   { id: "formulaire", label: "Formulaire" },
 ] as const;
@@ -620,7 +620,7 @@ export function DesignSystemView() {
                     </Button>
                     <Button variant="brand-gradient">
                       <Crown className="size-4" />
-                      S&apos;abonner
+                      Recharger
                     </Button>
                     <Button variant="outline">
                       <ClipboardList className="size-4" />
@@ -644,7 +644,7 @@ export function DesignSystemView() {
                     <Button disabled>Désactivé</Button>
                     <Button variant="brand-gradient" disabled>
                       <Crown className="size-4" />
-                      Premium désactivé
+                      Crédits désactivé
                     </Button>
                   </div>
                 </div>
@@ -805,7 +805,7 @@ export function DesignSystemView() {
                       {
                         icon: Crown,
                         value: "1 240",
-                        label: "Premium",
+                        label: "Crédits",
                         tone: "neutral",
                       },
                     ]}
@@ -932,7 +932,7 @@ export function DesignSystemView() {
               </div>
             </SectionShell>
 
-            {/* ─────────── 9. Abonnement Premium ─────────── */}
+            {/* ─────────── 9. Portefeuille Crédits ─────────── */}
             <section id="abonnement" className="scroll-mt-24">
               <Card className="overflow-hidden border-brand/20 py-0 shadow-premium-lg">
                 <div className="relative bg-brand-gradient p-6 text-white">
@@ -940,10 +940,10 @@ export function DesignSystemView() {
                   <div className="relative flex items-start justify-between gap-4">
                     <div className="space-y-1">
                       <Eyebrow className="text-amber-200">
-                        Abonnement Premium
+                        Portefeuille Crédits
                       </Eyebrow>
                       <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-                        Passez Premium
+                        Passez Crédits
                       </h3>
                       <p className="max-w-md text-sm leading-relaxed text-white/85">
                         Débloquez toutes les fonctionnalités avancées et
@@ -979,7 +979,7 @@ export function DesignSystemView() {
                       className="flex-1 bg-brand-gradient text-white hover:opacity-90"
                     >
                       <Crown className="size-4" />
-                      S&apos;abonner
+                      Recharger
                     </Button>
                     <Button size="lg" variant="outline" className="flex-1">
                       En savoir plus

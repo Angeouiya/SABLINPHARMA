@@ -1,19 +1,16 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   ChevronLeft,
-  ChevronRight,
   CreditCard,
   Smartphone,
   Lock,
   ShieldCheck,
   Loader2,
   CheckCircle2,
-  Crown,
   XCircle,
   AlertCircle,
-  Clock,
   Zap,
   Receipt,
   Copy,
@@ -86,54 +83,53 @@ const PROVIDERS: {
   },
 ];
 
-const PRICE = 500;
 const PASS_PRICE = 300;
-type PaymentMode = "premium" | "recharge" | "pass";
+type PaymentMode = "recharge" | "pass";
 
 // Fictive payment history
 const PAYMENT_HISTORY = [
   {
     date: "2026-06-16",
-    formule: "Premium mensuel",
+    formule: "Pack Standard (6 crédits)",
     montant: 500,
     moyen: "Orange Money",
     statut: "success" as const,
-    reference: "SPL-202606161435",
+    reference: "SPL-RECHARGE-202606161435",
+  },
+  {
+    date: "2026-05-28",
+    formule: "Pass Ordonnance",
+    montant: 300,
+    moyen: "Wave",
+    statut: "success" as const,
+    reference: "SPL-PASS-202605280912",
   },
   {
     date: "2026-05-16",
-    formule: "Premium mensuel",
-    montant: 500,
-    moyen: "Wave",
-    statut: "success" as const,
-    reference: "SPL-202605160912",
-  },
-  {
-    date: "2026-04-16",
-    formule: "Premium mensuel",
-    montant: 500,
+    formule: "Pack Découverte (2 crédits)",
+    montant: 200,
     moyen: "MTN Money",
     statut: "success" as const,
-    reference: "SPL-202604161820",
+    reference: "SPL-RECHARGE-202605161820",
   },
   {
-    date: "2026-03-16",
-    formule: "Premium mensuel",
-    montant: 500,
+    date: "2026-04-30",
+    formule: "Pack Plus (13 crédits)",
+    montant: 1000,
     moyen: "Moov Money",
     statut: "failed" as const,
-    reference: "SPL-202603161104",
+    reference: "SPL-RECHARGE-202604301104",
   },
 ];
 
 export function PaymentView() {
   const { navigate, params } = useNav();
-  const { user, premium, setPremium, fetchMe } = useAuth();
+  const { user } = useAuth();
   const { recharge, fetch: fetchCredits, hasPass } = useCredits();
 
   // Mode dérivé des params (wallet → payment) ou du state local
   const [mode, setMode] = useState<PaymentMode>(
-    params.packAmount ? "recharge" : params.passOrdonnance ? "pass" : "premium"
+    params.passOrdonnance ? "pass" : "recharge"
   );
   const [selectedPackAmount, setSelectedPackAmount] = useState<number>(
     params.packAmount ?? 500
@@ -156,8 +152,7 @@ export function PaymentView() {
   // Montant et libellé dynamiques selon le mode
   const currentAmount = useMemo(() => {
     if (mode === "recharge") return selectedPackAmount;
-    if (mode === "pass") return PASS_PRICE;
-    return PRICE;
+    return PASS_PRICE;
   }, [mode, selectedPackAmount]);
 
   const currentLabel = useMemo(() => {
@@ -165,14 +160,12 @@ export function PaymentView() {
       const pack = CREDIT_PACKS.find((p) => p.amount === selectedPackAmount);
       return pack ? `${pack.label} (${pack.credits} crédits)` : "Recharge de crédits";
     }
-    if (mode === "pass") return "Pass Ordonnance";
-    return "Abonnement Premium · 1 mois";
+    return "Pass Ordonnance";
   }, [mode, selectedPackAmount]);
 
   const currentShortLabel = useMemo(() => {
     if (mode === "recharge") return "Recharge de crédits";
-    if (mode === "pass") return "Pass Ordonnance";
-    return "Abonnement Premium";
+    return "Pass Ordonnance";
   }, [mode]);
 
   // Not connected
@@ -234,7 +227,7 @@ export function PaymentView() {
         toast.success("Recharge réussie !", {
           description: `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits ajoutés à votre compte.`,
         });
-      } else if (mode === "pass") {
+      } else {
         const res = await fetch("/api/credits/pass", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -257,39 +250,6 @@ export function PaymentView() {
         toast.success("Pass Ordonnance activé !", {
           description: "Vos estimations d'ordonnance sont désormais gratuites.",
         });
-      } else {
-        // Premium (comportement existant)
-        const res = await fetch("/api/subscription", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            method: "mobile_money",
-            provider,
-          }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => null);
-          throw new Error(data?.error ?? "Échec du paiement");
-        }
-
-        const result = await res.json();
-        const ref = `SPL-${Date.now()}`;
-        const now = new Date();
-        const exp = new Date();
-        exp.setMonth(exp.getMonth() + 1);
-
-        setTransactionRef(ref);
-        setPaymentDate(now.toISOString());
-        setExpiryDate(exp.toISOString());
-        setPremium(true);
-        await fetchMe();
-        setState("success");
-        setShowSuccess(true);
-        toast.success("Paiement réussi ! Abonnement Premium activé", {
-          description: "Bienvenue dans l'expérience Premium SABLIN PHARMA.",
-        });
-        void result;
       }
     } catch (err) {
       setState("failed");
@@ -316,18 +276,16 @@ export function PaymentView() {
       <section className="bg-brand-light">
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
           <button
-            onClick={() => navigate(mode === "premium" ? "subscription" : "wallet")}
+            onClick={() => navigate("wallet")}
             className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
           >
             <ChevronLeft className="size-4" />
-            {mode === "premium" ? "Abonnement" : "Mon portefeuille"}
+            Mon portefeuille
           </button>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <span className="flex size-12 items-center justify-center rounded-2xl bg-brand text-white shadow-premium">
-              {mode === "premium" ? (
-                <Crown className="size-6" />
-              ) : mode === "pass" ? (
+              {mode === "pass" ? (
                 <Receipt className="size-6" />
               ) : (
                 <Coins className="size-6" />
@@ -336,30 +294,20 @@ export function PaymentView() {
             <div>
               <Eyebrow className="text-brand-dark">Paiement sécurisé</Eyebrow>
               <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-foreground sm:text-3xl">
-                {mode === "premium"
-                  ? "Paiement de l'abonnement Premium"
-                  : mode === "pass"
-                    ? "Achat du Pass Ordonnance"
-                    : "Recharge de vos crédits"}
+                Paiement
               </h1>
             </div>
           </div>
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
-            {mode === "premium" ? (
-              <>
-                Activez votre accès aux fonctionnalités avancées : recherche illimitée,
-                estimation d&apos;ordonnance, pharmacies de garde, favoris, historique et
-                alertes. Simple, rapide et sécurisé.
-              </>
-            ) : mode === "pass" ? (
+            {mode === "pass" ? (
               <>
                 Profitez d&apos;estimations d&apos;ordonnance gratuites pendant 30 jours.
                 Idéal pour un usage occasionnel sans engagement.
               </>
             ) : (
               <>
-                Rechargez vos crédits quand vous voulez. Aucun abonnement obligatoire —
-                vous payez uniquement ce que vous consommez.
+                Rechargez vos crédits quand vous voulez. Vous payez uniquement
+                ce que vous consommez.
               </>
             )}
           </p>
@@ -377,34 +325,7 @@ export function PaymentView() {
               Que souhaitez-vous payer ?
             </h2>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {/* Premium card */}
-            <button
-              type="button"
-              onClick={() => setMode("premium")}
-              className={cn(
-                "flex flex-col items-start gap-2 rounded-xl border p-4 text-left transition-all",
-                mode === "premium"
-                  ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
-                  : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
-              )}
-              aria-pressed={mode === "premium"}
-            >
-              <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
-                <Crown className="size-4" />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-foreground">Abonnement Premium</p>
-                <p className="text-[11px] text-muted-foreground">Accès complet · 1 mois</p>
-              </div>
-              <p className="mt-1 text-base font-extrabold text-brand-dark">{formatFCFA(PRICE)}</p>
-              {mode === "premium" && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brand">
-                  <CheckCircle2 className="size-3" /> Sélectionné
-                </span>
-              )}
-            </button>
-
+          <div className="grid gap-3 sm:grid-cols-2">
             {/* Pass Ordonnance card */}
             <button
               type="button"
@@ -455,7 +376,7 @@ export function PaymentView() {
               </span>
               <div>
                 <p className="text-sm font-bold text-foreground">Recharger mes crédits</p>
-                <p className="text-[11px] text-muted-foreground">Sans engagement · À la carte</p>
+                <p className="text-[11px] text-muted-foreground">À la carte · Sans engagement</p>
               </div>
               <p className="mt-1 text-base font-extrabold text-brand-dark">
                 dès {formatFCFA(CREDIT_PACKS[0].amount)}
@@ -480,7 +401,7 @@ export function PaymentView() {
                 <div>
                   <h2 className="text-base font-bold text-foreground">Recharger mes crédits</h2>
                   <p className="text-[11px] text-muted-foreground">
-                    Rechargez vos crédits quand vous voulez. Aucun abonnement obligatoire.
+                    Rechargez vos crédits quand vous voulez, à la carte.
                   </p>
                 </div>
               </div>
@@ -547,8 +468,8 @@ export function PaymentView() {
                     </div>
                     <p className="mt-1 max-w-md text-sm text-muted-foreground">
                       Profitez d&apos;estimations d&apos;ordonnance gratuites et illimitées
-                      pendant 30 jours. Idéal pour un usage occasionnel sans souscrire à
-                      l&apos;abonnement Premium.
+                      pendant 30 jours. Idéal pour un usage occasionnel sans recharger
+                      vos crédits.
                     </p>
                     {hasPass && (
                       <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-success-light px-2 py-0.5 text-[11px] font-bold text-success">
@@ -796,13 +717,10 @@ export function PaymentView() {
               <div className="mt-4 flex items-start gap-3 rounded-xl bg-brand-light/40 p-4">
                 <span
                   className={cn(
-                    "flex size-10 items-center justify-center rounded-xl text-white",
-                    mode === "premium" ? "bg-amber-500" : "bg-brand"
+                    "flex size-10 items-center justify-center rounded-xl bg-brand text-white"
                   )}
                 >
-                  {mode === "premium" ? (
-                    <Crown className="size-5" />
-                  ) : mode === "pass" ? (
+                  {mode === "pass" ? (
                     <Receipt className="size-5" />
                   ) : (
                     <Coins className="size-5" />
@@ -811,11 +729,9 @@ export function PaymentView() {
                 <div className="flex-1">
                   <p className="text-sm font-bold text-foreground">{currentShortLabel}</p>
                   <p className="text-xs text-muted-foreground">
-                    {mode === "premium"
-                      ? "Formule mensuelle · Activation immédiate"
-                      : mode === "pass"
-                        ? "Validité 30 jours · Activation immédiate"
-                        : `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits · Activation immédiate`}
+                    {mode === "pass"
+                      ? "Validité 30 jours · Activation immédiate"
+                      : `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits · Activation immédiate`}
                   </p>
                 </div>
                 <Badge className="border-0 bg-success text-white">
@@ -835,7 +751,7 @@ export function PaymentView() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Durée</span>
                   <span className="font-semibold text-foreground">
-                    {mode === "premium" ? "1 mois" : mode === "pass" ? "30 jours" : "Illimité"}
+                    {mode === "pass" ? "30 jours" : "Illimité"}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -877,10 +793,10 @@ export function PaymentView() {
               <Button
                 variant="ghost"
                 className="mt-2 w-full text-muted-foreground"
-                onClick={() => navigate(mode === "premium" ? "subscription" : "wallet")}
+                onClick={() => navigate("wallet")}
                 disabled={state === "pending"}
               >
-                <ChevronLeft className="size-4" /> {mode === "premium" ? "Modifier l'offre" : "Retour au portefeuille"}
+                <ChevronLeft className="size-4" /> Retour au portefeuille
               </Button>
             </Card>
           </div>
@@ -972,11 +888,9 @@ export function PaymentView() {
                 Paiement confirmé !
               </h2>
               <p className="relative mt-1 text-sm text-white/85">
-                {mode === "premium"
-                  ? "Abonnement Premium activé avec succès"
-                  : mode === "pass"
-                    ? "Pass Ordonnance activé avec succès"
-                    : "Recharge de crédits effectuée avec succès"}
+                {mode === "pass"
+                  ? "Pass Ordonnance activé avec succès"
+                  : "Recharge de crédits effectuée avec succès"}
               </p>
             </div>
 
@@ -1023,14 +937,10 @@ export function PaymentView() {
                 size="lg"
                 onClick={() => {
                   setShowSuccess(false);
-                  navigate(mode === "premium" ? "profile" : "wallet");
+                  navigate("wallet");
                 }}
               >
-                {mode === "premium" ? (
-                  <>Accéder à mon compte <ArrowRight className="size-4" /></>
-                ) : (
-                  <>Retour à mon portefeuille <ArrowRight className="size-4" /></>
-                )}
+                Retour à mon portefeuille <ArrowRight className="size-4" />
               </Button>
               <Button
                 variant="ghost"

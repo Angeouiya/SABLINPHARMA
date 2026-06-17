@@ -33,6 +33,7 @@ import { useAuth } from "@/store/auth";
 import { NotificationDropdown } from "@/components/shared/notification-dropdown";
 import { CreditBadge } from "@/components/shared/credit-badge";
 import { useNotifications } from "@/store/notifications";
+import { useCredits } from "@/store/credits";
 import { cn } from "@/lib/utils";
 import type { View } from "@/lib/types";
 
@@ -55,7 +56,8 @@ function initials(name: string) {
 
 export function Header() {
   const { view, navigate } = useNav();
-  const { user, premium } = useAuth();
+  const { user } = useAuth();
+  const credits = useCredits((s) => s.credits);
   const { unread, fetch: fetchNotifs, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
 
@@ -131,28 +133,6 @@ export function Header() {
             </Button>
           </div>
 
-          {/* Subscription button */}
-          {premium ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="hidden border-brand/30 bg-brand-light/50 text-brand-dark hover:bg-brand-light sm:inline-flex"
-              onClick={() => go("profile")}
-            >
-              <Crown className="size-4 text-amber-500" />
-              Premium
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              className="hidden bg-brand-gradient text-white hover:opacity-90 sm:inline-flex"
-              onClick={() => go("subscription")}
-            >
-              <Crown className="size-4" />
-              Premium · 500 F
-            </Button>
-          )}
-
           {/* Account menu */}
           {user ? (
             <DropdownMenu>
@@ -179,11 +159,9 @@ export function Header() {
                     <span className="text-xs font-normal text-muted-foreground">
                       {user.email}
                     </span>
-                    {premium && (
-                      <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-brand-light px-2 py-0.5 text-[10px] font-bold text-brand-dark">
-                        <Crown className="size-3 text-amber-500" /> Premium actif
-                      </span>
-                    )}
+                    <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-brand-light px-2 py-0.5 text-[10px] font-bold text-brand-dark">
+                      <Coins className="size-3" /> {credits} crédit{credits > 1 ? "s" : ""}
+                    </span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -205,8 +183,8 @@ export function Header() {
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => go("subscription")}>
-                  <CreditCard className="size-4" /> Abonnement
+                <DropdownMenuItem onClick={() => go("wallet")}>
+                  <CreditCard className="size-4" /> Mon portefeuille
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => go("wallet")}>
                   <Coins className="size-4" /> Mon portefeuille
@@ -345,27 +323,15 @@ export function Header() {
               <ChevronRight className="size-4 opacity-50" />
             </button>
             <div className="my-2 h-px bg-border" />
-            {premium ? (
-              <button
-                onClick={() => go("profile")}
-                className="flex items-center justify-between rounded-xl bg-brand-light px-4 py-3 text-left text-sm font-semibold text-brand-dark"
-              >
-                <span className="flex items-center gap-2">
-                  <Crown className="size-4 text-amber-500" /> Compte Premium
-                </span>
-                <ChevronRight className="size-4" />
-              </button>
-            ) : (
-              <button
-                onClick={() => go("subscription")}
-                className="flex items-center justify-between rounded-xl bg-brand-gradient px-4 py-3 text-left text-sm font-semibold text-white"
-              >
-                <span className="flex items-center gap-2">
-                  <Crown className="size-4" /> Passer Premium · 500 F/mois
-                </span>
-                <ChevronRight className="size-4" />
-              </button>
-            )}
+            <button
+              onClick={() => go("wallet")}
+              className="flex items-center justify-between rounded-xl bg-brand px-4 py-3 text-left text-sm font-semibold text-white"
+            >
+              <span className="flex items-center gap-2">
+                <Coins className="size-4" /> Recharger mes crédits
+              </span>
+              <ChevronRight className="size-4" />
+            </button>
             {unread > 0 && (
               <button
                 onClick={() => {

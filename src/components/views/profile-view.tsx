@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   CircleUser,
-  Crown,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -22,13 +21,11 @@ import {
   Lock,
   HelpCircle,
   FileText,
-  CreditCard,
   Timer,
   Search,
   Navigation,
   AlertCircle,
   Info,
-  RotateCcw,
   Eye,
   KeyRound,
   Wallet,
@@ -53,7 +50,7 @@ import { useFavorites } from "@/store/favorites";
 import { useHistory } from "@/store/history";
 import { formatDate, distanceKm, formatFCFA } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Subscription, FavoriteItem, HistoryItem, AppNotification } from "@/lib/types";
+import type { FavoriteItem, HistoryItem, AppNotification } from "@/lib/types";
 
 const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
 
@@ -70,7 +67,6 @@ const SETTINGS_MENU = [
   { icon: CircleUser, label: "Modifier mes informations", view: "settings" as const },
   { icon: KeyRound, label: "Changer le mot de passe", view: "settings" as const },
   { icon: Bell, label: "Gérer les notifications", view: "settings" as const },
-  { icon: CreditCard, label: "Gérer mon abonnement", view: "subscription" as const },
   { icon: Wallet, label: "Mon portefeuille", view: "wallet" as const },
   { icon: ShieldCheck, label: "Confidentialité", view: "settings" as const },
   { icon: HelpCircle, label: "Aide et support", view: "settings" as const },
@@ -86,7 +82,7 @@ function getInitials(name: string): string {
 
 export function ProfileView() {
   const { navigate } = useNav();
-  const { user, premium, logout } = useAuth();
+  const { user, logout } = useAuth();
   const credits = useCredits((s) => s.credits);
   const hasPass = useCredits((s) => s.hasPass);
   const unreadCount = useNotifications((s) => s.unread);
@@ -94,37 +90,17 @@ export function ProfileView() {
   const favCount = useFavorites((s) => s.favorites.length);
   const favorites = useFavorites((s) => s.favorites);
   const history = useHistory((s) => s.history);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [savedPrescriptions, setSavedPrescriptions] = useState<SavedPrescription[]>([]);
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
+  const [savedPrescriptions] = useState<SavedPrescription[]>(
+    () => {
+      if (typeof window === "undefined") return [];
       try {
-        const res = await fetch("/api/me");
-        if (res.ok) {
-          const data = await res.json();
-          if (active) setSubscription(data.subscription ?? null);
-        }
+        return JSON.parse(localStorage.getItem("sablin-prescriptions") || "[]");
       } catch {
-        /* noop */
-      } finally {
-        if (active) setLoading(false);
+        return [];
       }
-    })();
-    // Load saved prescriptions from localStorage
-    try {
-      const saved = JSON.parse(localStorage.getItem("sablin-prescriptions") || "[]");
-      setSavedPrescriptions(saved);
-    } catch {
-      /* noop */
     }
-    return () => {
-      active = false;
-    };
-  }, []);
+  );
 
   // ---------- Not logged in ----------
   if (!user) {
@@ -177,11 +153,6 @@ export function ProfileView() {
     navigate("home");
   };
 
-  // Account status badge
-  const accountStatus = premium
-    ? { label: "Premium actif", className: "bg-amber-500 text-white", icon: Crown }
-    : { label: "Compte gratuit", className: "bg-brand-light text-brand-dark", icon: CircleUser };
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* Back link */}
@@ -222,10 +193,8 @@ export function ProfileView() {
                   )}
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                  <Badge className={cn("border-0 text-xs font-bold", accountStatus.className)}>
-                    <accountStatus.icon className="size-3" /> {accountStatus.label}
-                  </Badge>
                   <CreditBadge />
+                  {hasPass && <PassBadge />}
                 </div>
               </div>
             </div>
@@ -284,7 +253,7 @@ export function ProfileView() {
               </p>
             </div>
             <p className="mt-3 max-w-md text-sm leading-relaxed text-brand-dark/80">
-              Les recherches simples sont gratuites. Les services avancés utilisent vos crédits.
+              Rechargez vos crédits ou achetez un Pass Ordonnance pour débloquer les services avancés.
             </p>
           </div>
           <div className="flex shrink-0 flex-col gap-2 sm:w-56">
@@ -292,21 +261,21 @@ export function ProfileView() {
               onClick={() => navigate("wallet")}
               className="bg-brand text-white hover:bg-brand-dark"
             >
-              <Coins className="size-4" /> Recharger
+              <Coins className="size-4" /> Recharger mes crédits
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate("payment", { passOrdonnance: true })}
+              className="border-amber-500/50 bg-amber-50 text-amber-900 hover:bg-amber-100"
+            >
+              <ClipboardList className="size-4" /> Acheter un Pass Ordonnance
             </Button>
             <Button
               variant="outline"
               onClick={() => navigate("wallet")}
               className="border-brand/30 text-brand-dark hover:bg-brand"
             >
-              <Receipt className="size-4" /> Voir les tarifs
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate("wallet")}
-              className="border-brand/30 text-brand-dark hover:bg-brand"
-            >
-              <ClipboardList className="size-4" /> Historique
+              <Receipt className="size-4" /> Historique
             </Button>
           </div>
         </div>
@@ -351,75 +320,6 @@ export function ProfileView() {
 
         {/* RIGHT: content sections */}
         <div className="space-y-6">
-          {/* ============ ABONNEMENT ============ */}
-          <section>
-            <SectionTitle icon={Crown} title="Abonnement" />
-            {premium && subscription ? (
-              <Card className="overflow-hidden border-amber-500/30 py-0 shadow-premium">
-                <div className="flex items-center justify-between bg-amber-50 px-5 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
-                      <Crown className="size-5" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold text-foreground">Premium actif</p>
-                      <p className="text-[11px] text-muted-foreground">Formule mensuelle</p>
-                    </div>
-                  </div>
-                  <Badge className="border-0 bg-success text-white">
-                    <CheckCircle2 className="size-3" /> Payé
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-2 divide-x divide-border/50 border-t border-border/50 sm:grid-cols-4">
-                  <SubInfo label="Prix" value="500 FCFA/mois" />
-                  <SubInfo label="Début" value={formatDate(subscription.startDate)} />
-                  <SubInfo label="Expiration" value={subscription.endDate ? formatDate(subscription.endDate) : "—"} />
-                  <SubInfo label="Statut" value="Actif" success />
-                </div>
-                <div className="flex flex-wrap gap-2 border-t border-border/50 p-4">
-                  <Button
-                    size="sm"
-                    className="bg-amber-500 text-white hover:bg-amber-600"
-                    onClick={() => navigate("subscription")}
-                  >
-                    <RotateCcw className="size-3.5" /> Renouveler mon abonnement
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => navigate("payment")}>
-                    <CreditCard className="size-3.5" /> Historique paiements
-                  </Button>
-                </div>
-              </Card>
-            ) : (
-              <Card className="overflow-hidden border-brand/20 py-0 shadow-premium">
-                <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-start gap-3">
-                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand-light text-brand">
-                      <Crown className="size-6" />
-                    </span>
-                    <div>
-                      <h3 className="text-base font-bold text-foreground">
-                        Compte gratuit
-                      </h3>
-                      <p className="mt-0.5 text-sm text-muted-foreground">
-                        Passez à Premium pour débloquer les estimations illimitées,
-                        les alertes de garde et l&apos;assistance prioritaire.
-                      </p>
-                      <p className="mt-1.5 text-lg font-extrabold text-brand-dark">
-                        500 FCFA <span className="text-xs font-medium text-muted-foreground">/ mois</span>
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    className="shrink-0 bg-brand-gradient text-white hover:opacity-90"
-                    onClick={() => navigate("subscription")}
-                  >
-                    <Crown className="size-4" /> Passer à Premium
-                  </Button>
-                </div>
-              </Card>
-            )}
-          </section>
-
           {/* ============ MES ACCÈS SABLIN PHARMA ============ */}
           <section>
             <SectionTitle icon={CheckCircle2} title="Mes accès SABLIN PHARMA" />
@@ -681,7 +581,7 @@ function SectionTitle({
   title,
   action,
 }: {
-  icon: typeof Crown;
+  icon: typeof Wallet;
   title: string;
   action?: { label: string; onClick: () => void };
 }) {
@@ -725,30 +625,6 @@ function ProfileStat({
       </span>
       <p className="mt-1.5 text-xl font-extrabold tabular-nums text-brand-dark">{value}</p>
       <p className="text-[10px] leading-tight text-muted-foreground">{label}</p>
-    </div>
-  );
-}
-
-/* ============================================================
-   SubInfo — info d'abonnement
-   ============================================================ */
-function SubInfo({
-  label,
-  value,
-  success = false,
-}: {
-  label: string;
-  value: string;
-  success?: boolean;
-}) {
-  return (
-    <div className="px-4 py-3 text-center">
-      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className={cn("mt-0.5 text-sm font-bold", success ? "text-success" : "text-foreground")}>
-        {value}
-      </p>
     </div>
   );
 }

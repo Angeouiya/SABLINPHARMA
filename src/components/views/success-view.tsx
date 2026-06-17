@@ -103,7 +103,7 @@ export function SuccessView() {
           Paiement réussi !
         </h1>
         <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Votre abonnement Premium SABLIN PHARMA est maintenant actif. Profitez
+          Vos crédits SABLIN PHARMA ont été rechargés avec succès. Profitez
           pleinement de toutes les fonctionnalités avancées.
         </p>
 
@@ -120,7 +120,7 @@ export function SuccessView() {
             <div className="flex items-center justify-between rounded-lg bg-muted/40 px-4 py-2.5">
               <span className="text-muted-foreground">Formule</span>
               <span className="font-bold text-foreground">
-                Abonnement Premium
+                Recharge de crédits
               </span>
             </div>
             <div className="flex items-center justify-between rounded-lg bg-muted/40 px-4 py-2.5">

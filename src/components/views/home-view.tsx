@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   Search,
   ClipboardList,
-  Crown,
   ChevronRight,
   Timer,
   Plus,
@@ -19,6 +18,7 @@ import {
   Headphones,
   ArrowRight,
   Coins,
+  Wallet,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { SearchBar } from "@/components/shared/search-bar";
@@ -27,6 +27,7 @@ import { StatBlock } from "@/components/shared/stat-block";
 import { MedicationStatusBadge } from "@/components/shared/status-badge";
 import { GoogleMap } from "@/components/shared/google-map";
 import { AlertMessage } from "@/components/shared/alert-message";
+import { CreditCost, PassBadge } from "@/components/shared/credit-cost";
 import { CategoryIcon } from "@/components/category-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -143,10 +144,10 @@ export function HomeView() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-white/30 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
-                onClick={() => navigate("prescription")}
+                className="border-amber-300/50 bg-amber-400/20 text-white backdrop-blur-sm hover:bg-amber-400/30 hover:text-white"
+                onClick={() => navigate("payment", { passOrdonnance: true })}
               >
-                <ClipboardList className="size-4" /> Estimer mon ordonnance
+                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance
               </Button>
               <Button
                 size="lg"
@@ -271,8 +272,7 @@ export function HomeView() {
                 1. Recherchez gratuitement
               </h3>
               <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
-                Recherchez un médicament ou une pharmacie. C&rsquo;est gratuit et
-                illimité.
+                Recherchez gratuitement des informations simples.
               </p>
             </Card>
 
@@ -285,21 +285,20 @@ export function HomeView() {
                 2. Utilisez vos crédits
               </h3>
               <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
-                Les services avancés utilisent vos crédits. Vous payez seulement
-                ce que vous utilisez.
+                Utilisez vos crédits pour débloquer les services avancés.
               </p>
             </Card>
 
             {/* Étape 3 */}
             <Card className="gap-0 border-border/70 p-6 text-center shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
               <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
-                <CheckCircle2 className="size-6" />
+                <Wallet className="size-6" />
               </span>
               <h3 className="mt-4 text-base font-extrabold text-foreground">
-                3. Gagnez du temps
+                3. Rechargez vos crédits
               </h3>
               <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
-                Vérifiez la disponibilité avant de vous déplacer en pharmacie.
+                Rechargez à partir de 200 FCFA ou achetez un Pass Ordonnance à 300 FCFA.
               </p>
             </Card>
           </div>
@@ -394,92 +393,114 @@ export function HomeView() {
       </section>
 
       {/* ========================================================
-          5. ESTIMATION ORDONNANCE + PREMIUM
+          5. ORDONNANCE AVEC CRÉDITS + CRÉDITS SABLIN
           ======================================================== */}
       <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <div className="grid gap-5 lg:grid-cols-2">
-          {/* Estimation */}
+          {/* Ordonnance avec crédits */}
           <Card className="relative overflow-hidden border-brand/20 bg-brand-light py-0">
-            <div className="absolute -right-8 -top-8 size-40 rounded-full bg-brand/10 blur-2xl" />
             <div className="relative flex h-full flex-col gap-4 p-6">
               <div className="flex items-center gap-3">
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-premium">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-brand text-white">
                   <ClipboardList className="size-6" />
                 </span>
-                <Eyebrow>Estimation gratuite</Eyebrow>
+                <Eyebrow>Services avancés</Eyebrow>
               </div>
               <div>
-                <Heading level="h3">Estimez votre ordonnance</Heading>
+                <Heading level="h3">Ordonnance avec crédits</Heading>
                 <p className="mt-1.5 text-sm leading-relaxed break-words text-muted-foreground">
-                  Ajoutez plusieurs médicaments et obtenez instantanément un coût total
-                  estimatif, avec la liste des pharmacies où les trouver au meilleur prix.
+                  Ajoutez vos médicaments, estimez votre ordonnance et trouvez les
+                  pharmacies adaptées grâce aux crédits SABLIN.
                 </p>
               </div>
-              <ul className="space-y-1.5 text-sm text-foreground/80">
-                {[
-                  "Ajoutez autant de médicaments que nécessaire",
-                  "Fourchette de coût min. / max. en temps réel",
-                  "Comparaison des prix par pharmacie",
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2">
-                    <CheckCircle2 className="size-4 shrink-0 text-brand" /> {f}
-                  </li>
-                ))}
+              <ul className="space-y-2 text-sm text-foreground/85">
+                <li className="flex items-center justify-between gap-2">
+                  <span>Accès au module Ordonnance</span>
+                  <PassBadge />
+                </li>
+                <li className="flex items-center justify-between gap-2">
+                  <span>Ajouter un médicament</span>
+                  <CreditCost cost={1} />
+                </li>
+                <li className="flex items-center justify-between gap-2">
+                  <span>Estimation complète</span>
+                  <CreditCost cost={2} />
+                </li>
+                <li className="flex items-center justify-between gap-2">
+                  <span>Meilleure pharmacie</span>
+                  <CreditCost cost={1} />
+                </li>
+                <li className="flex items-center justify-between gap-2">
+                  <span>Comparaison prix/distance</span>
+                  <CreditCost cost={1} />
+                </li>
+                <li className="flex items-center justify-between gap-2">
+                  <span>Confirmation avant déplacement</span>
+                  <CreditCost cost={3} />
+                </li>
               </ul>
               <Button
-                className="mt-auto w-full bg-brand-gradient text-white hover:opacity-90"
+                className="mt-auto w-full bg-brand text-white hover:bg-brand-dark"
                 size="lg"
-                onClick={() => navigate("prescription")}
+                onClick={() => navigate("wallet")}
               >
-                <ClipboardList className="size-4" /> Commencer l&apos;estimation
-                <ArrowRight className="size-4" />
+                <Coins className="size-4" /> Recharger mes crédits
+              </Button>
+              <Button
+                className="w-full border-amber-500/50 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("payment", { passOrdonnance: true })}
+              >
+                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance — 300 FCFA
               </Button>
             </div>
           </Card>
 
-          {/* Premium */}
-          <Card className="relative overflow-hidden border-amber-500/30 bg-amber-50 py-0">
-            <div className="absolute -right-10 -top-10 size-44 rounded-full bg-amber-300/20 blur-3xl" />
+          {/* Crédits SABLIN */}
+          <Card className="relative overflow-hidden border-brand/20 bg-background py-0">
             <div className="relative flex h-full flex-col gap-4 p-6">
-              <div className="flex items-center justify-between">
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-premium">
-                  <Crown className="size-6" />
+              <div className="flex items-center gap-3">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-brand text-white">
+                  <Wallet className="size-6" />
                 </span>
-                <Badge className="border-0 bg-amber-500 text-[11px] font-bold text-white">
-                  Recommandé
-                </Badge>
+                <Eyebrow>Crédits prépayés</Eyebrow>
               </div>
               <div>
-                <Heading level="h3">Abonnement Premium</Heading>
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  Débloquez toutes les fonctionnalités avancées de SABLIN PHARMA.
+                <Heading level="h3">Crédits SABLIN</Heading>
+                <p className="mt-1.5 text-sm leading-relaxed break-words text-muted-foreground">
+                  Rechargez vos crédits et payez uniquement les services avancés que
+                  vous utilisez.
                 </p>
               </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-4xl font-extrabold text-brand-dark">500</span>
-                <span className="text-sm font-semibold text-muted-foreground">FCFA / mois</span>
-              </div>
-              <ul className="grid grid-cols-1 gap-1.5 text-sm text-foreground/80 sm:grid-cols-2">
-                {[
-                  "Recherche illimitée",
-                  "Estimation d'ordonnance",
-                  "Pharmacies ouvertes",
-                  "Pharmacies de garde",
-                  "Historique complet",
-                  "Favoris illimités",
-                  "Alertes de disponibilité",
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2">
-                    <CheckCircle2 className="size-4 shrink-0 text-amber-500" /> {f}
-                  </li>
-                ))}
+              <ul className="space-y-2 text-sm text-foreground/85">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Sans engagement mensuel
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Crédits utilisables sur tous les services avancés
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Recharge à partir de 200 FCFA
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Pass Ordonnance à 300 FCFA pour usage ponctuel
+                </li>
               </ul>
               <Button
-                className="mt-auto w-full bg-amber-500 text-white hover:bg-amber-600"
+                className="mt-auto w-full bg-brand text-white hover:bg-brand-dark"
                 size="lg"
-                onClick={() => navigate("subscription")}
+                onClick={() => navigate("wallet")}
               >
-                <Crown className="size-4" /> S&apos;abonner maintenant
+                <Coins className="size-4" /> Recharger mes crédits
+              </Button>
+              <Button
+                className="w-full border-amber-500/50 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("payment", { passOrdonnance: true })}
+              >
+                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance — 300 FCFA
               </Button>
             </div>
           </Card>

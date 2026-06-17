@@ -43,7 +43,7 @@ import { formatFCFA, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Subscription } from "@/lib/types";
 
-// Les 8 avantages Premium demandés
+// Les 8 avantages Crédits demandés
 const AVANTAGES = [
   { icon: Search, label: "Recherche illimitée de médicaments" },
   { icon: ClipboardList, label: "Estimation d'ordonnance" },
@@ -72,7 +72,7 @@ const COMPARATIF: {
   { label: "Sans publicité", gratuit: "—", premium: "Inclus", premiumOnly: true },
 ];
 
-// Pourquoi passer à Premium
+// Pourquoi passer à Crédits
 const POURQUOI = [
   {
     icon: Zap,
@@ -104,15 +104,15 @@ const POURQUOI = [
 const FAQ = [
   {
     q: "Comment payer l'abonnement ?",
-    a: "Vous pouvez régler votre abonnement via Mobile Money (Orange Money, MTN MoMo, Moov Money) ou par carte bancaire (Visa, Mastercard). Le paiement est sécurisé et chiffré. Aucun prélèvement automatique : vous payez 500 FCFA pour 30 jours d'accès Premium.",
+    a: "Vous pouvez régler votre abonnement via Mobile Money (Orange Money, MTN MoMo, Moov Money) ou par carte bancaire (Visa, Mastercard). Le paiement est sécurisé et chiffré. Aucun prélèvement automatique : vous payez 500 FCFA pour 6 crédits.",
   },
   {
     q: "Puis-je annuler ?",
-    a: "Oui, l'abonnement est sans engagement. Il n'est pas reconduit automatiquement. Vous conservez l'accès Premium jusqu'à la fin de la période payée, puis le compte repasse en mode gratuit sans aucune action de votre part.",
+    a: "Oui, l'abonnement est sans engagement. Il n'est pas reconduit automatiquement. Vous conservez l'accès Crédits jusqu'à la fin de la période payée, puis le compte repasse en mode gratuit sans aucune action de votre part.",
   },
   {
     q: "Que se passe-t-il si mon abonnement expire ?",
-    a: "Votre compte repasse automatiquement en mode gratuit. Vous conservez accès aux fonctionnalités de base (recherche limitée, pharmacies). Vos favoris et historique sont conservés. Vous pouvez renouveler à tout moment pour retrouver toutes les fonctionnalités Premium.",
+    a: "Votre compte repasse automatiquement en mode gratuit. Vous conservez accès aux fonctionnalités de base (recherche limitée, pharmacies). Vos favoris et historique sont conservés. Vous pouvez renouveler à tout moment pour retrouver toutes les fonctionnalités Crédits.",
   },
   {
     q: "Les prix des médicaments sont-ils garantis ?",
@@ -162,10 +162,10 @@ export function SubscriptionView() {
           <div className="mx-auto mt-6 max-w-2xl text-center">
             <Badge className="mx-auto inline-flex items-center gap-1.5 border-0 bg-amber-500 px-3 py-1 text-xs font-bold text-white shadow-premium">
               <Crown className="size-3.5" />
-              Offre Premium
+              Offre Crédits
             </Badge>
             <h1 className="mt-4 text-3xl font-extrabold leading-tight tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-              Abonnement Premium
+              Portefeuille Crédits
             </h1>
             <p className="mt-3 text-sm leading-relaxed break-words text-muted-foreground sm:text-base">
               Accédez à toutes les fonctionnalités pour trouver vos médicaments plus
@@ -195,7 +195,7 @@ export function SubscriptionView() {
                 </span>
                 <div>
                   <Eyebrow>Vos avantages</Eyebrow>
-                  <Heading level="h2">Ce que vous obtenez avec Premium</Heading>
+                  <Heading level="h2">Ce que vous obtenez avec Crédits</Heading>
                 </div>
               </div>
               <Muted className="mt-2 max-w-lg">
@@ -229,7 +229,7 @@ export function SubscriptionView() {
             />
           </div>
 
-          {/* RIGHT — Carte Premium pricing (sticky) */}
+          {/* RIGHT — Carte Crédits pricing (sticky) */}
           <div className="lg:sticky lg:top-24 lg:self-start">
             <Card className="relative overflow-hidden border-amber-500/30 bg-amber-50 p-0 shadow-premium-lg">
               <div className="absolute -right-10 -top-10 size-44 rounded-full bg-amber-300/30 blur-3xl" />
@@ -241,12 +241,12 @@ export function SubscriptionView() {
                     <Crown className="size-6" />
                   </span>
                   <Badge className="border-0 bg-amber-500 text-[11px] font-bold text-white">
-                    Recommandé
+                    Populaire
                   </Badge>
                 </div>
 
                 <h3 className="mt-5 text-xl font-extrabold text-foreground">
-                  Plan Premium
+                  Plan Crédits
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Accès complet à toutes les fonctionnalités avancées.
@@ -286,7 +286,7 @@ export function SubscriptionView() {
                     size="lg"
                     onClick={() => navigate("payment")}
                   >
-                    <Crown className="size-4" /> S&apos;abonner à 500 FCFA/mois
+                    <Crown className="size-4" /> Recharger mes crédits
                   </Button>
                 )}
                 <Button
@@ -320,7 +320,7 @@ export function SubscriptionView() {
           <div className="text-center">
             <Eyebrow className="justify-center">Comparez les offres</Eyebrow>
             <Heading level="h2" className="text-center">
-              Gratuit vs <span className="text-amber-600">Premium</span>
+              Gratuit vs <span className="text-amber-600">Crédits</span>
             </Heading>
             <Muted className="mt-2 text-center">
               Comparez les fonctionnalités et choisissez l&apos;offre qui vous convient.
@@ -340,10 +340,10 @@ export function SubscriptionView() {
                     </th>
                     <th className="px-5 py-4 text-center text-xs font-bold uppercase tracking-wide text-amber-600">
                       <span className="inline-flex items-center gap-1">
-                        <Crown className="size-3.5" /> Premium
+                        <Crown className="size-3.5" /> Crédits
                       </span>
                       <span className="ml-1.5 inline-flex rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] text-white">
-                        Recommandé
+                        Populaire
                       </span>
                     </th>
                   </tr>
@@ -391,10 +391,10 @@ export function SubscriptionView() {
           <div className="text-center">
             <Eyebrow className="justify-center">Bénéfices concrets</Eyebrow>
             <Heading level="h2" className="text-center">
-              Pourquoi passer à Premium ?
+              Pourquoi passer à Crédits ?
             </Heading>
             <Muted className="mt-2 text-center">
-              500 FCFA/mois pour gagner du temps et mieux gérer votre santé.
+              Rechargez vos crédits pour gagner du temps et mieux gérer votre santé.
             </Muted>
           </div>
 
@@ -455,10 +455,10 @@ export function SubscriptionView() {
                   <Crown className="size-7" />
                 </span>
                 <h2 className="mt-5 text-2xl font-extrabold text-foreground sm:text-3xl">
-                  Prêt à passer Premium ?
+                  Prêt à passer Crédits ?
                 </h2>
                 <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                  Rejoignez les utilisateurs Premium de SABLIN PHARMA et débloquez
+                  Rejoignez les utilisateurs Crédits de SABLIN PHARMA et débloquez
                   l&apos;expérience complète pour seulement{" "}
                   <span className="font-bold text-amber-700">500 FCFA / mois</span>.
                 </p>
@@ -468,7 +468,7 @@ export function SubscriptionView() {
                   onClick={() => navigate("payment")}
                 >
                   <Crown className="size-4" />
-                  S&apos;abonner à 500 FCFA/mois
+                  Recharger mes crédits
                 </Button>
               </div>
             </Card>
@@ -507,14 +507,14 @@ function SubscriptionStatus({
                 <Crown className="size-5" />
               </span>
               <div>
-                <p className="text-sm font-bold text-foreground">Premium actif</p>
+                <p className="text-sm font-bold text-foreground">Crédits actif</p>
                 <Badge className="mt-0.5 border-0 bg-success text-white">
                   <CheckCircle2 className="size-3" /> Actif
                 </Badge>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <StatusInfo label="Type d'abonnement" value="Premium mensuel" />
+              <StatusInfo label="Type d'abonnement" value="Crédits mensuel" />
               <StatusInfo label="Statut" value="Actif" success />
               <StatusInfo label="Date de début" value={formatDate(subscription.startDate)} />
               <StatusInfo
@@ -556,7 +556,7 @@ function SubscriptionStatus({
               className="w-full bg-brand-gradient text-white hover:opacity-90"
               onClick={onSubscribe}
             >
-              <Crown className="size-4" /> S&apos;abonner maintenant
+              <Crown className="size-4" /> Recharger maintenant
             </Button>
           </div>
         )}

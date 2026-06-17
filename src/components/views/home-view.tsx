@@ -10,6 +10,7 @@ import {
   Plus,
   MapPin,
   Phone,
+  Lock,
   Navigation,
   CheckCircle2,
   ShieldAlert,
@@ -665,13 +666,11 @@ function DutyPharmacyCard({ pharma }: { pharma: Pharmacy }) {
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand-light px-2 py-1 font-semibold text-brand-dark">
             <Navigation className="size-3.5" /> {dist} km
           </span>
-          <a
-            href={`tel:${pharma.phone.replace(/\s/g, "")}`}
-            className="inline-flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-brand"
-            onClick={(e) => e.stopPropagation()}
+          <span
+            className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2 py-1 font-semibold text-muted-foreground"
           >
-            <Phone className="size-3.5" /> {pharma.phone.replace("+225 ", "")}
-          </a>
+            <Lock className="size-3.5" /> Contact verrouillé
+          </span>
         </div>
 
         {/* Actions */}

@@ -1507,3 +1507,28 @@ Stage Summary:
 - Pass Ordonnance = tous contacts gratuits
 - 7 services de contact payants (1/1/1/2/3/3/4 crédits)
 - Wallet, Profil, header mis à jour avec les nouvelles restrictions
+
+---
+Task ID: 36
+Agent: main (orchestrator)
+Task: Application du verrouillage contacts sur TOUTE la plateforme
+
+Work Log:
+- Audit complet de tous les liens tel: non verrouillés via grep
+- 3 emplacements corrigés :
+  1. home-view DutyPharmacyCard : remplacement lien tel: par "Contact verrouillé" avec icône Lock
+  2. medication-detail-view PharmacyMedCard : remplacement bouton "Appeler" (tel:) par "Contact — 1 crédit" (navigation vers pharmacy-detail)
+  3. prescription-result-view FullPharmacyCard : remplacement bouton tel: par icône Lock (navigation vers pharmacy-detail)
+  4. prescription-result-view Meilleure option : remplacement bouton "Appeler" (tel:) par "Contact — 1 crédit" (navigation vers pharmacy-detail)
+- Le seul lien tel: restant est le support SABLIN dans le footer (tel:+2250700000000) — pas un contact pharmacie
+- Vérification Agent Browser (utilisateur 0 crédit connecté) :
+  * Page Accueil : 0 lien tel: pharmacie, "Contact verrouillé" présent dans DutyPharmacyCard
+  * Page Pharmacies : 0 lien tel: pharmacie, badges "1 crédit" présents
+  * Page Détail médicament : 0 lien tel: pharmacie (section pharmacies verrouillée)
+  * 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Verrouillage des contacts pharmacies appliqué sur TOUTE la plateforme
+- Aucun lien tel: de pharmacie non verrouillé dans tout le code
+- Seul lien tel: restant = support SABLIN (footer, pas une pharmacie)
+- 3 emplacements corrigés (home-view, medication-detail-view, prescription-result-view x2)

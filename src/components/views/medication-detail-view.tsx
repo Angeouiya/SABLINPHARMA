@@ -847,10 +847,13 @@ function PharmacyMedCard({
         >
           Voir la pharmacie
         </Button>
-        <Button size="sm" variant="outline" asChild>
-          <a href={phoneHref}>
-            <Phone className="size-3.5" /> Appeler
-          </a>
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-muted-foreground"
+          onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
+        >
+          <Lock className="size-3.5" /> Contact — 1 crédit
         </Button>
         <Button size="sm" variant="outline" asChild>
           <a href={mapsUrl} target="_blank" rel="noopener noreferrer">

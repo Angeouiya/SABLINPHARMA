@@ -11,6 +11,7 @@ import {
   Pill,
   AlertTriangle,
   Navigation,
+  Lock,
   Phone,
   Plus,
   Clock,
@@ -680,10 +681,13 @@ export function PrescriptionResultView() {
                       <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.bestPharmacy} className="ml-1" />
                       <ChevronRight className="size-3.5" />
                     </Button>
-                    <Button size="sm" variant="outline" asChild>
-                      <a href={`tel:${bestOption.phone.replace(/\s/g, "")}`}>
-                        <Phone className="size-3.5" /> Appeler
-                      </a>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-muted-foreground"
+                      onClick={() => navigate("pharmacy-detail", { slug: bestOption.slug })}
+                    >
+                      <Lock className="size-3.5" /> Contact — 1 crédit
                     </Button>
                     <Button size="sm" variant="outline" asChild>
                       <a
@@ -1119,8 +1123,13 @@ function FullPharmacyCard({
           <Button size="sm" className="bg-brand-gradient text-white hover:opacity-90" onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}>
             Voir
           </Button>
-          <Button size="sm" variant="outline" asChild>
-            <a href={phoneHref}><Phone className="size-3.5" /></a>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-muted-foreground"
+            onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
+          >
+            <Lock className="size-3.5" />
           </Button>
           <Button size="sm" variant="outline" asChild>
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer">

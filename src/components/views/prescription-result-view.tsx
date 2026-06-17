@@ -733,9 +733,61 @@ export function PrescriptionResultView() {
                 </Muted>
               </div>
 
-              <Card className="overflow-hidden border-border/70 py-0 shadow-card">
+              {/* Mobile: cartes empilées */}
+              <div className="flex flex-col gap-3 lg:hidden">
+                {fullPharmacies
+                  .slice()
+                  .sort((a, b) => a.totalEstimate - b.totalEstimate)
+                  .map((p, pIdx) => (
+                    <Card
+                      key={p.id}
+                      className={cn(
+                        "border-border/70 p-4 shadow-card",
+                        pIdx === 0 && "border-success/40 bg-success-light/10"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {pIdx === 0 && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-success px-1.5 py-0.5 text-[9px] font-bold text-white">
+                              <TrendingDown className="size-2.5" /> Moins cher
+                            </span>
+                          )}
+                          <div>
+                            <p className="text-sm font-bold text-foreground">{p.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{p.commune} · {p.distance} km</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Total</p>
+                          <p className={cn(
+                            "text-base font-extrabold",
+                            pIdx === 0 ? "text-success" : "text-brand-dark"
+                          )}>
+                            {p.totalEstimate.toLocaleString("fr-FR")} F
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/50 pt-3">
+                        {p.medPrices?.map((mp, i) => (
+                          <div key={i} className="flex items-center justify-between rounded-lg bg-muted/30 px-2.5 py-1.5">
+                            <span className="truncate text-[11px] font-medium text-muted-foreground">
+                              {mp ? mp.name : "—"}
+                            </span>
+                            <span className={cn("text-xs font-bold", mp ? "text-foreground" : "text-danger")}>
+                              {mp ? `${mp.lineTotal.toLocaleString("fr-FR")} F` : "—"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+              </div>
+
+              {/* Desktop: tableau */}
+              <Card className="hidden overflow-hidden border-border/70 py-0 shadow-card lg:block">
                 <div className="overflow-x-auto scroll-thin">
-                  <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+                  <table className="w-full border-collapse text-left text-sm" style={{ display: "table" }}>
                     <thead className="border-b border-border/60 bg-muted/40">
                       <tr>
                         <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">

@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Crown,
+  Coins,
   Share2,
   MapPin,
   Pill,
@@ -489,7 +490,7 @@ export function PrescriptionResultView() {
           {error ?? "Nous n'avons pas pu calculer votre estimation."}
         </AlertMessage>
         <Button
-          className="mt-4 bg-brand-gradient text-white"
+          className="mt-4 bg-brand text-white"
           onClick={() => navigate("prescription")}
         >
           <ChevronLeft className="size-4" /> Retour à l&apos;ordonnance
@@ -566,9 +567,9 @@ export function PrescriptionResultView() {
       </div>
 
       {/* ============ MAIN LAYOUT ============ */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_340px] lg:gap-6">
         {/* LEFT: detail + pharmacies */}
-        <div className="space-y-8">
+        <div className="space-y-5 lg:space-y-6">
           {/* Médicaments list */}
           <section>
             <div className="mb-4 flex items-center justify-between">
@@ -636,7 +637,7 @@ export function PrescriptionResultView() {
           {bestOption && (
             <section>
               <Card className="overflow-hidden border-brand/30 py-0 shadow-premium-lg">
-                <div className="flex items-center gap-3 bg-brand-gradient px-5 py-3.5 text-white">
+                <div className="flex items-center gap-3 bg-brand px-5 py-3.5 text-white">
                   <span className="flex size-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
                     <Award className="size-5" />
                   </span>
@@ -931,9 +932,9 @@ export function PrescriptionResultView() {
         </div>
 
         {/* RIGHT: Résumé + actions */}
-        <div className="space-y-4">
+        <div className="space-y-3 lg:space-y-4">
           {/* Résumé de l'ordonnance */}
-          <Card className="sticky top-24 border-border/70 p-5 shadow-premium">
+          <Card className="border-border/70 p-4 shadow-card lg:sticky lg:top-24 lg:p-5">
             <div className="flex items-center gap-2">
               <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
                 <ClipboardList className="size-4" />
@@ -1066,11 +1067,11 @@ export function PrescriptionResultView() {
               <div className="bg-amber-50 p-4">
                 <div className="flex items-center gap-2">
                   <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
-                    <Crown className="size-5" />
+                    <Coins className="size-5" />
                   </span>
                   <div>
                     <p className="text-sm font-bold text-foreground">Rechargez vos crédits</p>
-                    <p className="text-[11px] text-muted-foreground">500 FCFA / mois</p>
+                    <p className="text-[11px] text-muted-foreground">À partir de 200 FCFA</p>
                   </div>
                 </div>
                 <ul className="mt-3 space-y-1 text-xs text-foreground/80">
@@ -1086,10 +1087,10 @@ export function PrescriptionResultView() {
                 </ul>
                 <Button
                   size="sm"
-                  className="mt-3 w-full bg-amber-500 text-white hover:bg-amber-600"
-                  onClick={() => navigate("subscription")}
+                  className="mt-3 w-full bg-brand text-white hover:bg-brand-dark"
+                  onClick={() => navigate("wallet")}
                 >
-                  <Crown className="size-3.5" /> Recharger
+                  <Coins className="size-3.5" /> Recharger
                 </Button>
               </div>
             </Card>
@@ -1222,7 +1223,7 @@ function FullPharmacyCard({
 
   return (
     <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
-      <div className="flex items-center justify-between bg-brand-gradient px-4 py-2.5">
+      <div className="flex items-center justify-between bg-brand px-4 py-2.5">
         <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
           <CheckCircle2 className="size-2.5" /> Ordonnance complète
         </span>
@@ -1277,7 +1278,7 @@ function FullPharmacyCard({
           </div>
         </div>
         <div className="grid grid-cols-3 gap-1.5">
-          <Button size="sm" className="bg-brand-gradient text-white hover:opacity-90" onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}>
+          <Button size="sm" className="bg-brand text-white hover:opacity-90" onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}>
             Voir
           </Button>
           <Button

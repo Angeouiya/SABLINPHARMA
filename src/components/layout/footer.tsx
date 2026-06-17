@@ -48,7 +48,7 @@ export function Footer() {
               <li><button onClick={() => go("home")} className="hover:text-brand">Accueil</button></li>
               <li><button onClick={() => go("medications")} className="hover:text-brand">Médicaments</button></li>
               <li><button onClick={() => go("pharmacies")} className="hover:text-brand">Pharmacies</button></li>
-              <li><button onClick={() => go("prescription")} className="hover:text-brand">Estimer mon ordonnance</button></li>
+              <li><button onClick={() => go("prescription")} className="hover:text-brand">Ordonnance</button></li>
             </ul>
           </div>
 

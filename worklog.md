@@ -1860,3 +1860,40 @@ Stage Summary:
 - Tous les conteneurs limités à max-width: 100%
 - Boutons permettent le retour à la ligne
 - Textes toujours lisibles, aucun texte coupé
+
+---
+Task ID: 41
+Agent: main (orchestrator)
+Task: Audit responsive complet de bout en bout — SaaS ultra responsive
+
+Work Log:
+- Audit overflow horizontal systématique sur TOUTES les pages × TOUS les breakpoints :
+  * Pages: Accueil, Médicaments, Détail médicament, Pharmacies, Détail pharmacie, Ordonnance, Résultat ordonnance, Portefeuille, Profil, Notifications, Historique, Favoris, Paramètres
+  * Breakpoints: 320px, 375px, 768px, 1440px
+  * Résultat: 0px overflow sur TOUTES les pages à TOUS les breakpoints
+- Audit visuel VLM sur pages clés:
+  * 375px (Médicaments, Pharmacies, Portefeuille) : "Responsive, lisibilité correcte, boutons accessibles. Pas de débordement ni texte coupé. Aucun problème majeur."
+  * 320px (Accueil, Médicaments, Ordonnance) : "Aucun texte ou élément ne dépasse."
+  * 375px (Détail médicament) : overflow 0px, boutons accessibles
+  * 375px (Détail pharmacie) : overflow 0px, sections bien empilées, boutons accessibles
+  * 375px (Résultat ordonnance complet) : "Structure bien organisée, stats claires, détail visible, meilleure option mise en avant, comparaison en liste, pharmacies listées, résumé bien placé. Empilement logique, lisibilité bonne."
+  * 768px (Résultat ordonnance) : "Version adaptée"
+  * 1440px (Résultat ordonnance) : "2 colonnes (contenu + résumé/actions), tableau de comparaison structuré"
+- Corrections appliquées lors de cette session:
+  * Layout résultat ordonnance: grid gap réduit sur mobile, sticky seulement sur desktop
+  * Comparaison des prix: cartes empilées sur mobile, tableau sur desktop
+  * Espacements: space-y-5 sur mobile vs space-y-6 sur desktop
+  * Upsell crédits: texte corrigé (200 FCFA au lieu de 500/mois), navigation vers wallet
+  * Footer: "Ordonnance" au lieu de "Estimer mon ordonnance"
+  * bg-brand-gradient → bg-brand partout
+  * CSS global: table { display: block } remplacé par .table-scroll (ne casse plus les tableaux desktop)
+- 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Plateforme SABLIN PHARMA certifiée SaaS ultra responsive de bout en bout
+- 0 overflow horizontal sur toutes les pages à tous les breakpoints (320px → 1440px)
+- Toutes les pages auditées: Accueil, Médicaments, Détail médicament, Pharmacies, Détail pharmacie, Ordonnance, Résultat ordonnance, Portefeuille, Profil, Notifications, Historique, Favoris, Paramètres
+- VLM confirme: responsive, lisible, boutons accessibles, pas de débordement
+- Desktop: mise en page premium 2 colonnes avec tableau de comparaison
+- Tablette: mise en page adaptée
+- Mobile: sections empilées proprement, cartes au lieu de tableaux

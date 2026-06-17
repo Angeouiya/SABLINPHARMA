@@ -1,0 +1,861 @@
+     1→"use client";
+     2→
+     3→import { useState } from "react";
+     4→import {
+     5→  CircleUser,
+     6→  LogOut,
+     7→  ChevronLeft,
+     8→  ChevronRight,
+     9→  Mail,
+    10→  Phone,
+    11→  MapPin,
+    12→  ShieldCheck,
+    13→  Settings,
+    14→  Pill,
+    15→  ClipboardList,
+    16→  CheckCircle2,
+    17→  Bell,
+    18→  Heart,
+    19→  Clock,
+    20→  Loader2,
+    21→  Lock,
+    22→  HelpCircle,
+    23→  FileText,
+    24→  Timer,
+    25→  Search,
+    26→  Navigation,
+    27→  AlertCircle,
+    28→  Info,
+    29→  Eye,
+    30→  KeyRound,
+    31→  Wallet,
+    32→  Coins,
+    33→  Receipt,
+    34→} from "lucide-react";
+    35→import { toast } from "sonner";
+    36→import { Logo } from "@/components/logo";
+    37→import { Button } from "@/components/ui/button";
+    38→import { Card } from "@/components/ui/card";
+    39→import { Badge } from "@/components/ui/badge";
+    40→import { Separator } from "@/components/ui/separator";
+    41→import { Skeleton } from "@/components/ui/skeleton";
+    42→import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
+    43→import { useNav } from "@/store/nav";
+    44→import { useAuth } from "@/store/auth";
+    45→import { useCredits, FREE_FEATURES, PAID_FEATURES } from "@/store/credits";
+    46→import { CreditBadge } from "@/components/shared/credit-badge";
+    47→import { CreditCost, PassBadge } from "@/components/shared/credit-cost";
+    48→import { useNotifications } from "@/store/notifications";
+    49→import { useFavorites } from "@/store/favorites";
+    50→import { useHistory } from "@/store/history";
+    51→import { formatDate, distanceKm, formatFCFA } from "@/lib/format";
+    52→import { cn } from "@/lib/utils";
+    53→import type { FavoriteItem, HistoryItem, AppNotification } from "@/lib/types";
+    54→
+    55→const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
+    56→
+    57→// Fictive saved prescriptions (localStorage)
+    58→interface SavedPrescription {
+    59→  id: string;
+    60→  name: string;
+    61→  medCount: number;
+    62→  totalCost: number;
+    63→  date: string;
+    64→}
+    65→
+    66→const SETTINGS_MENU = [
+    67→  { icon: CircleUser, label: "Modifier mes informations", view: "settings" as const },
+    68→  { icon: KeyRound, label: "Changer le mot de passe", view: "settings" as const },
+    69→  { icon: Bell, label: "Gérer les notifications", view: "settings" as const },
+    70→  { icon: Wallet, label: "Mon portefeuille", view: "wallet" as const },
+    71→  { icon: ShieldCheck, label: "Confidentialité", view: "settings" as const },
+    72→  { icon: HelpCircle, label: "Aide et support", view: "settings" as const },
+    73→  { icon: FileText, label: "Conditions d'utilisation", view: "settings" as const },
+    74→];
+    75→
+    76→function getInitials(name: string): string {
+    77→  const parts = name.trim().split(/\s+/).filter(Boolean);
+    78→  if (parts.length === 0) return "?";
+    79→  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    80→  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    81→}
+    82→
+    83→export function ProfileView() {
+    84→  const { navigate } = useNav();
+    85→  const { user, logout } = useAuth();
+    86→  const credits = useCredits((s) => s.credits);
+    87→  const hasPass = useCredits((s) => s.hasPass);
+    88→  const unreadCount = useNotifications((s) => s.unread);
+    89→  const notifications = useNotifications((s) => s.notifications);
+    90→  const favCount = useFavorites((s) => s.favorites.length);
+    91→  const favorites = useFavorites((s) => s.favorites);
+    92→  const history = useHistory((s) => s.history);
+    93→  const [loggingOut, setLoggingOut] = useState(false);
+    94→  const [savedPrescriptions] = useState<SavedPrescription[]>(
+    95→    () => {
+    96→      if (typeof window === "undefined") return [];
+    97→      try {
+    98→        return JSON.parse(localStorage.getItem("sablin-prescriptions") || "[]");
+    99→      } catch {
+   100→        return [];
+   101→      }
+   102→    }
+   103→  );
+   104→
+   105→  // ---------- Not logged in ----------
+   106→  if (!user) {
+   107→    return (
+   108→      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col items-center justify-center px-4 py-12">
+   109→        <Card className="w-full border-border/70 p-8 text-center shadow-premium">
+   110→          <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-full bg-brand-light">
+   111→            <CircleUser className="size-10 text-brand" />
+   112→          </div>
+   113→          <h1 className="text-xl font-bold tracking-tight text-brand-dark">
+   114→            Connectez-vous pour accéder à votre profil
+   115→          </h1>
+   116→          <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
+   117→            Connectez-vous ou créez un compte gratuit pour suivre vos médicaments
+   118→            consultés, vos ordonnances estimées et vos pharmacies favorites à Abidjan.
+   119→          </p>
+   120→          <div className="mt-6 flex flex-col gap-2.5">
+   121→            <Button
+   122→              onClick={() => navigate("auth", { authMode: "login" })}
+   123→              className="h-11 w-full bg-brand-gradient text-base font-semibold text-white shadow-premium transition-all hover:opacity-95 hover:shadow-premium-lg"
+   124→            >
+   125→              Se connecter
+   126→            </Button>
+   127→            <Button
+   128→              variant="outline"
+   129→              onClick={() => navigate("auth", { authMode: "register" })}
+   130→              className="h-11 w-full border-brand/30 text-base font-semibold text-brand transition-colors hover:bg-brand-light"
+   131→            >
+   132→              Créer un compte
+   133→            </Button>
+   134→          </div>
+   135→          <button
+   136→            type="button"
+   137→            onClick={() => navigate("home")}
+   138→            className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
+   139→          >
+   140→            <ChevronLeft className="size-4" />
+   141→            Retour à l&apos;accueil
+   142→          </button>
+   143→        </Card>
+   144→      </div>
+   145→    );
+   146→  }
+   147→
+   148→  const handleLogout = async () => {
+   149→    setLoggingOut(true);
+   150→    await logout();
+   151→    toast.success("Vous êtes déconnecté. À bientôt !");
+   152→    setLoggingOut(false);
+   153→    navigate("home");
+   154→  };
+   155→
+   156→  return (
+   157→    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+   158→      {/* Back link */}
+   159→      <button
+   160→        onClick={() => navigate("home")}
+   161→        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+   162→      >
+   163→        <ChevronLeft className="size-4" /> Accueil
+   164→      </button>
+   165→
+   166→      {/* ============ PROFILE CARD ============ */}
+   167→      <Card className="overflow-hidden border-border/70 py-0 shadow-premium">
+   168→        <div className="relative bg-brand-gradient">
+   169→          <div className="absolute inset-0 bg-dotted-white opacity-15" />
+   170→          <div className="absolute -right-12 -top-12 size-44 rounded-full bg-white/10 blur-3xl" />
+   171→          <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+   172→            <div className="flex items-center gap-4">
+   173→              <span className="flex size-20 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-2xl font-extrabold text-white backdrop-blur-sm ring-4 ring-white/10">
+   174→                {getInitials(user.name)}
+   175→              </span>
+   176→              <div className="text-white">
+   177→                <h1 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
+   178→                  {user.name}
+   179→                </h1>
+   180→                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/85">
+   181→                  {user.phone && (
+   182→                    <span className="flex items-center gap-1">
+   183→                      <Phone className="size-3.5" /> {user.phone}
+   184→                    </span>
+   185→                  )}
+   186→                  <span className="flex items-center gap-1">
+   187→                    <Mail className="size-3.5" /> {user.email}
+   188→                  </span>
+   189→                  {user.commune && (
+   190→                    <span className="flex items-center gap-1">
+   191→                      <MapPin className="size-3.5" /> {user.commune}
+   192→                    </span>
+   193→                  )}
+   194→                </div>
+   195→                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+   196→                  <CreditBadge />
+   197→                  {hasPass && <PassBadge />}
+   198→                </div>
+   199→              </div>
+   200→            </div>
+   201→            <Button
+   202→              variant="outline"
+   203→              className="border-white/30 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
+   204→              onClick={() => navigate("settings")}
+   205→            >
+   206→              <Settings className="size-4" /> Paramètres
+   207→            </Button>
+   208→          </div>
+   209→        </div>
+   210→
+   211→        {/* Stats strip */}
+   212→        <div className="grid grid-cols-3 divide-x divide-border/50">
+   213→          <ProfileStat icon={Pill} value={history.filter((h) => h.kind === "medication").length || 24} label="Médicaments consultés" />
+   214→          <ProfileStat icon={ClipboardList} value={savedPrescriptions.length || 7} label="Ordonnances estimées" />
+   215→          <ProfileStat icon={Heart} value={favCount || 3} label="Pharmacies favorites" />
+   216→        </div>
+   217→      </Card>
+   218→
+   219→      {/* ============ MON PORTEFEUILLE ============ */}
+   220→      <Card className="mt-6 border-border/70 bg-brand-light p-6 shadow-premium">
+   221→        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+   222→          <div className="min-w-0 flex-1">
+   223→            <div className="flex items-center gap-2.5">
+   224→              <span className="flex size-10 items-center justify-center rounded-xl bg-brand text-white">
+   225→                <Wallet className="size-5" />
+   226→              </span>
+   227→              <div>
+   228→                <p className="text-xs font-bold uppercase tracking-wide text-brand-dark/70">
+   229→                  Mon portefeuille
+   230→                </p>
+   231→                <p className="text-sm font-medium text-brand-dark/80">
+   232→                  Crédits SABLIN PHARMA
+   233→                  {hasPass && (
+   234→                    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+   235→                      <ClipboardList className="size-2.5" /> Pass Ordonnance
+   236→                    </span>
+   237→                  )}
+   238→                </p>
+   239→              </div>
+   240→            </div>
+   241→            <div className="mt-3">
+   242→              <p className="text-4xl font-extrabold tabular-nums text-brand-dark">
+   243→                {credits}{" "}
+   244→                <span className="text-xl font-bold">
+   245→                  crédit{credits > 1 ? "s" : ""}
+   246→                </span>
+   247→              </p>
+   248→              <p className="mt-1 text-sm font-semibold text-brand-dark/80">
+   249→                ≈ {formatFCFA(credits * 100)}
+   250→                <span className="ml-1 font-normal text-brand-dark/60">
+   251→                  (1 crédit ≈ 100 FCFA)
+   252→                </span>
+   253→              </p>
+   254→            </div>
+   255→            <p className="mt-3 max-w-md text-sm leading-relaxed text-brand-dark/80">
+   256→              Rechargez vos crédits ou achetez un Pass Ordonnance pour débloquer les services avancés.
+   257→            </p>
+   258→          </div>
+   259→          <div className="flex shrink-0 flex-col gap-2 sm:w-56">
+   260→            <Button
+   261→              onClick={() => navigate("wallet")}
+   262→              className="bg-brand text-white hover:bg-brand-dark"
+   263→            >
+   264→              <Coins className="size-4" /> Recharger mes crédits
+   265→            </Button>
+   266→            <Button
+   267→              variant="outline"
+   268→              onClick={() => navigate("payment", { passOrdonnance: true })}
+   269→              className="border-amber-500/50 bg-amber-50 text-amber-900 hover:bg-amber-100"
+   270→            >
+   271→              <ClipboardList className="size-4" /> Acheter un Pass Ordonnance
+   272→            </Button>
+   273→            <Button
+   274→              variant="outline"
+   275→              onClick={() => navigate("wallet")}
+   276→              className="border-brand/30 text-brand-dark hover:bg-brand"
+   277→            >
+   278→              <Receipt className="size-4" /> Historique
+   279→            </Button>
+   280→          </div>
+   281→        </div>
+   282→      </Card>
+   283→
+   284→      {/* ============ MAIN LAYOUT ============ */}
+   285→      <div className="mt-6 grid gap-6 lg:grid-cols-[260px_1fr]">
+   286→        {/* LEFT: Settings menu */}
+   287→        <aside>
+   288→          <Card className="border-border/70 py-0">
+   289→            <div className="border-b border-border/50 bg-muted/30 px-4 py-3">
+   290→              <h3 className="text-sm font-bold text-foreground">Menu du profil</h3>
+   291→            </div>
+   292→            <div className="flex flex-col p-2">
+   293→              {SETTINGS_MENU.map((item, i) => (
+   294→                <button
+   295→                  key={i}
+   296→                  onClick={() => navigate(item.view)}
+   297→                  className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 transition-colors hover:bg-accent hover:text-brand"
+   298→                >
+   299→                  <item.icon className="size-4 shrink-0 text-muted-foreground group-hover:text-brand" />
+   300→                  <span className="flex-1">{item.label}</span>
+   301→                  <ChevronRight className="size-3.5 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
+   302→                </button>
+   303→              ))}
+   304→              <Separator className="my-2" />
+   305→              <button
+   306→                onClick={handleLogout}
+   307→                disabled={loggingOut}
+   308→                className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+   309→              >
+   310→                {loggingOut ? (
+   311→                  <Loader2 className="size-4 shrink-0 animate-spin" />
+   312→                ) : (
+   313→                  <LogOut className="size-4 shrink-0" />
+   314→                )}
+   315→                <span className="flex-1">Se déconnecter</span>
+   316→              </button>
+   317→            </div>
+   318→          </Card>
+   319→        </aside>
+   320→
+   321→        {/* RIGHT: content sections */}
+   322→        <div className="space-y-6">
+   323→          {/* ============ MES ACCÈS SABLIN PHARMA ============ */}
+   324→          <section>
+   325→            <SectionTitle icon={CheckCircle2} title="Mes accès SABLIN PHARMA" />
+   326→            <div className="grid gap-4 sm:grid-cols-2">
+   327→              {/* Bloc : Fonctionnalités gratuites */}
+   328→              <Card className="border-success/30 bg-success-light/20 p-5">
+   329→                <div className="flex items-center gap-2.5">
+   330→                  <span className="flex size-10 items-center justify-center rounded-xl bg-success text-white">
+   331→                    <CheckCircle2 className="size-5" />
+   332→                  </span>
+   333→                  <div>
+   334→                    <h3 className="text-base font-bold text-foreground">
+   335→                      Fonctionnalités gratuites
+   336→                    </h3>
+   337→                    <p className="text-xs text-muted-foreground">
+   338→                      Accessibles à tous, sans crédits
+   339→                    </p>
+   340→                  </div>
+   341→                </div>
+   342→                <ul className="mt-4 max-h-72 space-y-2 overflow-y-auto scroll-thin pr-1">
+   343→                  {FREE_FEATURES.map((f) => (
+   344→                    <li
+   345→                      key={f}
+   346→                      className="flex items-start gap-2 text-sm text-foreground/85"
+   347→                    >
+   348→                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+   349→                      <span>{f}</span>
+   350→                    </li>
+   351→                  ))}
+   352→                </ul>
+   353→              </Card>
+   354→
+   355→              {/* Bloc : Fonctionnalités avec crédits */}
+   356→              <Card className="border-brand/30 bg-brand-light/20 p-5">
+   357→                <div className="flex items-center gap-2.5">
+   358→                  <span className="flex size-10 items-center justify-center rounded-xl bg-brand text-white">
+   359→                    <Coins className="size-5" />
+   360→                  </span>
+   361→                  <div>
+   362→                    <h3 className="text-base font-bold text-foreground">
+   363→                      Fonctionnalités avec crédits
+   364→                    </h3>
+   365→                    <p className="text-xs text-muted-foreground">
+   366→                      Services avancés payants
+   367→                    </p>
+   368→                  </div>
+   369→                </div>
+   370→                <ul className="mt-4 max-h-72 space-y-2.5 overflow-y-auto scroll-thin pr-1">
+   371→                  {PAID_FEATURES.map((f) => (
+   372→                    <li
+   373→                      key={f.label}
+   374→                      className="flex items-start justify-between gap-2 text-sm text-foreground/85"
+   375→                    >
+   376→                      <span className="flex-1">{f.label}</span>
+   377→                      {"isPass" in f && f.isPass ? (
+   378→                        <PassBadge className="shrink-0" />
+   379→                      ) : (
+   380→                        <CreditCost cost={f.cost} className="shrink-0" />
+   381→                      )}
+   382→                    </li>
+   383→                  ))}
+   384→                </ul>
+   385→                <Button
+   386→                  variant="outline"
+   387→                  size="sm"
+   388→                  className="mt-4 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   389→                  onClick={() => navigate("wallet")}
+   390→                >
+   391→                  <Wallet className="size-4" /> Gérer mes crédits
+   392→                </Button>
+   393→              </Card>
+   394→            </div>
+   395→          </section>
+   396→
+   397→          {/* ============ RESTRICTIONS DE MON COMPTE ============ */}
+   398→          <section>
+   399→            <SectionTitle icon={Lock} title="Restrictions de mon compte" />
+   400→            <Card className="border-border/70 p-5">
+   401→              <ul className="space-y-3">
+   402→                <li className="flex items-start gap-3 text-sm text-foreground/85">
+   403→                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+   404→                  <span>
+   405→                    Sans crédit, vous pouvez rechercher des informations simples.
+   406→                  </span>
+   407→                </li>
+   408→                <li className="flex items-start gap-3 text-sm text-foreground/85">
+   409→                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+   410→                  <span>
+   411→                    Sans crédit, vous ne pouvez pas utiliser le module Ordonnance.
+   412→                  </span>
+   413→                </li>
+   414→                <li className="flex items-start gap-3 text-sm text-foreground/85">
+   415→                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+   416→                  <span>
+   417→                    Sans crédit, vous ne pouvez pas voir les pharmacies qui possèdent réellement un médicament.
+   418→                  </span>
+   419→                </li>
+   420→                <li className="flex items-start gap-3 text-sm text-foreground/85">
+   421→                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+   422→                  <span>
+   423→                    Sans crédit, vous ne pouvez pas comparer les prix.
+   424→                  </span>
+   425→                </li>
+   426→                <li className="flex items-start gap-3 text-sm text-foreground/85">
+   427→                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+   428→                  <span>
+   429→                    Sans crédit, vous ne pouvez pas demander de confirmation avant déplacement.
+   430→                  </span>
+   431→                </li>
+   432→                <li className="flex items-start gap-3 text-sm text-foreground/85">
+   433→                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+   434→                  <span>
+   435→                    Sans crédit, vous ne pouvez pas voir les contacts complets des pharmacies.
+   436→                  </span>
+   437→                </li>
+   438→                <li className="flex items-start gap-3 text-sm text-foreground/85">
+   439→                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+   440→                  <span>
+   441→                    Sans crédit, vous ne pouvez pas appeler une pharmacie depuis SABLIN PHARMA.
+   442→                  </span>
+   443→                </li>
+   444→                <li className="flex items-start gap-3 text-sm text-foreground/85">
+   445→                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+   446→                  <span>
+   447→                    Sans crédit, vous ne pouvez pas envoyer une demande de conseil.
+   448→                  </span>
+   449→                </li>
+   450→                <li className="flex items-start gap-3 rounded-xl bg-success-light/40 p-3 text-sm font-bold text-foreground">
+   451→                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
+   452→                  <div className="flex-1">
+   453→                    <p>
+   454→                      Rechargez vos crédits ou achetez un Pass Ordonnance pour débloquer ces services.
+   455→                    </p>
+   456→                    <Button
+   457→                      size="sm"
+   458→                      className="mt-2 bg-brand text-white hover:bg-brand-dark"
+   459→                      onClick={() => navigate("wallet")}
+   460→                    >
+   461→                      <Wallet className="size-4" /> Recharger
+   462→                    </Button>
+   463→                  </div>
+   464→                </li>
+   465→              </ul>
+   466→            </Card>
+   467→          </section>
+   468→
+   469→          {/* ============ NOTIFICATIONS PERSONNALISÉES ============ */}
+   470→          {notifications.length > 0 && (
+   471→            <section>
+   472→              <SectionTitle
+   473→                icon={Bell}
+   474→                title="Notifications personnalisées"
+   475→                action={{ label: "Tout voir", onClick: () => navigate("notifications") }}
+   476→              />
+   477→              <div className="space-y-2">
+   478→                {notifications.slice(0, 3).map((n) => (
+   479→                  <NotifRow key={n.id} notif={n} onClick={() => navigate("notifications")} />
+   480→                ))}
+   481→              </div>
+   482→            </section>
+   483→          )}
+   484→
+   485→          {/* ============ HISTORIQUE DES RECHERCHES ============ */}
+   486→          <section>
+   487→            <SectionTitle
+   488→              icon={Search}
+   489→              title="Historique des recherches"
+   490→              action={{ label: "Tout voir", onClick: () => navigate("history") }}
+   491→            />
+   492→            {history.filter((h) => h.kind === "medication").length > 0 ? (
+   493→              <Card className="divide-y divide-border/50 border-border/70 py-0">
+   494→                {history
+   495→                  .filter((h) => h.kind === "medication")
+   496→                  .slice(0, 4)
+   497→                  .map((h) => (
+   498→                    <HistoryRow key={h.id} item={h} />
+   499→                  ))}
+   500→              </Card>
+   501→            ) : (
+   502→              <FictiveHistory />
+   503→            )}
+   504→          </section>
+   505→
+   506→          {/* ============ ORDONNANCES ENREGISTRÉES ============ */}
+   507→          <section>
+   508→            <SectionTitle icon={ClipboardList} title="Ordonnances enregistrées" />
+   509→            {savedPrescriptions.length > 0 ? (
+   510→              <div className="grid gap-3 sm:grid-cols-2">
+   511→                {savedPrescriptions.slice(0, 4).map((rx) => (
+   512→                  <Card key={rx.id} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+   513→                    <div className="flex items-start justify-between gap-2">
+   514→                      <div className="flex items-center gap-2.5">
+   515→                        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+   516→                          <ClipboardList className="size-5" />
+   517→                        </span>
+   518→                        <div>
+   519→                          <h3 className="text-sm font-bold text-foreground">{rx.name}</h3>
+   520→                          <p className="text-xs text-muted-foreground">
+   521→                            {rx.medCount} médicament{rx.medCount > 1 ? "s" : ""} · {formatDate(rx.date)}
+   522→                          </p>
+   523→                        </div>
+   524→                      </div>
+   525→                      <Price amount={rx.totalCost} size="sm" variant="brand" />
+   526→                    </div>
+   527→                    <Button
+   528→                      size="sm"
+   529→                      variant="outline"
+   530→                      className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   531→                      onClick={() => navigate("prescription")}
+   532→                    >
+   533→                      <Eye className="size-3.5" /> Voir le détail
+   534→                    </Button>
+   535→                  </Card>
+   536→                ))}
+   537→              </div>
+   538→            ) : (
+   539→              <FictivePrescriptions />
+   540→            )}
+   541→          </section>
+   542→
+   543→          {/* ============ PHARMACIES FAVORITES ============ */}
+   544→          <section>
+   545→            <SectionTitle
+   546→              icon={Heart}
+   547→              title="Pharmacies favorites"
+   548→              action={{ label: "Tout voir", onClick: () => navigate("favorites") }}
+   549→            />
+   550→            {favorites.filter((f) => f.kind === "pharmacy").length > 0 ? (
+   551→              <div className="grid gap-3 sm:grid-cols-2">
+   552→                {favorites
+   553→                  .filter((f) => f.kind === "pharmacy")
+   554→                  .slice(0, 4)
+   555→                  .map((f) => (
+   556→                    <FavPharmacyCard key={f.id} fav={f} />
+   557→                  ))}
+   558→              </div>
+   559→            ) : (
+   560→              <FictiveFavorites />
+   561→            )}
+   562→          </section>
+   563→
+   564→          {/* Disclaimer */}
+   565→          <p className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+   566→            <Info className="mr-1 inline size-3.5" />
+   567→            SABLIN PHARMA est une plateforme d&apos;information. Vos données sont
+   568→            confidentielles et sécurisées. Aucune vente en ligne.
+   569→          </p>
+   570→        </div>
+   571→      </div>
+   572→    </div>
+   573→  );
+   574→}
+   575→
+   576→/* ============================================================
+   577→   SectionTitle — en-tête de section avec icône + action
+   578→   ============================================================ */
+   579→function SectionTitle({
+   580→  icon: Icon,
+   581→  title,
+   582→  action,
+   583→}: {
+   584→  icon: typeof Wallet;
+   585→  title: string;
+   586→  action?: { label: string; onClick: () => void };
+   587→}) {
+   588→  return (
+   589→    <div className="mb-3 flex items-center justify-between">
+   590→      <div className="flex items-center gap-2.5">
+   591→        <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
+   592→          <Icon className="size-5" />
+   593→        </span>
+   594→        <h2 className="text-lg font-extrabold tracking-tight text-brand-dark">{title}</h2>
+   595→      </div>
+   596→      {action && (
+   597→        <button
+   598→          onClick={action.onClick}
+   599→          className="group flex items-center gap-0.5 text-sm font-semibold text-brand hover:underline"
+   600→        >
+   601→          {action.label}
+   602→          <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+   603→        </button>
+   604→      )}
+   605→    </div>
+   606→  );
+   607→}
+   608→
+   609→/* ============================================================
+   610→   ProfileStat — statistique du profil
+   611→   ============================================================ */
+   612→function ProfileStat({
+   613→  icon: Icon,
+   614→  value,
+   615→  label,
+   616→}: {
+   617→  icon: typeof Pill;
+   618→  value: number;
+   619→  label: string;
+   620→}) {
+   621→  return (
+   622→    <div className="flex flex-col items-center justify-center px-3 py-4 text-center">
+   623→      <span className="flex size-9 items-center justify-center rounded-lg bg-brand-light text-brand">
+   624→        <Icon className="size-4.5" />
+   625→      </span>
+   626→      <p className="mt-1.5 text-xl font-extrabold tabular-nums text-brand-dark">{value}</p>
+   627→      <p className="text-[10px] leading-tight text-muted-foreground">{label}</p>
+   628→    </div>
+   629→  );
+   630→}
+   631→
+   632→/* ============================================================
+   633→   NotifRow — ligne de notification
+   634→   ============================================================ */
+   635→function NotifRow({
+   636→  notif,
+   637→  onClick,
+   638→}: {
+   639→  notif: AppNotification;
+   640→  onClick: () => void;
+   641→}) {
+   642→  const toneMap = {
+   643→    info: "bg-info-light text-info",
+   644→    success: "bg-success-light text-success",
+   645→    warning: "bg-warning-light text-warning-foreground",
+   646→    alert: "bg-danger-light text-danger",
+   647→    promotion: "bg-amber-100 text-amber-700",
+   648→  } as const;
+   649→  const tone = toneMap[notif.type] || toneMap.info;
+   650→  return (
+   651→    <button
+   652→      onClick={onClick}
+   653→      className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all hover:border-brand/30 hover:shadow-card"
+   654→    >
+   655→      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", tone)}>
+   656→        <Bell className="size-4" />
+   657→      </span>
+   658→      <div className="min-w-0 flex-1">
+   659→        <p className="truncate text-sm font-semibold text-foreground">{notif.title}</p>
+   660→        <p className="truncate text-xs text-muted-foreground">{notif.message}</p>
+   661→      </div>
+   662→      {!notif.read && <span className="size-2 shrink-0 rounded-full bg-brand" />}
+   663→    </button>
+   664→  );
+   665→}
+   666→
+   667→/* ============================================================
+   668→   HistoryRow — ligne d'historique
+   669→   ============================================================ */
+   670→function HistoryRow({ item }: { item: HistoryItem }) {
+   671→  const { navigate } = useNav();
+   672→  return (
+   673→    <div className="flex items-center gap-3 p-3.5">
+   674→      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
+   675→        <Pill className="size-4.5" />
+   676→      </span>
+   677→      <div className="min-w-0 flex-1">
+   678→        <p className="truncate text-sm font-semibold text-foreground">{item.label}</p>
+   679→        <p className="text-xs text-muted-foreground">
+   680→          {item.meta ? `${item.meta} · ` : ""}{formatDate(item.createdAt)}
+   681→        </p>
+   682→      </div>
+   683→      <Badge className="border-0 bg-success-light text-success">
+   684→        <CheckCircle2 className="size-2.5" /> Disponible
+   685→      </Badge>
+   686→      <Button
+   687→        size="sm"
+   688→        variant="ghost"
+   689→        className="text-brand hover:bg-brand-light"
+   690→        onClick={() =>
+   691→          item.slug
+   692→            ? navigate("medication-detail", { slug: item.slug })
+   693→            : navigate("medications", { query: item.query ?? undefined })
+   694→        }
+   695→      >
+   696→        <Search className="size-3.5" /> Rechercher
+   697→      </Button>
+   698→    </div>
+   699→  );
+   700→}
+   701→
+   702→/* ============================================================
+   703→   FavPharmacyCard — carte pharmacie favorite
+   704→   ============================================================ */
+   705→function FavPharmacyCard({ fav }: { fav: FavoriteItem }) {
+   706→  const { navigate } = useNav();
+   707→  const meta = fav.meta ? JSON.parse(fav.meta) : null;
+   708→  return (
+   709→    <Card className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+   710→      <div className="flex items-start gap-3">
+   711→        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
+   712→          <MapPin className="size-5" />
+   713→        </span>
+   714→        <div className="min-w-0 flex-1">
+   715→          <h3 className="truncate text-sm font-bold text-foreground">{fav.label}</h3>
+   716→          <p className="text-xs text-muted-foreground">{meta?.commune || fav.meta || "Abidjan"}</p>
+   717→          <div className="mt-1.5 flex flex-wrap gap-1">
+   718→            <span className="inline-flex items-center gap-0.5 rounded-full bg-success-light px-1.5 py-0.5 text-[9px] font-bold text-success">
+   719→              <span className="size-1.5 rounded-full bg-success animate-pulse" /> Ouvert
+   720→            </span>
+   721→          </div>
+   722→        </div>
+   723→      </div>
+   724→      <Button
+   725→        size="sm"
+   726→        variant="outline"
+   727→        className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   728→        onClick={() => navigate("pharmacy-detail", { slug: fav.slug })}
+   729→      >
+   730→        Voir la pharmacie <ChevronRight className="size-3.5" />
+   731→      </Button>
+   732→    </Card>
+   733→  );
+   734→}
+   735→
+   736→/* ============================================================
+   737→   Fictive data components (when user has no real data yet)
+   738→   ============================================================ */
+   739→function FictiveHistory() {
+   740→  const { navigate } = useNav();
+   741→  const items = [
+   742→    { name: "Paracétamol", dosage: "500 mg", date: "Aujourd'hui", available: true },
+   743→    { name: "Amoxicilline", dosage: "500 mg", date: "Hier", available: true },
+   744→    { name: "Vitamine C", dosage: "1000 mg", date: "12 juin 2026", available: true },
+   745→    { name: "Smecta", dosage: "3 g", date: "10 juin 2026", available: false },
+   746→  ];
+   747→  return (
+   748→    <Card className="divide-y divide-border/50 border-border/70 py-0">
+   749→      {items.map((it, i) => (
+   750→        <div key={i} className="flex items-center gap-3 p-3.5">
+   751→          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-light text-brand">
+   752→            <Pill className="size-4.5" />
+   753→          </span>
+   754→          <div className="min-w-0 flex-1">
+   755→            <p className="truncate text-sm font-semibold text-foreground">
+   756→              {it.name} <span className="font-normal text-muted-foreground">· {it.dosage}</span>
+   757→            </p>
+   758→            <p className="text-xs text-muted-foreground">{it.date}</p>
+   759→          </div>
+   760→          <Badge className={cn("border-0", it.available ? "bg-success-light text-success" : "bg-danger-light text-danger")}>
+   761→            {it.available ? "Disponible" : "Rupture"}
+   762→          </Badge>
+   763→          <Button
+   764→            size="sm"
+   765→            variant="ghost"
+   766→            className="text-brand hover:bg-brand-light"
+   767→            onClick={() => navigate("medications", { query: it.name })}
+   768→          >
+   769→            <Search className="size-3.5" /> Rechercher
+   770→          </Button>
+   771→        </div>
+   772→      ))}
+   773→    </Card>
+   774→  );
+   775→}
+   776→
+   777→function FictivePrescriptions() {
+   778→  const { navigate } = useNav();
+   779→  const items = [
+   780→    { id: "rx1", name: "Ordonnance rhume", medCount: 3, totalCost: 2150, date: "2026-06-14" },
+   781→    { id: "rx2", name: "Traitement paludisme", medCount: 2, totalCost: 4000, date: "2026-06-08" },
+   782→  ];
+   783→  return (
+   784→    <div className="grid gap-3 sm:grid-cols-2">
+   785→      {items.map((rx) => (
+   786→        <Card key={rx.id} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+   787→          <div className="flex items-start justify-between gap-2">
+   788→            <div className="flex items-center gap-2.5">
+   789→              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+   790→                <ClipboardList className="size-5" />
+   791→              </span>
+   792→              <div>
+   793→                <h3 className="text-sm font-bold text-foreground">{rx.name}</h3>
+   794→                <p className="text-xs text-muted-foreground">
+   795→                  {rx.medCount} médicaments · {formatDate(rx.date)}
+   796→                </p>
+   797→              </div>
+   798→            </div>
+   799→            <Price amount={rx.totalCost} size="sm" variant="brand" />
+   800→          </div>
+   801→          <Button
+   802→            size="sm"
+   803→            variant="outline"
+   804→            className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   805→            onClick={() => navigate("prescription")}
+   806→          >
+   807→            <Eye className="size-3.5" /> Voir le détail
+   808→          </Button>
+   809→        </Card>
+   810→      ))}
+   811→    </div>
+   812→  );
+   813→}
+   814→
+   815→function FictiveFavorites() {
+   816→  const { navigate } = useNav();
+   817→  const items = [
+   818→    { name: "Pharmacie de la Riviera", commune: "Cocody", quartier: "Riviera Palmeraie", dist: 2.8, open: true, duty: true },
+   819→    { name: "Pharmacie du Plateau", commune: "Plateau", quartier: "Avenue Chardy", dist: 2.6, open: false, duty: false },
+   820→  ];
+   821→  return (
+   822→    <div className="grid gap-3 sm:grid-cols-2">
+   823→      {items.map((p, i) => (
+   824→        <Card key={i} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+   825→          <div className="flex items-start gap-3">
+   826→            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
+   827→              <MapPin className="size-5" />
+   828→            </span>
+   829→            <div className="min-w-0 flex-1">
+   830→              <h3 className="truncate text-sm font-bold text-foreground">{p.name}</h3>
+   831→              <p className="text-xs text-muted-foreground">
+   832→                {p.quartier}, {p.commune} · {p.dist} km
+   833→              </p>
+   834→              <div className="mt-1.5 flex flex-wrap gap-1">
+   835→                <span className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold", p.open ? "bg-success-light text-success" : "bg-neutral-light text-neutral-foreground")}>
+   836→                  <span className={cn("size-1.5 rounded-full", p.open ? "bg-success animate-pulse" : "bg-muted-foreground/50")} />
+   837→                  {p.open ? "Ouvert" : "Fermé"}
+   838→                </span>
+   839→                {p.duty && (
+   840→                  <span className="inline-flex items-center gap-0.5 rounded-full bg-warning-light px-1.5 py-0.5 text-[9px] font-bold text-warning-foreground">
+   841→                    <Timer className="size-2.5" /> De garde
+   842→                  </span>
+   843→                )}
+   844→              </div>
+   845→            </div>
+   846→          </div>
+   847→          <Button
+   848→            size="sm"
+   849→            variant="outline"
+   850→            className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+   851→            onClick={() => navigate("pharmacies")}
+   852→          >
+   853→            Voir la pharmacie <ChevronRight className="size-3.5" />
+   854→          </Button>
+   855→        </Card>
+   856→      ))}
+   857→    </div>
+   858→  );
+   859→}
+
+[showing lines 1-859 of 860; use offset=860 with limit to continue reading]

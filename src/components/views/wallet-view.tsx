@@ -15,11 +15,20 @@ import {
   Lock,
   Crown,
   Phone,
+  HelpCircle,
+  Pill,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 import {
   Heading,
   Eyebrow,
@@ -118,14 +127,15 @@ export function WalletView() {
           <Wallet className="size-3.5" /> Gestion des crédits
         </Eyebrow>
         <Heading level="h1" className="mt-2 text-foreground">
-          Mon portefeuille
+          Votre portefeuille de crédits
         </Heading>
         <Muted className="mt-1.5 max-w-2xl">
-          Rechargez vos crédits et gérez vos services avancés.
+          Vos crédits vous permettent d&apos;utiliser les services avancés de
+          SABLIN PHARMA. Ils ne sont débités qu&apos;après votre confirmation.
         </Muted>
       </header>
 
-      {/* ============ SOLDE ACTUEL ============ */}
+      {/* ============ VOTRE PORTEFEUILLE DE CRÉDITS ============ */}
       <Card className="border-border/70 bg-brand-light p-6 shadow-premium sm:p-7">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1">
@@ -154,17 +164,19 @@ export function WalletView() {
                   </span>
                 </p>
               )}
-              <p className="mt-1 text-sm font-semibold text-brand-dark/80">
-                ≈ {formatFCFA(estimatedFCFA)}
-                <span className="ml-1 font-normal text-brand-dark/60">
-                  (1 crédit ≈ {FCFA_PER_CREDIT} FCFA)
-                </span>
-              </p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-brand-dark/80">
+                  Valeur approximative : {formatFCFA(estimatedFCFA)}
+                </p>
+                <Badge className="border-0 bg-brand text-white">
+                  1 crédit = {FCFA_PER_CREDIT} FCFA
+                </Badge>
+              </div>
             </div>
 
             <p className="mt-3 max-w-md text-sm leading-relaxed text-brand-dark/80">
               Les recherches simples sont gratuites. Les services avancés
-              utilisent vos crédits.
+              utilisent vos crédits, débités uniquement après votre confirmation.
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -172,14 +184,14 @@ export function WalletView() {
                 onClick={() => scrollTo(packsRef)}
                 className="bg-brand text-white hover:bg-brand-dark"
               >
-                <Plus className="size-4" /> Recharger
+                <Plus className="size-4" /> Recharger mes crédits
               </Button>
               <Button
                 variant="outline"
                 onClick={() => scrollTo(tariffsRef)}
                 className="border-brand/30 text-brand-dark hover:bg-brand"
               >
-                <Receipt className="size-4" /> Voir les tarifs
+                <Receipt className="size-4" /> Voir les services payants
               </Button>
             </div>
           </div>
@@ -277,6 +289,130 @@ export function WalletView() {
               </Button>
             </Card>
           ))}
+        </div>
+      </section>
+
+      {/* ============ À QUOI SERVENT MES CRÉDITS ? ============ */}
+      <section className="mt-10">
+        <SectionTitle icon={Coins} title="À quoi servent mes crédits ?" />
+        <Muted className="mb-4">
+          Vos crédits débloquent les services avancés de SABLIN PHARMA, répartis
+          en 3 catégories.
+        </Muted>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Catégorie Médicaments */}
+          <Card className="flex flex-col border-border/70 p-5">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-brand-light text-brand">
+                <Pill className="size-5" />
+              </span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Catégorie
+                </p>
+                <h3 className="text-base font-extrabold text-foreground">
+                  Médicaments
+                </h3>
+              </div>
+            </div>
+            <ul className="space-y-2.5">
+              {[
+                { label: "Voir les pharmacies disponibles", cost: 1 },
+                { label: "Voir les prix détaillés", cost: 1 },
+                { label: "Activer une alerte de disponibilité", cost: 1 },
+              ].map((item) => (
+                <li
+                  key={item.label}
+                  className="flex items-center justify-between gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5 text-sm"
+                >
+                  <span className="font-medium text-foreground/85">
+                    {item.label}
+                  </span>
+                  <CreditCost cost={item.cost} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {/* Catégorie Ordonnance */}
+          <Card className="flex flex-col border-amber-500/30 bg-amber-50/40 p-5">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-amber-500 text-white">
+                <ClipboardList className="size-5" />
+              </span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
+                  Catégorie
+                </p>
+                <h3 className="text-base font-extrabold text-foreground">
+                  Ordonnance
+                </h3>
+              </div>
+            </div>
+            <ul className="space-y-2.5">
+              <li className="flex items-center justify-between gap-2.5 rounded-lg bg-amber-100/50 px-3 py-2.5 text-sm">
+                <span className="font-medium text-amber-900">
+                  Accès au module Ordonnance
+                </span>
+                <PassBadge />
+              </li>
+              {[
+                { label: "Ajouter un médicament", cost: 1 },
+                { label: "Estimation complète", cost: 2 },
+                { label: "Meilleure pharmacie", cost: 1 },
+                { label: "Comparaison des pharmacies", cost: 1 },
+              ].map((item) => (
+                <li
+                  key={item.label}
+                  className="flex items-center justify-between gap-2.5 rounded-lg bg-amber-100/50 px-3 py-2.5 text-sm"
+                >
+                  <span className="font-medium text-amber-900">
+                    {item.label}
+                  </span>
+                  <CreditCost cost={item.cost} />
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {/* Catégorie Pharmacies */}
+          <Card className="flex flex-col border-border/70 p-5">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-brand-light text-brand">
+                <Phone className="size-5" />
+              </span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Catégorie
+                </p>
+                <h3 className="text-base font-extrabold text-foreground">
+                  Pharmacies
+                </h3>
+              </div>
+            </div>
+            <ul className="space-y-2.5">
+              {[
+                { label: "Voir le contact (téléphone)", cost: 1 },
+                { label: "Appeler une pharmacie", cost: 1 },
+                { label: "Contacter via WhatsApp", cost: 1 },
+                { label: "Demander conseil à une pharmacie", cost: 2 },
+                { label: "Confirmer disponibilité", cost: 3 },
+                { label: "Confirmer prix", cost: 3 },
+                { label: "Confirmation complète", cost: 4 },
+              ].map((item) => (
+                <li
+                  key={item.label}
+                  className="flex items-center justify-between gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5 text-sm"
+                >
+                  <span className="font-medium text-foreground/85">
+                    {item.label}
+                  </span>
+                  <CreditCost cost={item.cost} />
+                </li>
+              ))}
+            </ul>
+          </Card>
         </div>
       </section>
 
@@ -433,30 +569,34 @@ export function WalletView() {
         </Card>
       </section>
 
-      {/* ============ SERVICES DE CONTACT PHARMACIE ============ */}
+      {/* ============ CE QUI EST GRATUIT ============ */}
       <section className="mt-10">
-        <SectionTitle icon={Phone} title="Services de contact pharmacie" />
+        <SectionTitle icon={Search} title="Ce qui est gratuit" />
         <Muted className="mb-4">
-          Les contacts directs des pharmacies nécessitent des crédits.
+          Ces actions restent accessibles à tous, sans connexion ni crédits.
         </Muted>
         <Card className="border-border/70 p-5">
           <ul className="grid gap-2.5 sm:grid-cols-2">
             {[
-              { label: "Voir le contact pharmacie (téléphone)", cost: "1 crédit" },
-              { label: "Appeler une pharmacie", cost: "1 crédit" },
-              { label: "WhatsApp pharmacie", cost: "1 crédit" },
-              { label: "Demander conseil pharmacie", cost: "2 crédits" },
-              { label: "Confirmer disponibilité", cost: "3 crédits" },
-              { label: "Confirmer prix", cost: "3 crédits" },
-              { label: "Confirmation complète", cost: "4 crédits" },
+              "Rechercher un médicament",
+              "Voir les informations générales d'un médicament",
+              "Rechercher une pharmacie",
+              "Voir le nom, la commune et le quartier d'une pharmacie",
+              "Voir les horaires généraux d'une pharmacie",
+              "Consulter les pharmacies ouvertes et de garde",
+              "Consulter son profil",
+              "Accéder à l'aide et au support",
             ].map((s) => (
               <li
-                key={s.label}
-                className="flex items-center justify-between gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5 text-sm"
+                key={s}
+                className="flex items-center justify-between gap-2.5 rounded-lg bg-success-light/40 px-3 py-2.5 text-sm"
               >
-                <span className="font-medium text-foreground/85">{s.label}</span>
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-light px-2 py-0.5 text-[10px] font-bold text-brand-dark">
-                  {s.cost}
+                <span className="flex items-center gap-2 font-medium text-foreground/85">
+                  <CheckCircle2 className="size-4 shrink-0 text-success" />
+                  {s}
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-success-light px-2 py-0.5 text-[10px] font-bold text-success">
+                  Gratuit
                 </span>
               </li>
             ))}
@@ -464,42 +604,44 @@ export function WalletView() {
         </Card>
       </section>
 
-      {/* ============ SERVICES BLOQUÉS SANS CRÉDITS ============ */}
+      {/* ============ CE QUI NÉCESSITE DES CRÉDITS ============ */}
       <section className="mt-10">
-        <SectionTitle icon={Lock} title="Services bloqués sans crédits" />
+        <SectionTitle icon={Coins} title="Ce qui nécessite des crédits" />
         <Muted className="mb-4">
-          Ces services nécessitent des crédits ou le Pass Ordonnance pour fonctionner.
+          Ces services avancés nécessitent des crédits SABLIN ou le Pass
+          Ordonnance pour fonctionner.
         </Muted>
         <Card className="border-border/70 p-5">
           <ul className="grid gap-2.5 sm:grid-cols-2">
             {[
-              "Module Ordonnance",
-              "Ajout de médicament à une ordonnance",
-              "Estimation complète",
-              "Meilleure pharmacie",
-              "Comparaison des prix",
-              "Disponibilité réelle par pharmacie",
-              "Confirmation avant déplacement",
-              "Alertes de disponibilité",
-              "Voir le contact (téléphone) d'une pharmacie",
-              "Appeler une pharmacie",
-              "Contacter via WhatsApp",
-              "Demander conseil à une pharmacie",
-              "Confirmer le prix avant déplacement",
+              { label: "Voir le contact (téléphone) d'une pharmacie", cost: 1 },
+              { label: "Appeler une pharmacie", cost: 1 },
+              { label: "Voir la disponibilité réelle par pharmacie", cost: 1 },
+              { label: "Voir les prix détaillés par pharmacie", cost: 1 },
+              { label: "Accéder au module Ordonnance", cost: 0, pass: true },
+              { label: "Ajouter un médicament à une ordonnance", cost: 1 },
+              { label: "Estimer une ordonnance complète", cost: 2 },
+              { label: "Comparer les pharmacies (prix et distance)", cost: 1 },
+              { label: "Demander conseil à une pharmacie", cost: 2 },
+              { label: "Confirmation complète avant déplacement", cost: 4 },
             ].map((s) => (
               <li
-                key={s}
-                className="flex items-start gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5 text-sm font-medium text-foreground/85"
+                key={s.label}
+                className="flex items-center justify-between gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5 text-sm"
               >
-                <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
-                <span>{s}</span>
+                <span className="flex items-center gap-2 font-medium text-foreground/85">
+                  <Lock className="size-4 shrink-0 text-danger" />
+                  {s.label}
+                </span>
+                {s.pass ? <PassBadge /> : <CreditCost cost={s.cost} />}
               </li>
             ))}
           </ul>
 
           <div className="mt-5 flex flex-col gap-3 rounded-xl border border-brand/20 bg-brand-light/40 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-semibold text-brand-dark">
-              Rechargez vos crédits à partir de 200 FCFA ou achetez un Pass Ordonnance à 300 FCFA pour débloquer ces services.
+              Rechargez vos crédits à partir de 200 FCFA ou achetez un Pass
+              Ordonnance à 300 FCFA pour débloquer ces services.
             </p>
             <div className="flex shrink-0 flex-wrap gap-2">
               <Button
@@ -561,50 +703,157 @@ export function WalletView() {
           <Card className="divide-y divide-border/40 border-border/70 p-0">
             {transactions.map((t) => {
               const positive = t.amount >= 0;
+              const balanceBefore = t.balanceAfter - t.amount;
+              const fcfaEquiv = Math.abs(t.amount) * FCFA_PER_CREDIT;
               return (
                 <div
                   key={t.id}
-                  className="flex items-center gap-3 p-4 transition-colors hover:bg-muted/30"
+                  className="flex flex-col gap-3 p-4 transition-colors hover:bg-muted/30 sm:flex-row sm:items-start sm:justify-between"
                 >
-                  <span
-                    className={cn(
-                      "flex size-10 shrink-0 items-center justify-center rounded-xl",
-                      positive
-                        ? "bg-success-light text-success"
-                        : "bg-brand-light text-brand-dark"
-                    )}
-                  >
-                    {positive ? <Plus className="size-5" /> : <Coins className="size-5" />}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {t.description}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      <span className="capitalize">{t.type}</span>
-                      {" · "}
-                      {formatDate(t.createdAt)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <span
                       className={cn(
-                        "text-sm font-extrabold tabular-nums",
-                        positive ? "text-success" : "text-foreground"
+                        "flex size-10 shrink-0 items-center justify-center rounded-xl",
+                        positive
+                          ? "bg-success-light text-success"
+                          : "bg-brand-light text-brand-dark"
                       )}
                     >
-                      {positive ? "+" : "−"}
-                      {Math.abs(t.amount)} crédit{Math.abs(t.amount) > 1 ? "s" : ""}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Solde : {t.balanceAfter}
-                    </p>
+                      {positive ? (
+                        <Plus className="size-5" />
+                      ) : (
+                        <Coins className="size-5" />
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {t.description}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        <span className="capitalize">{t.type}</span>
+                        {" · "}
+                        {formatDate(t.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:flex sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-0">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Coût
+                      </p>
+                      <p
+                        className={cn(
+                          "font-bold tabular-nums",
+                          positive ? "text-success" : "text-foreground"
+                        )}
+                      >
+                        {positive ? "+" : "−"}
+                        {Math.abs(t.amount)} crédit{Math.abs(t.amount) > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Équivalent
+                      </p>
+                      <p className="font-bold tabular-nums text-foreground">
+                        {formatFCFA(fcfaEquiv)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Solde avant
+                      </p>
+                      <p className="font-bold tabular-nums text-foreground">
+                        {balanceBefore}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Solde après
+                      </p>
+                      <p className="font-bold tabular-nums text-foreground">
+                        {t.balanceAfter}
+                      </p>
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Statut
+                      </p>
+                      <Badge className="border-0 bg-success text-white">
+                        <CheckCircle2 className="size-3" /> Réussie
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </Card>
         )}
+      </section>
+
+      {/* ============ FAQ — QUESTIONS SUR LES CRÉDITS ============ */}
+      <section className="mt-10">
+        <SectionTitle icon={HelpCircle} title="Questions sur les crédits" />
+        <Muted className="mb-4">
+          Les réponses aux questions les plus fréquentes sur le fonctionnement
+          des crédits SABLIN.
+        </Muted>
+        <Card className="border-border/70 p-5">
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="q1">
+              <AccordionTrigger className="text-sm font-bold text-foreground hover:no-underline">
+                C&apos;est quoi un crédit SABLIN ?
+              </AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
+                C&apos;est une unité interne qui permet de payer les services
+                avancés sur SABLIN PHARMA.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="q2">
+              <AccordionTrigger className="text-sm font-bold text-foreground hover:no-underline">
+                Combien vaut 1 crédit ?
+              </AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
+                1 crédit vaut 100 FCFA.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="q3">
+              <AccordionTrigger className="text-sm font-bold text-foreground hover:no-underline">
+                Est-ce que les recherches sont payantes ?
+              </AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
+                Les recherches simples restent accessibles. Les services
+                avancés nécessitent des crédits.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="q4">
+              <AccordionTrigger className="text-sm font-bold text-foreground hover:no-underline">
+                Quand mes crédits sont-ils débités ?
+              </AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
+                Vos crédits sont débités uniquement après votre confirmation.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="q5">
+              <AccordionTrigger className="text-sm font-bold text-foreground hover:no-underline">
+                Puis-je utiliser SABLIN PHARMA sans crédit ?
+              </AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
+                Oui, vous pouvez consulter les informations simples. Mais les
+                services avancés nécessitent des crédits.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="q6">
+              <AccordionTrigger className="text-sm font-bold text-foreground hover:no-underline">
+                Que se passe-t-il si mon solde est insuffisant ?
+              </AccordionTrigger>
+              <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
+                L&apos;action est bloquée et vous pouvez recharger vos crédits.
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </Card>
       </section>
 
       {/* ============ ASSISTANCE ============ */}

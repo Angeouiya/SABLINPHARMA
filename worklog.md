@@ -1675,3 +1675,126 @@ Stage Summary:
 - Paiement : recharge crédits + Pass Ordonnance uniquement (pas d'abonnement 500 FCFA/mois)
 - Notifications : crédits/Pass (pas d'abonnement)
 - 0 mention interdite dans tout le code source
+
+---
+Task ID: 602-a
+Agent: subagent (profile & header credits UX)
+Task: Ajout d'une section "Comprendre mes crédits" dans profile-view + icône Info tooltip dans le header
+
+Work Log:
+- Lecture du worklog partagé et des fichiers cibles (profile-view.tsx, header.tsx, store/credits.ts, globals.css)
+- FICHIER 1 — src/components/views/profile-view.tsx :
+  - Ajout du sélecteur `transactions = useCredits((s) => s.transactions)` pour accéder aux 3 dernières transactions
+  - Insertion d'une nouvelle Card "Comprendre mes crédits" APRÈS la carte "Mon portefeuille" et AVANT la section "Mes accès SABLIN PHARMA" (MAIN LAYOUT)
+  - En-tête avec icône Coins (déjà importée) dans un badge solide bg-brand/text-white (pas de dégradé)
+  - Bloc définition (bg-muted/40) : "Un crédit SABLIN est une unité interne qui permet de débloquer les services avancés. 1 crédit = 100 FCFA."
+  - Grille 2 colonnes : "Solde actuel" (credits en grand, bg-brand-light/50) + "Équivalent en FCFA" (credits × 100 via formatFCFA, bg-background)
+  - Liste "Services récemment utilisés" : 3 dernières transactions via transactions.slice(0, 3), badge coloré solide (bg-success-light/text-success pour recharge, bg-danger-light/text-danger pour débit), fallback vide si transactions.length === 0
+  - Boutons CTA : "Voir mon portefeuille" (navigate("wallet"), bg-brand solide) + "FAQ crédits" (navigate("wallet"), outline)
+- FICHIER 2 — src/components/layout/header.tsx :
+  - Ajout de `Info` à l'import lucide-react
+  - Ajout d'une icône Info (size-4) à côté du CreditBadge dans le bloc desktop (sm:flex), enveloppée d'un <span title="..."> simple (pas de popover lourd) avec aria-label et role="img" pour l'accessibilité
+  - Texte du tooltip : "1 crédit = 100 FCFA. Les crédits servent à débloquer les services avancés."
+  - Style discret : text-muted-foreground → hover:text-brand, focus-visible ring
+- CONTRAINTES respectées :
+  - Aucune couleur dégradée ajoutée (uniquement couleurs pleines : bg-brand, bg-brand-light, bg-success-light, bg-danger-light, bg-muted)
+  - Texte lisible (text-foreground, text-brand-dark, text-white sur fonds colorés solides)
+  - FRANÇAIS partout
+- Vérification : `bun run lint` ✅ sans erreur ; dev server compile sans erreur
+
+Stage Summary:
+- profile-view.tsx : nouvelle section "Comprendre mes crédits" opérationnelle (définition, solde, équivalent FCFA, 3 dernières transactions, 2 CTA)
+- header.tsx : icône Info avec tooltip natif (title HTML) à côté du CreditBadge desktop
+- Aucune régression sur les composants existants (imports et structure préservés)
+
+---
+Task ID: 601-a
+Agent: subagent (modifications SABLIN PHARMA — wallet-view.tsx, enrichissement du portefeuille de crédits)
+
+Task: Enrichir src/components/views/wallet-view.tsx avec 6 nouvelles sections pédagogiques (portefeuille, à quoi servent mes crédits, ce qui est gratuit, ce qui nécessite des crédits, FAQ, historique amélioré). FRANÇAIS. Couleurs pleines uniquement, aucune couleur dégradée, texte lisible.
+
+Work Log:
+- Lecture préalable de /home/z/my-project/worklog.md (contexte des tâches 1 → 503-a) + src/store/credits.ts (FREE_FEATURES, PAID_FEATURES, CREDIT_PACKS, CREDIT_COSTS, FCFA_PER_CREDIT=100) + src/components/shared/credit-cost.tsx (CreditCost + PassBadge) + src/components/ui/typography.tsx + src/components/ui/accordion.tsx + API /api/credits (route.ts, debit/route.ts) pour comprendre le schéma CreditTransaction {id, type, amount, description, balanceAfter, createdAt}
+- FICHIER — src/components/views/wallet-view.tsx (MultiEdit, 5 opérations atomiques) :
+  * Imports lucide-react : ajouté `HelpCircle`, `Pill`, `Search` (supprimé en 2e passe les imports `MessageCircle`/`MapPin` inutilisés pour garder le lint propre)
+  * Imports UI : ajouté `Accordion, AccordionItem, AccordionTrigger, AccordionContent` depuis `@/components/ui/accordion` (composant shadcn/New York déjà existant)
+  * Section HEADER + SOLDE ACTUEL (anciennes lignes 115-211) entièrement remplacée par "Votre portefeuille de crédits" :
+    - Heading niveau h1 "Votre portefeuille de crédits" (au lieu de "Mon portefeuille")
+    - Muted : "Vos crédits vous permettent d'utiliser les services avancés de SABLIN PHARMA. Ils ne sont débités qu'après votre confirmation."
+    - Carte bg-brand-light avec solde actuel (text-4xl) + "Valeur approximative : {formatFCFA(estimatedFCFA)}" + Badge solide bg-brand "1 crédit = 100 FCFA" (couleur pleine, pas de dégradé)
+    - Boutons "Recharger mes crédits" (bg-brand solide, scroll packsRef) + "Voir les services payants" (outline, scroll tariffsRef)
+    - Bloc Pass Ordonnance conservé (couleurs pleines amber-500/amber-50/success)
+  * NOUVELLE section "À quoi servent mes crédits ?" insérée après PACKS DE RECHARGE, avant PASS ORDONNANCE :
+    - SectionTitle icon={Coins} title="À quoi servent mes crédits ?"
+    - Grille lg:grid-cols-3 de 3 Cards (couleurs pleines, pas de dégradé) :
+      · Card Médicaments (Pill sur bg-brand-light solide) : Voir pharmacies disponibles (CreditCost 1), Voir prix détaillés (1), Activer alerte disponibilité (1)
+      · Card Ordonnance (ClipboardList sur bg-amber-500 solide, fond bg-amber-50/40) : Accès module Ordonnance (PassBadge), Ajouter médicament (1), Estimation complète (2), Meilleure pharmacie (1), Comparaison pharmacies (1)
+      · Card Pharmacies (Phone sur bg-brand-light solide) : Voir contact (1), Appeler (1), WhatsApp (1), Demander conseil (2), Confirmer disponibilité (3), Confirmer prix (3), Confirmation complète (4)
+  * ANCIENNES sections "Services de contact pharmacie" + "Services bloqués sans crédits" SUPPRIMÉES (contenu redondant avec les nouvelles sections "Ce qui est gratuit" + "Ce qui nécessite des crédits") — évite la duplication
+  * NOUVELLE section "Ce qui est gratuit" après FONCTIONNALITÉS & TARIFS :
+    - SectionTitle icon={Search} title="Ce qui est gratuit"
+    - Liste grid sm:grid-cols-2 de 8 items (bg-success-light/40, CheckCircle2 text-success) avec badge "Gratuit" vert solide (bg-success-light + text-success, couleur pleine) :
+      · Rechercher un médicament · Voir les informations générales · Rechercher une pharmacie · Voir nom/commune/quartier · Voir horaires générales · Consulter pharmacies ouvertes et de garde · Consulter son profil · Accéder à l'aide et au support
+  * NOUVELLE section "Ce qui nécessite des crédits" après "Ce qui est gratuit" :
+    - SectionTitle icon={Coins} title="Ce qui nécessite des crédits"
+    - Liste grid sm:grid-cols-2 de 10 items (bg-muted/30, Lock text-danger) avec coûts CreditCost ou PassBadge :
+      · Voir contact pharmacie (1) · Appeler pharmacie (1) · Disponibilité réelle (1) · Prix détaillés (1) · Module Ordonnance (PassBadge) · Ajouter médicament (1) · Estimer ordonnance (2) · Comparer pharmacies (1) · Demander conseil (2) · Confirmation complète (4)
+    - Bloc CTA conservé : "Rechargez vos crédits à partir de 200 FCFA ou achetez un Pass Ordonnance à 300 FCFA" avec boutons "Recharger" (bg-brand solide) + "Acheter un Pass" (outline amber)
+  * HISTORIQUE DES CRÉDITS — chaque transaction enrichie (anciennes lignes 562-605 remplacées) :
+    - Layout flex-col sm:flex-row avec 2 zones : (1) icône + description + type + date, (2) grille de 5 infos (Coût, Équivalent FCFA, Solde avant, Solde après, Statut)
+    - `balanceBefore = t.balanceAfter - t.amount` (calcul dérivé car le schéma DB ne stocke que balanceAfter)
+    - `fcfaEquiv = Math.abs(t.amount) * FCFA_PER_CREDIT` (équivalent FCFA, formatFCFA)
+    - Statut : Badge solide bg-success text-white "Réussie" avec CheckCircle2 (toutes les transactions en DB sont successful)
+    - Layout responsive : grid grid-cols-2 sur mobile, sm:flex sm:flex-wrap sur desktop
+    - Coût en crédits affiché avec signe + (recharge, text-success) ou − (débit, text-foreground)
+  * NOUVELLE section FAQ "Questions sur les crédits" insérée après HISTORIQUE, avant ASSISTANCE :
+    - SectionTitle icon={HelpCircle} title="Questions sur les crédits"
+    - Card + Accordion (type="single" collapsible) avec 6 AccordionItem :
+      · q1 "C'est quoi un crédit SABLIN ?" → "C'est une unité interne qui permet de payer les services avancés sur SABLIN PHARMA."
+      · q2 "Combien vaut 1 crédit ?" → "1 crédit vaut 100 FCFA."
+      · q3 "Est-ce que les recherches sont payantes ?" → "Les recherches simples restent accessibles. Les services avancés nécessitent des crédits."
+      · q4 "Quand mes crédits sont-ils débités ?" → "Vos crédits sont débités uniquement après votre confirmation."
+      · q5 "Puis-je utiliser SABLIN PHARMA sans crédit ?" → "Oui, vous pouvez consulter les informations simples. Mais les services avancés nécessitent des crédits."
+      · q6 "Que se passe-t-il si mon solde est insuffisant ?" → "L'action est bloquée et vous pouvez recharger vos crédits."
+    - AccordionTrigger : text-sm font-bold text-foreground hover:no-underline
+    - AccordionContent : text-sm leading-relaxed text-muted-foreground (lisible)
+- CONTRAINTES respectées : aucune couleur dégradée (uniquement bg-brand, bg-brand-light, bg-amber-50/100/500, bg-success-light, bg-success, bg-muted/30 — toutes couleurs pleines ou opacités simples) ; texte lisible (text-foreground, text-brand-dark, text-amber-900, text-success avec contrastes suffisants) ; tout en français
+- Vérification lint : `bun run lint` → 0 erreur, 0 warning (après suppression des imports inutilisés MessageCircle/MapPin en 2e passe)
+- Vérification dev.log : compilations réussies (✓ Compiled in 159ms / 173ms / 210ms / 203ms / 365ms / 206ms), toutes les routes API répondent 200, aucune runtime error, page / compile en 114ms puis 57ms
+- Composants existants réutilisés : Card, Button, Badge, Skeleton, Heading, Eyebrow, Muted, CreditCost, PassBadge, EmptyState, SectionTitle (local), InfoNote (local) + Accordion/AccordionItem/AccordionTrigger/AccordionContent (nouvel import depuis ui/accordion)
+
+Stage Summary:
+- 1 fichier modifié avec succès (src/components/views/wallet-view.tsx : ~685 → ~880 lignes)
+- Portefeuille enrichi avec 6 sections : (1) bloc "Votre portefeuille de crédits" en haut avec solde + valeur approximative + badge 1 crédit = 100 FCFA + boutons Recharger/Voir services payants, (2) "À quoi servent mes crédits ?" avec 3 catégories (Médicaments/Ordonnance/Pharmacies) CreditCost + PassBadge, (3) "Ce qui est gratuit" 8 items avec badges Gratuits verts, (4) "Ce qui nécessite des crédits" 10 items avec coûts, (5) FAQ 6 questions avec Accordion, (6) Historique amélioré avec date/action/coût/FCFA/solde avant/solde après/statut
+- Anciennes sections redondantes "Services de contact pharmacie" + "Services bloqués sans crédits" supprimées (remplacées par les nouvelles sections plus claires)
+- Aucune couleur dégradée, uniquement couleurs pleines ; texte lisible avec contrastes suffisants
+- Lint 0 erreur, dev server compile sans erreur, toutes routes API 200
+
+---
+Task ID: 38
+Agent: main (orchestrator)
+Task: Explication pédagogique du système de crédits sur toute la plateforme
+
+Work Log:
+- Page Accueil : ajout section "C'est quoi un crédit SABLIN ?" avec définition, règle 1 crédit = 100 FCFA, 4 packs visuels (200/500/1000/2000), boutons Recharger/Services payants
+- Page Accueil : ajout section "Exemples d'utilisation des crédits" avec 7 cartes (contact 1, pharmacies 1, ajouter 1, estimer 2, conseil 2, confirmer 3, complète 4) + équivalent FCFA
+- Page Portefeuille : ajout bloc "Votre portefeuille de crédits" (solde, valeur FCFA, règle, boutons)
+- Page Portefeuille : ajout section "À quoi servent mes crédits ?" (3 catégories : Médicaments, Ordonnance, Pharmacies avec coûts)
+- Page Portefeuille : ajout section "Ce qui est gratuit" (8 services avec badges Gratuits)
+- Page Portefeuille : ajout section "Ce qui nécessite des crédits" (10 services avec coûts)
+- Page Portefeuille : ajout FAQ "Questions sur les crédits" (6 Q/R avec Accordion)
+- Page Portefeuille : historique transactions amélioré (date, action, coût crédits, équivalent FCFA, solde avant, solde après, statut)
+- Page Profil : ajout section "Comprendre mes crédits" (définition, solde, équivalent FCFA, 3 dernières transactions, boutons portefeuille/FAQ)
+- Header : ajout icône Info à côté du badge crédits avec infobulle "1 crédit = 100 FCFA"
+- Vérification Agent Browser + VLM : "Section 'C'est quoi un crédit SABLIN ?' avec règle '1 crédit = 100 FCFA' et section 'Exemples d'utilisation des crédits' présentes"
+- 0 erreur console, lint 0 erreur/0 warning
+
+Stage Summary:
+- Système de crédits entièrement expliqué de façon pédagogique sur toute la plateforme
+- Accueil : "C'est quoi un crédit", "Exemples d'utilisation", "Comment fonctionne"
+- Portefeuille : bloc solde, "À quoi servent mes crédits", "Ce qui est gratuit", "Ce qui nécessite des crédits", FAQ 6 questions
+- Profil : "Comprendre mes crédits" avec solde, FCFA, transactions récentes
+- Header : infobulle "1 crédit = 100 FCFA"
+- Vocabulaire harmonisé : "crédit SABLIN", "solde de crédits", "recharger mes crédits", "service avancé"
+- Règle 1 crédit = 100 FCFA visible partout
+- Transparence : coût affiché avant chaque action, solde avant/après dans les modales

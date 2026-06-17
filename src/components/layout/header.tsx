@@ -16,6 +16,7 @@ import {
   Coins,
   Wallet,
   Plus,
+  Info,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,14 @@ export function Header() {
             <button onClick={() => go("wallet")}>
               <CreditBadge />
             </button>
+            <span
+              title="1 crédit = 100 FCFA. Les crédits servent à débloquer les services avancés."
+              className="inline-flex size-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              role="img"
+              aria-label="1 crédit = 100 FCFA. Les crédits servent à débloquer les services avancés."
+            >
+              <Info className="size-4" />
+            </span>
             <Button
               size="sm"
               variant="outline"

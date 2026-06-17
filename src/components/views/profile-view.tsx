@@ -85,6 +85,7 @@ export function ProfileView() {
   const { user, logout } = useAuth();
   const credits = useCredits((s) => s.credits);
   const hasPass = useCredits((s) => s.hasPass);
+  const transactions = useCredits((s) => s.transactions);
   const unreadCount = useNotifications((s) => s.unread);
   const notifications = useNotifications((s) => s.notifications);
   const favCount = useFavorites((s) => s.favorites.length);
@@ -278,6 +279,132 @@ export function ProfileView() {
               <Receipt className="size-4" /> Historique
             </Button>
           </div>
+        </div>
+      </Card>
+
+      {/* ============ COMPRENDRE MES CRÉDITS ============ */}
+      <Card className="mt-6 border-border/70 p-6 shadow-premium">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-brand text-white">
+            <Coins className="size-5" />
+          </span>
+          <div>
+            <h2 className="text-lg font-extrabold tracking-tight text-brand-dark">
+              Comprendre mes crédits
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Tout ce qu&apos;il faut savoir sur les crédits SABLIN
+            </p>
+          </div>
+        </div>
+
+        {/* Définition */}
+        <div className="mt-4 rounded-xl bg-muted/40 p-4">
+          <p className="text-sm leading-relaxed text-foreground/85">
+            <strong className="font-semibold text-foreground">Un crédit SABLIN</strong> est une
+            unité interne qui permet de débloquer les services avancés de la plateforme.
+            <span className="mt-1 block font-semibold text-brand-dark">
+              1 crédit = 100 FCFA.
+            </span>
+          </p>
+        </div>
+
+        {/* Solde actuel + équivalent FCFA */}
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-brand/20 bg-brand-light/50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-dark/70">
+              Solde actuel
+            </p>
+            <p className="mt-1 text-4xl font-extrabold tabular-nums text-brand-dark">
+              {credits}
+            </p>
+            <p className="text-sm font-medium text-brand-dark/70">
+              crédit{credits > 1 ? "s" : ""} SABLIN
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-background p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Équivalent en FCFA
+            </p>
+            <p className="mt-1 text-4xl font-extrabold tabular-nums text-foreground">
+              {formatFCFA(credits * 100)}
+            </p>
+            <p className="text-sm font-medium text-muted-foreground">
+              au taux 1 crédit = 100 FCFA
+            </p>
+          </div>
+        </div>
+
+        {/* Services récemment utilisés (3 dernières transactions) */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-foreground">
+              Services récemment utilisés
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              3 dernières transactions
+            </span>
+          </div>
+          {transactions.length > 0 ? (
+            <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto scroll-thin pr-1">
+              {transactions.slice(0, 3).map((t) => {
+                const isCredit = t.amount > 0;
+                return (
+                  <li
+                    key={t.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background px-3 py-2.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {t.description}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(t.createdAt)}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums",
+                        isCredit
+                          ? "bg-success-light text-success"
+                          : "bg-danger-light text-danger"
+                      )}
+                    >
+                      {isCredit ? "+" : ""}
+                      {t.amount} crédit{Math.abs(t.amount) > 1 ? "s" : ""}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="mt-3 flex flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center">
+              <Coins className="size-7 text-muted-foreground/60" />
+              <p className="mt-2 text-sm font-medium text-muted-foreground">
+                Aucune transaction pour le moment.
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground/80">
+                Vos services utilisés apparaîtront ici.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* CTA buttons */}
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+          <Button
+            onClick={() => navigate("wallet")}
+            className="flex-1 bg-brand text-white hover:bg-brand-dark"
+          >
+            <Wallet className="size-4" /> Voir mon portefeuille
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate("wallet")}
+            className="flex-1 border-brand/30 text-brand-dark hover:bg-brand-light"
+          >
+            <HelpCircle className="size-4" /> FAQ crédits
+          </Button>
         </div>
       </Card>
 

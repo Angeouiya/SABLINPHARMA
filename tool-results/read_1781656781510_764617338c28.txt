@@ -1,0 +1,686 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useEffect, useRef } from "react";
+     4→     4→import {
+     5→     5→  ChevronLeft,
+     6→     6→  ChevronRight,
+     7→     7→  Coins,
+     8→     8→  Wallet,
+     9→     9→  CheckCircle2,
+    10→    10→  Receipt,
+    11→    11→  Zap,
+    12→    12→  Info,
+    13→    13→  ClipboardList,
+    14→    14→  Plus,
+    15→    15→  Lock,
+    16→    16→  Crown,
+    17→    17→  Phone,
+    18→    18→} from "lucide-react";
+    19→    19→import { Button } from "@/components/ui/button";
+    20→    20→import { Card } from "@/components/ui/card";
+    21→    21→import { Badge } from "@/components/ui/badge";
+    22→    22→import { Skeleton } from "@/components/ui/skeleton";
+    23→    23→import {
+    24→    24→  Heading,
+    25→    25→  Eyebrow,
+    26→    26→  Muted,
+    27→    27→} from "@/components/ui/typography";
+    28→    28→import { CreditCost, PassBadge } from "@/components/shared/credit-cost";
+    29→    29→import { EmptyState } from "@/components/shared/empty-state";
+    30→    30→import { useNav } from "@/store/nav";
+    31→    31→import { useAuth } from "@/store/auth";
+    32→    32→import {
+    33→    33→  useCredits,
+    34→    34→  CREDIT_PACKS,
+    35→    35→  FREE_FEATURES,
+    36→    36→  PAID_FEATURES,
+    37→    37→} from "@/store/credits";
+    38→    38→import { formatDate, formatFCFA } from "@/lib/format";
+    39→    39→import { cn } from "@/lib/utils";
+    40→    40→
+    41→    41→const FCFA_PER_CREDIT = 100;
+    42→    42→
+    43→    43→export function WalletView() {
+    44→    44→  const { navigate } = useNav();
+    45→    45→  const { user } = useAuth();
+    46→    46→  const { credits, transactions, hasPass, fetch, loading } = useCredits();
+    47→    47→
+    48→    48→  const packsRef = useRef<HTMLDivElement>(null);
+    49→    49→  const tariffsRef = useRef<HTMLDivElement>(null);
+    50→    50→  const historyRef = useRef<HTMLDivElement>(null);
+    51→    51→
+    52→    52→  useEffect(() => {
+    53→    53→    fetch();
+    54→    54→  }, [fetch]);
+    55→    55→
+    56→    56→  const estimatedFCFA = credits * FCFA_PER_CREDIT;
+    57→    57→
+    58→    58→  const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
+    59→    59→    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    60→    60→  };
+    61→    61→
+    62→    62→  // ---------- Not logged in ----------
+    63→    63→  if (!user) {
+    64→    64→    return (
+    65→    65→      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col items-center justify-center px-4 py-12">
+    66→    66→        <Card className="w-full border-border/70 p-8 text-center shadow-premium">
+    67→    67→          <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-full bg-brand-light">
+    68→    68→            <Wallet className="size-10 text-brand" />
+    69→    69→          </div>
+    70→    70→          <h1 className="text-xl font-bold tracking-tight text-foreground">
+    71→    71→            Connectez-vous pour accéder à votre portefeuille
+    72→    72→          </h1>
+    73→    73→          <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
+    74→    74→            Connectez-vous pour recharger vos crédits, acheter le Pass Ordonnance
+    75→    75→            et suivre votre historique de transactions SABLIN PHARMA.
+    76→    76→          </p>
+    77→    77→          <div className="mt-6 flex flex-col gap-2.5">
+    78→    78→            <Button
+    79→    79→              onClick={() => navigate("auth", { authMode: "login" })}
+    80→    80→              className="h-11 w-full bg-brand text-base font-semibold text-white shadow-premium transition-all hover:bg-brand-dark hover:shadow-premium-lg"
+    81→    81→            >
+    82→    82→              Se connecter
+    83→    83→            </Button>
+    84→    84→            <Button
+    85→    85→              variant="outline"
+    86→    86→              onClick={() => navigate("auth", { authMode: "register" })}
+    87→    87→              className="h-11 w-full border-brand/30 text-base font-semibold text-brand transition-colors hover:bg-brand-light"
+    88→    88→            >
+    89→    89→              Créer un compte
+    90→    90→            </Button>
+    91→    91→          </div>
+    92→    92→          <button
+    93→    93→            type="button"
+    94→    94→            onClick={() => navigate("home")}
+    95→    95→            className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
+    96→    96→          >
+    97→    97→            <ChevronLeft className="size-4" />
+    98→    98→            Retour à l&apos;accueil
+    99→    99→          </button>
+   100→   100→        </Card>
+   101→   101→      </div>
+   102→   102→    );
+   103→   103→  }
+   104→   104→
+   105→   105→  return (
+   106→   106→    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+   107→   107→      {/* Back link */}
+   108→   108→      <button
+   109→   109→        onClick={() => navigate("home")}
+   110→   110→        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+   111→   111→      >
+   112→   112→        <ChevronLeft className="size-4" /> Accueil
+   113→   113→      </button>
+   114→   114→
+   115→   115→      {/* ============ HEADER ============ */}
+   116→   116→      <header className="mb-6">
+   117→   117→        <Eyebrow>
+   118→   118→          <Wallet className="size-3.5" /> Gestion des crédits
+   119→   119→        </Eyebrow>
+   120→   120→        <Heading level="h1" className="mt-2 text-foreground">
+   121→   121→          Mon portefeuille
+   122→   122→        </Heading>
+   123→   123→        <Muted className="mt-1.5 max-w-2xl">
+   124→   124→          Rechargez vos crédits et gérez vos services avancés.
+   125→   125→        </Muted>
+   126→   126→      </header>
+   127→   127→
+   128→   128→      {/* ============ SOLDE ACTUEL ============ */}
+   129→   129→      <Card className="border-border/70 bg-brand-light p-6 shadow-premium sm:p-7">
+   130→   130→        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+   131→   131→          <div className="min-w-0 flex-1">
+   132→   132→            <div className="flex items-center gap-2">
+   133→   133→              <span className="flex size-10 items-center justify-center rounded-xl bg-brand text-white">
+   134→   134→                <Coins className="size-5" />
+   135→   135→              </span>
+   136→   136→              <div>
+   137→   137→                <p className="text-xs font-bold uppercase tracking-wide text-brand-dark/70">
+   138→   138→                  Solde actuel
+   139→   139→                </p>
+   140→   140→                <p className="text-sm font-medium text-brand-dark/80">
+   141→   141→                  Compte {user.name}
+   142→   142→                </p>
+   143→   143→              </div>
+   144→   144→            </div>
+   145→   145→
+   146→   146→            <div className="mt-4">
+   147→   147→              {loading ? (
+   148→   148→                <Skeleton className="h-12 w-40" />
+   149→   149→              ) : (
+   150→   150→                <p className="text-4xl font-extrabold tabular-nums text-brand-dark">
+   151→   151→                  {credits}{" "}
+   152→   152→                  <span className="text-xl font-bold">
+   153→   153→                    crédit{credits > 1 ? "s" : ""}
+   154→   154→                  </span>
+   155→   155→                </p>
+   156→   156→              )}
+   157→   157→              <p className="mt-1 text-sm font-semibold text-brand-dark/80">
+   158→   158→                ≈ {formatFCFA(estimatedFCFA)}
+   159→   159→                <span className="ml-1 font-normal text-brand-dark/60">
+   160→   160→                  (1 crédit ≈ {FCFA_PER_CREDIT} FCFA)
+   161→   161→                </span>
+   162→   162→              </p>
+   163→   163→            </div>
+   164→   164→
+   165→   165→            <p className="mt-3 max-w-md text-sm leading-relaxed text-brand-dark/80">
+   166→   166→              Les recherches simples sont gratuites. Les services avancés
+   167→   167→              utilisent vos crédits.
+   168→   168→            </p>
+   169→   169→
+   170→   170→            <div className="mt-4 flex flex-wrap gap-2">
+   171→   171→              <Button
+   172→   172→                onClick={() => scrollTo(packsRef)}
+   173→   173→                className="bg-brand text-white hover:bg-brand-dark"
+   174→   174→              >
+   175→   175→                <Plus className="size-4" /> Recharger
+   176→   176→              </Button>
+   177→   177→              <Button
+   178→   178→                variant="outline"
+   179→   179→                onClick={() => scrollTo(tariffsRef)}
+   180→   180→                className="border-brand/30 text-brand-dark hover:bg-brand"
+   181→   181→              >
+   182→   182→                <Receipt className="size-4" /> Voir les tarifs
+   183→   183→              </Button>
+   184→   184→            </div>
+   185→   185→          </div>
+   186→   186→
+   187→   187→          {/* Pass Ordonnance status badge */}
+   188→   188→          <div className="shrink-0 rounded-2xl border border-amber-500/30 bg-amber-50 p-4 sm:w-48">
+   189→   189→            <div className="flex items-center gap-2">
+   190→   190→              <span className="flex size-8 items-center justify-center rounded-lg bg-amber-500 text-white">
+   191→   191→                <ClipboardList className="size-4" />
+   192→   192→              </span>
+   193→   193→              <p className="text-sm font-bold text-amber-900">Pass Ordonnance</p>
+   194→   194→            </div>
+   195→   195→            {hasPass ? (
+   196→   196→              <div className="mt-2">
+   197→   197→                <Badge className="border-0 bg-success text-white">
+   198→   198→                  <CheckCircle2 className="size-3" /> Actif
+   199→   199→                </Badge>
+   200→   200→                <p className="mt-1.5 text-xs text-amber-800">
+   201→   201→                  Estimation complète disponible sans crédits.
+   202→   202→                </p>
+   203→   203→              </div>
+   204→   204→            ) : (
+   205→   205→              <p className="mt-2 text-xs text-amber-800">
+   206→   206→                Non activé. Découvrez-le plus bas.
+   207→   207→              </p>
+   208→   208→            )}
+   209→   209→          </div>
+   210→   210→        </div>
+   211→   211→      </Card>
+   212→   212→
+   213→   213→      {/* ============ MESSAGES PÉDAGOGIQUES ============ */}
+   214→   214→      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+   215→   215→        <InfoNote
+   216→   216→          icon={CheckCircle2}
+   217→   217→          title="Aucun abonnement obligatoire"
+   218→   218→          desc="SABLIN PHARMA fonctionne sans abonnement forcé."
+   219→   219→        />
+   220→   220→        <InfoNote
+   221→   221→          icon={Zap}
+   222→   222→          title="Vous payez seulement les services avancés"
+   223→   223→          desc="Recherches et consultations restent gratuites."
+   224→   224→        />
+   225→   225→        <InfoNote
+   226→   226→          icon={Coins}
+   227→   227→          title="Rechargez vos crédits quand vous voulez"
+   228→   228→          desc="Aucune limite de temps ni d&apos;engagement."
+   229→   229→        />
+   230→   230→      </div>
+   231→   231→
+   232→   232→      {/* ============ PACKS DE RECHARGE ============ */}
+   233→   233→      <section ref={packsRef} className="mt-10 scroll-mt-6">
+   234→   234→        <SectionTitle icon={Plus} title="Packs de recharge" />
+   235→   235→        <Muted className="mb-4">
+   236→   236→          Choisissez un pack adapté à vos besoins. Les crédits n&apos;expirent pas.
+   237→   237→        </Muted>
+   238→   238→        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+   239→   239→          {CREDIT_PACKS.map((pack) => (
+   240→   240→            <Card
+   241→   241→              key={pack.amount}
+   242→   242→              className={cn(
+   243→   243→                "relative flex flex-col border-border/70 p-5 transition-all hover:-translate-y-0.5 hover:shadow-premium",
+   244→   244→                pack.popular && "border-brand/50 ring-1 ring-brand/30"
+   245→   245→              )}
+   246→   246→            >
+   247→   247→              {pack.popular && (
+   248→   248→                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-premium">
+   249→   249→                  Populaire
+   250→   250→                </span>
+   251→   251→              )}
+   252→   252→              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+   253→   253→                {pack.label}
+   254→   254→              </p>
+   255→   255→              <p className="mt-2 text-2xl font-extrabold tabular-nums text-brand-dark">
+   256→   256→                {formatFCFA(pack.amount)}
+   257→   257→              </p>
+   258→   258→              <div className="mt-3 flex items-center gap-1.5">
+   259→   259→                <Coins className="size-4 text-brand" />
+   260→   260→                <span className="text-lg font-bold text-foreground">
+   261→   261→                  {pack.credits} crédit{pack.credits > 1 ? "s" : ""}
+   262→   262→                </span>
+   263→   263→              </div>
+   264→   264→              <p className="mt-1 text-xs text-muted-foreground">
+   265→   265→                Soit {Math.round((pack.credits / pack.amount) * 100)} FCFA / crédit
+   266→   266→              </p>
+   267→   267→              <Button
+   268→   268→                onClick={() => navigate("payment", { packAmount: pack.amount })}
+   269→   269→                className={cn(
+   270→   270→                  "mt-4 w-full",
+   271→   271→                  pack.popular
+   272→   272→                    ? "bg-brand text-white hover:bg-brand-dark"
+   273→   273→                    : "bg-brand-light text-brand-dark hover:bg-brand hover:text-white"
+   274→   274→                )}
+   275→   275→              >
+   276→   276→                Recharger <ChevronRight className="size-4" />
+   277→   277→              </Button>
+   278→   278→            </Card>
+   279→   279→          ))}
+   280→   280→        </div>
+   281→   281→      </section>
+   282→   282→
+   283→   283→      {/* ============ PASS ORDONNANCE ============ */}
+   284→   284→      <section className="mt-10">
+   285→   285→        <SectionTitle icon={ClipboardList} title="Pass Ordonnance" />
+   286→   286→        <Card className="border-amber-500/30 bg-amber-50 p-6 shadow-premium">
+   287→   287→          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+   288→   288→            <div className="min-w-0 flex-1">
+   289→   289→              <div className="flex items-center gap-2.5">
+   290→   290→                <span className="flex size-12 items-center justify-center rounded-2xl bg-amber-500 text-white">
+   291→   291→                  <ClipboardList className="size-6" />
+   292→   292→                </span>
+   293→   293→                <div>
+   294→   294→                  <h3 className="text-lg font-extrabold text-foreground">
+   295→   295→                    Pass Ordonnance
+   296→   296→                  </h3>
+   297→   297→                  <p className="text-sm text-amber-800">
+   298→   298→                    Estimation complète sans crédits, pour usage occasionnel
+   299→   299→                  </p>
+   300→   300→                </div>
+   301→   301→              </div>
+   302→   302→
+   303→   303→              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+   304→   304→                {[
+   305→   305→                  "Estimation complète de votre ordonnance",
+   306→   306→                  "Liste des pharmacies disponibles",
+   307→   307→                  "Comparaison simple des prix",
+   308→   308→                  "Sauvegarde de l'estimation",
+   309→   309→                ].map((b) => (
+   310→   310→                  <li
+   311→   311→                    key={b}
+   312→   312→                    className="flex items-start gap-2 text-sm text-amber-900"
+   313→   313→                  >
+   314→   314→                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-amber-600" />
+   315→   315→                    <span>{b}</span>
+   316→   316→                  </li>
+   317→   317→                ))}
+   318→   318→              </ul>
+   319→   319→            </div>
+   320→   320→
+   321→   321→            <div className="shrink-0 sm:text-right">
+   322→   322→              <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
+   323→   323→                Prix unique
+   324→   324→              </p>
+   325→   325→              <p className="mt-1 text-3xl font-extrabold tabular-nums text-amber-900">
+   326→   326→                300 FCFA
+   327→   327→              </p>
+   328→   328→              <p className="mt-0.5 text-xs text-amber-700">Valable à vie</p>
+   329→   329→              <Button
+   330→   330→                onClick={() => navigate("payment", { passOrdonnance: true })}
+   331→   331→                className="mt-4 w-full bg-amber-500 text-white hover:bg-amber-600 sm:w-auto"
+   332→   332→              >
+   333→   333→                Acheter le Pass — 300 FCFA
+   334→   334→              </Button>
+   335→   335→            </div>
+   336→   336→          </div>
+   337→   337→
+   338→   338→          {hasPass && (
+   339→   339→            <div className="mt-4 flex items-center gap-2 rounded-xl border border-success/30 bg-success-light/40 px-3 py-2 text-sm text-success">
+   340→   340→              <CheckCircle2 className="size-4" />
+   341→   341→              <span className="font-semibold">
+   342→   342→                Vous possédez déjà le Pass Ordonnance.
+   343→   343→              </span>
+   344→   344→            </div>
+   345→   345→          )}
+   346→   346→        </Card>
+   347→   347→      </section>
+   348→   348→
+   349→   349→      {/* ============ FONCTIONNALITÉS & TARIFS ============ */}
+   350→   350→      <section ref={tariffsRef} className="mt-10 scroll-mt-6">
+   351→   351→        <SectionTitle icon={Receipt} title="Fonctionnalités & Tarifs" />
+   352→   352→        <Muted className="mb-4">
+   353→   353→          Tout ce que vous pouvez faire sur SABLIN PHARMA, et ce que ça coûte.
+   354→   354→        </Muted>
+   355→   355→
+   356→   356→        <Card className="overflow-hidden border-border/70 p-0">
+   357→   357→          <div className="overflow-x-auto">
+   358→   358→            <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+   359→   359→              <thead>
+   360→   360→                <tr className="border-b border-border/60 bg-muted/40">
+   361→   361→                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+   362→   362→                    Fonctionnalité
+   363→   363→                  </th>
+   364→   364→                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+   365→   365→                    Description
+   366→   366→                  </th>
+   367→   367→                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+   368→   368→                    Type d&apos;accès
+   369→   369→                  </th>
+   370→   370→                  <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-muted-foreground">
+   371→   371→                    Coût
+   372→   372→                  </th>
+   373→   373→                </tr>
+   374→   374→              </thead>
+   375→   375→              <tbody>
+   376→   376→                {/* Free features */}
+   377→   377→                {FREE_FEATURES.map((feat) => (
+   378→   378→                  <tr
+   379→   379→                    key={feat}
+   380→   380→                    className="border-b border-border/40 last:border-0"
+   381→   381→                  >
+   382→   382→                    <td className="px-4 py-3 align-top font-semibold text-foreground">
+   383→   383→                      {feat}
+   384→   384→                    </td>
+   385→   385→                    <td className="px-4 py-3 align-top text-muted-foreground">
+   386→   386→                      Accès libre, sans connexion requise
+   387→   387→                    </td>
+   388→   388→                    <td className="px-4 py-3 align-top">
+   389→   389→                      <span className="inline-flex items-center gap-1 rounded-full bg-success-light px-2 py-0.5 text-[11px] font-bold text-success">
+   390→   390→                        <CheckCircle2 className="size-3" /> Gratuit
+   391→   391→                      </span>
+   392→   392→                    </td>
+   393→   393→                    <td className="px-4 py-3 text-right align-top">
+   394→   394→                      <span className="text-xs font-bold text-success">0 FCFA</span>
+   395→   395→                    </td>
+   396→   396→                  </tr>
+   397→   397→                ))}
+   398→   398→                {/* Paid features */}
+   399→   399→                {PAID_FEATURES.map((feat) => (
+   400→   400→                  <tr
+   401→   401→                    key={feat.label}
+   402→   402→                    className="border-b border-border/40 last:border-0"
+   403→   403→                  >
+   404→   404→                    <td className="px-4 py-3 align-top font-semibold text-foreground">
+   405→   405→                      {feat.label}
+   406→   406→                    </td>
+   407→   407→                    <td className="px-4 py-3 align-top text-muted-foreground">
+   408→   408→                      {feat.desc}
+   409→   409→                    </td>
+   410→   410→                    <td className="px-4 py-3 align-top">
+   411→   411→                      {"isPass" in feat && feat.isPass ? (
+   412→   412→                        <PassBadge />
+   413→   413→                      ) : (
+   414→   414→                        <span className="inline-flex items-center gap-1 rounded-full bg-brand-light px-2 py-0.5 text-[11px] font-bold text-brand-dark">
+   415→   415→                          <Coins className="size-3" /> Crédits
+   416→   416→                        </span>
+   417→   417→                      )}
+   418→   418→                    </td>
+   419→   419→                    <td className="px-4 py-3 text-right align-top">
+   420→   420→                      {"isPass" in feat && feat.isPass ? (
+   421→   421→                        <span className="text-xs font-bold text-amber-700">
+   422→   422→                          300 FCFA
+   423→   423→                        </span>
+   424→   424→                      ) : (
+   425→   425→                        <CreditCost cost={feat.cost} />
+   426→   426→                      )}
+   427→   427→                    </td>
+   428→   428→                  </tr>
+   429→   429→                ))}
+   430→   430→              </tbody>
+   431→   431→            </table>
+   432→   432→          </div>
+   433→   433→        </Card>
+   434→   434→      </section>
+   435→   435→
+   436→   436→      {/* ============ SERVICES DE CONTACT PHARMACIE ============ */}
+   437→   437→      <section className="mt-10">
+   438→   438→        <SectionTitle icon={Phone} title="Services de contact pharmacie" />
+   439→   439→        <Muted className="mb-4">
+   440→   440→          Les contacts directs des pharmacies nécessitent des crédits.
+   441→   441→        </Muted>
+   442→   442→        <Card className="border-border/70 p-5">
+   443→   443→          <ul className="grid gap-2.5 sm:grid-cols-2">
+   444→   444→            {[
+   445→   445→              { label: "Voir le contact pharmacie (téléphone)", cost: "1 crédit" },
+   446→   446→              { label: "Appeler une pharmacie", cost: "1 crédit" },
+   447→   447→              { label: "WhatsApp pharmacie", cost: "1 crédit" },
+   448→   448→              { label: "Demander conseil pharmacie", cost: "2 crédits" },
+   449→   449→              { label: "Confirmer disponibilité", cost: "3 crédits" },
+   450→   450→              { label: "Confirmer prix", cost: "3 crédits" },
+   451→   451→              { label: "Confirmation complète", cost: "4 crédits" },
+   452→   452→            ].map((s) => (
+   453→   453→              <li
+   454→   454→                key={s.label}
+   455→   455→                className="flex items-center justify-between gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5 text-sm"
+   456→   456→              >
+   457→   457→                <span className="font-medium text-foreground/85">{s.label}</span>
+   458→   458→                <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-light px-2 py-0.5 text-[10px] font-bold text-brand-dark">
+   459→   459→                  {s.cost}
+   460→   460→                </span>
+   461→   461→              </li>
+   462→   462→            ))}
+   463→   463→          </ul>
+   464→   464→        </Card>
+   465→   465→      </section>
+   466→   466→
+   467→   467→      {/* ============ SERVICES BLOQUÉS SANS CRÉDITS ============ */}
+   468→   468→      <section className="mt-10">
+   469→   469→        <SectionTitle icon={Lock} title="Services bloqués sans crédits" />
+   470→   470→        <Muted className="mb-4">
+   471→   471→          Ces services nécessitent des crédits ou le Pass Ordonnance pour fonctionner.
+   472→   472→        </Muted>
+   473→   473→        <Card className="border-border/70 p-5">
+   474→   474→          <ul className="grid gap-2.5 sm:grid-cols-2">
+   475→   475→            {[
+   476→   476→              "Module Ordonnance",
+   477→   477→              "Ajout de médicament à une ordonnance",
+   478→   478→              "Estimation complète",
+   479→   479→              "Meilleure pharmacie",
+   480→   480→              "Comparaison des prix",
+   481→   481→              "Disponibilité réelle par pharmacie",
+   482→   482→              "Confirmation avant déplacement",
+   483→   483→              "Alertes de disponibilité",
+   484→   484→              "Voir le contact (téléphone) d'une pharmacie",
+   485→   485→              "Appeler une pharmacie",
+   486→   486→              "Contacter via WhatsApp",
+   487→   487→              "Demander conseil à une pharmacie",
+   488→   488→              "Confirmer le prix avant déplacement",
+   489→   489→            ].map((s) => (
+   490→   490→              <li
+   491→   491→                key={s}
+   492→   492→                className="flex items-start gap-2.5 rounded-lg bg-muted/30 px-3 py-2.5 text-sm font-medium text-foreground/85"
+   493→   493→              >
+   494→   494→                <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+   495→   495→                <span>{s}</span>
+   496→   496→              </li>
+   497→   497→            ))}
+   498→   498→          </ul>
+   499→   499→
+   500→   500→          <div className="mt-5 flex flex-col gap-3 rounded-xl border border-brand/20 bg-brand-light/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+   501→   501→            <p className="text-sm font-semibold text-brand-dark">
+   502→   502→              Rechargez vos crédits à partir de 200 FCFA ou achetez un Pass Ordonnance à 300 FCFA pour débloquer ces services.
+   503→   503→            </p>
+   504→   504→            <div className="flex shrink-0 flex-wrap gap-2">
+   505→   505→              <Button
+   506→   506→                size="sm"
+   507→   507→                className="bg-brand text-white hover:bg-brand-dark"
+   508→   508→                onClick={() => scrollTo(packsRef)}
+   509→   509→              >
+   510→   510→                <Plus className="size-4" /> Recharger
+   511→   511→              </Button>
+   512→   512→              <Button
+   513→   513→                size="sm"
+   514→   514→                variant="outline"
+   515→   515→                className="border-amber-500/40 bg-amber-50 text-amber-700 hover:bg-amber-100"
+   516→   516→                onClick={() => navigate("payment", { passOrdonnance: true })}
+   517→   517→              >
+   518→   518→                <Crown className="size-4" /> Acheter un Pass
+   519→   519→              </Button>
+   520→   520→            </div>
+   521→   521→          </div>
+   522→   522→        </Card>
+   523→   523→      </section>
+   524→   524→
+   525→   525→      {/* ============ HISTORIQUE DES CRÉDITS ============ */}
+   526→   526→      <section ref={historyRef} className="mt-10 scroll-mt-6">
+   527→   527→        <SectionTitle
+   528→   528→          icon={Receipt}
+   529→   529→          title="Historique des crédits"
+   530→   530→        />
+   531→   531→        <Muted className="mb-4">
+   532→   532→          Suivez vos recharges et débits de crédits.
+   533→   533→        </Muted>
+   534→   534→
+   535→   535→        {loading ? (
+   536→   536→          <Card className="divide-y divide-border/40 border-border/70 p-0">
+   537→   537→            {Array.from({ length: 3 }).map((_, i) => (
+   538→   538→              <div key={i} className="flex items-center gap-3 p-4">
+   539→   539→                <Skeleton className="size-10 rounded-xl" />
+   540→   540→                <div className="flex-1 space-y-2">
+   541→   541→                  <Skeleton className="h-4 w-40" />
+   542→   542→                  <Skeleton className="h-3 w-24" />
+   543→   543→                </div>
+   544→   544→                <Skeleton className="h-6 w-20" />
+   545→   545→              </div>
+   546→   546→            ))}
+   547→   547→          </Card>
+   548→   548→        ) : transactions.length === 0 ? (
+   549→   549→          <Card className="border-border/70 p-0">
+   550→   550→            <EmptyState
+   551→   551→              icon={Receipt}
+   552→   552→              title="Aucune transaction pour le moment"
+   553→   553→              description="Vos recharges et débits de crédits apparaîtront ici. Rechargez votre portefeuille pour commencer à utiliser les services avancés."
+   554→   554→              action={{
+   555→   555→                label: "Recharger maintenant",
+   556→   556→                onClick: () => scrollTo(packsRef),
+   557→   557→              }}
+   558→   558→            />
+   559→   559→          </Card>
+   560→   560→        ) : (
+   561→   561→          <Card className="divide-y divide-border/40 border-border/70 p-0">
+   562→   562→            {transactions.map((t) => {
+   563→   563→              const positive = t.amount >= 0;
+   564→   564→              return (
+   565→   565→                <div
+   566→   566→                  key={t.id}
+   567→   567→                  className="flex items-center gap-3 p-4 transition-colors hover:bg-muted/30"
+   568→   568→                >
+   569→   569→                  <span
+   570→   570→                    className={cn(
+   571→   571→                      "flex size-10 shrink-0 items-center justify-center rounded-xl",
+   572→   572→                      positive
+   573→   573→                        ? "bg-success-light text-success"
+   574→   574→                        : "bg-brand-light text-brand-dark"
+   575→   575→                    )}
+   576→   576→                  >
+   577→   577→                    {positive ? <Plus className="size-5" /> : <Coins className="size-5" />}
+   578→   578→                  </span>
+   579→   579→                  <div className="min-w-0 flex-1">
+   580→   580→                    <p className="truncate text-sm font-semibold text-foreground">
+   581→   581→                      {t.description}
+   582→   582→                    </p>
+   583→   583→                    <p className="text-xs text-muted-foreground">
+   584→   584→                      <span className="capitalize">{t.type}</span>
+   585→   585→                      {" · "}
+   586→   586→                      {formatDate(t.createdAt)}
+   587→   587→                    </p>
+   588→   588→                  </div>
+   589→   589→                  <div className="text-right">
+   590→   590→                    <p
+   591→   591→                      className={cn(
+   592→   592→                        "text-sm font-extrabold tabular-nums",
+   593→   593→                        positive ? "text-success" : "text-foreground"
+   594→   594→                      )}
+   595→   595→                    >
+   596→   596→                      {positive ? "+" : "−"}
+   597→   597→                      {Math.abs(t.amount)} crédit{Math.abs(t.amount) > 1 ? "s" : ""}
+   598→   598→                    </p>
+   599→   599→                    <p className="text-[11px] text-muted-foreground">
+   600→   600→                      Solde : {t.balanceAfter}
+   601→   601→                    </p>
+   602→   602→                  </div>
+   603→   603→                </div>
+   604→   604→              );
+   605→   605→            })}
+   606→   606→          </Card>
+   607→   607→        )}
+   608→   608→      </section>
+   609→   609→
+   610→   610→      {/* ============ ASSISTANCE ============ */}
+   611→   611→      <Card className="mt-8 flex flex-col items-start gap-3 border-border/70 p-5 sm:flex-row sm:items-center sm:justify-between">
+   612→   612→        <div className="flex items-start gap-3">
+   613→   613→          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+   614→   614→            <Info className="size-5" />
+   615→   615→          </span>
+   616→   616→          <div>
+   617→   617→            <p className="text-sm font-bold text-foreground">
+   618→   618→              Besoin d&apos;aide avec vos crédits ?
+   619→   619→            </p>
+   620→   620→            <p className="text-sm text-muted-foreground">
+   621→   621→              Notre équipe support répond à toutes vos questions sur la
+   622→   622→              facturation et les services avancés.
+   623→   623→            </p>
+   624→   624→          </div>
+   625→   625→        </div>
+   626→   626→        <Button
+   627→   627→          variant="outline"
+   628→   628→          className="border-brand/30 text-brand-dark hover:bg-brand-light"
+   629→   629→          onClick={() => navigate("settings")}
+   630→   630→        >
+   631→   631→          Contacter le support <ChevronRight className="size-4" />
+   632→   632→        </Button>
+   633→   633→      </Card>
+   634→   634→    </div>
+   635→   635→  );
+   636→   636→}
+   637→   637→
+   638→   638→/* ============================================================
+   639→   639→   SectionTitle — en-tête de section
+   640→   640→   ============================================================ */
+   641→   641→function SectionTitle({
+   642→   642→  icon: Icon,
+   643→   643→  title,
+   644→   644→}: {
+   645→   645→  icon: typeof Coins;
+   646→   646→  title: string;
+   647→   647→}) {
+   648→   648→  return (
+   649→   649→    <div className="mb-2 flex items-center gap-2.5">
+   650→   650→      <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
+   651→   651→        <Icon className="size-5" />
+   652→   652→      </span>
+   653→   653→      <h2 className="text-xl font-extrabold tracking-tight text-foreground">
+   654→   654→        {title}
+   655→   655→      </h2>
+   656→   656→    </div>
+   657→   657→  );
+   658→   658→}
+   659→   659→
+   660→   660→/* ============================================================
+   661→   661→   InfoNote — petit message pédagogique
+   662→   662→   ============================================================ */
+   663→   663→function InfoNote({
+   664→   664→  icon: Icon,
+   665→   665→  title,
+   666→   666→  desc,
+   667→   667→}: {
+   668→   668→  icon: typeof Info;
+   669→   669→  title: string;
+   670→   670→  desc: string;
+   671→   671→}) {
+   672→   672→  return (
+   673→   673→    <Card className="flex items-start gap-3 border-border/70 p-4">
+   674→   674→      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
+   675→   675→        <Icon className="size-5" />
+   676→   676→      </span>
+   677→   677→      <div>
+   678→   678→        <p className="text-sm font-bold text-foreground">{title}</p>
+   679→   679→        <p className="mt-0.5 text-xs leading-relaxed break-words text-muted-foreground">
+   680→   680→          {desc}
+   681→   681→        </p>
+   682→   682→      </div>
+   683→   683→    </Card>
+   684→   684→  );
+   685→   685→}
+   686→   686→

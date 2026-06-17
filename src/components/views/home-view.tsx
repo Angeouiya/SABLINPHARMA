@@ -312,6 +312,111 @@ export function HomeView() {
       </section>
 
       {/* ========================================================
+          C'EST QUOI UN CRÉDIT SABLIN ?
+          ======================================================== */}
+      <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <Card className="border-brand/20 bg-brand-light/20 p-6 sm:p-8">
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
+            <div>
+              <Eyebrow>Comprendre les crédits</Eyebrow>
+              <Heading level="h2" className="mt-2">
+                C&apos;est quoi un crédit SABLIN ?
+              </Heading>
+              <p className="mt-3 text-sm leading-relaxed break-words text-foreground/80 sm:text-base">
+                Un crédit SABLIN est une unité interne qui vous permet de débloquer les services
+                avancés de la plateforme.{" "}
+                <span className="font-bold text-brand-dark">1 crédit = 100 FCFA.</span>{" "}
+                Vous rechargez vos crédits une seule fois, puis vous les utilisez uniquement
+                lorsque vous effectuez une action importante.
+              </p>
+              <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
+                Les recherches simples restent accessibles. Les crédits servent à débloquer les
+                services avancés comme l&apos;ordonnance, les contacts pharmacies, les
+                confirmations, les comparaisons et les disponibilités précises.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => navigate("wallet")}>
+                  <Coins className="size-4" /> Recharger mes crédits
+                </Button>
+                <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => navigate("wallet")}>
+                  Voir les services payants
+                </Button>
+              </div>
+            </div>
+
+            {/* Règle 1 crédit = 100 FCFA */}
+            <div className="flex flex-col gap-3">
+              <div className="rounded-xl border border-brand/30 bg-background p-5 text-center shadow-card">
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Règle officielle
+                </p>
+                <p className="mt-2 text-3xl font-extrabold text-brand-dark">
+                  1 crédit = 100 FCFA
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Aucun crédit n&apos;est débité sans votre confirmation.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-background p-3 text-center shadow-card">
+                  <p className="text-lg font-extrabold text-foreground">200 F</p>
+                  <p className="text-xs text-muted-foreground">= 2 crédits</p>
+                </div>
+                <div className="rounded-lg bg-background p-3 text-center shadow-card">
+                  <p className="text-lg font-extrabold text-foreground">500 F</p>
+                  <p className="text-xs text-muted-foreground">= 6 crédits</p>
+                </div>
+                <div className="rounded-lg bg-background p-3 text-center shadow-card">
+                  <p className="text-lg font-extrabold text-foreground">1 000 F</p>
+                  <p className="text-xs text-muted-foreground">= 13 crédits</p>
+                </div>
+                <div className="rounded-lg bg-background p-3 text-center shadow-card">
+                  <p className="text-lg font-extrabold text-foreground">2 000 F</p>
+                  <p className="text-xs text-muted-foreground">= 28 crédits</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      {/* ========================================================
+          EXEMPLES D'UTILISATION DES CRÉDITS
+          ======================================================== */}
+      <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mb-6 text-center">
+          <Eyebrow>Concret</Eyebrow>
+          <Heading level="h2" className="mt-2">
+            Exemples d&apos;utilisation des crédits
+          </Heading>
+          <Muted className="mt-2">
+            Chaque service avancé a un coût clair, affiché avant validation.
+          </Muted>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { label: "Voir le contact d'une pharmacie", cost: 1, fcfa: 100 },
+            { label: "Voir les pharmacies qui possèdent un médicament", cost: 1, fcfa: 100 },
+            { label: "Ajouter un médicament à une ordonnance", cost: 1, fcfa: 100 },
+            { label: "Estimer une ordonnance complète", cost: 2, fcfa: 200 },
+            { label: "Demander conseil à une pharmacie", cost: 2, fcfa: 200 },
+            { label: "Confirmer une disponibilité avant déplacement", cost: 3, fcfa: 300 },
+            { label: "Confirmation complète (médicament + prix + dispo)", cost: 4, fcfa: 400 },
+          ].map((item) => (
+            <Card key={item.label} className="flex items-center justify-between gap-3 border-border/70 p-4 shadow-card">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">≈ {item.fcfa} FCFA</p>
+              </div>
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-light px-2.5 py-1 text-xs font-bold text-brand-dark">
+                <Coins className="size-3" /> {item.cost} crédit{item.cost > 1 ? "s" : ""}
+              </span>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      {/* ========================================================
           3. CATÉGORIES
           ======================================================== */}
       <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">

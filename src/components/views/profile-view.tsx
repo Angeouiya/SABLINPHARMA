@@ -45,6 +45,7 @@ import { useAuth } from "@/store/auth";
 import { useCredits, FREE_FEATURES, PAID_FEATURES } from "@/store/credits";
 import { CreditBadge } from "@/components/shared/credit-badge";
 import { CreditCost, PassBadge } from "@/components/shared/credit-cost";
+import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
 import { useNotifications } from "@/store/notifications";
 import { useFavorites } from "@/store/favorites";
 import { useHistory } from "@/store/history";
@@ -430,18 +431,19 @@ export function ProfileView() {
                 </button>
               ))}
               <Separator className="my-2" />
-              <button
-                onClick={handleLogout}
-                disabled={loggingOut}
-                className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-              >
-                {loggingOut ? (
-                  <Loader2 className="size-4 shrink-0 animate-spin" />
-                ) : (
-                  <LogOut className="size-4 shrink-0" />
-                )}
-                <span className="flex-1">Se déconnecter</span>
-              </button>
+              <LogoutConfirmDialog onConfirm={handleLogout}>
+                <button
+                  disabled={loggingOut}
+                  className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                >
+                  {loggingOut ? (
+                    <Loader2 className="size-4 shrink-0 animate-spin" />
+                  ) : (
+                    <LogOut className="size-4 shrink-0" />
+                  )}
+                  <span className="flex-1">Se déconnecter</span>
+                </button>
+              </LogoutConfirmDialog>
             </div>
           </Card>
         </aside>

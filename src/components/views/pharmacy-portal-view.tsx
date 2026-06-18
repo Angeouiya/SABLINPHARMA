@@ -17,6 +17,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Lock,
+  LogOut,
   Mail,
   MapPin,
   MessageCircle,
@@ -41,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Heading, Muted, Price } from "@/components/ui/typography";
+import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import {
@@ -320,6 +322,11 @@ export function PharmacyPortalView() {
     [activeRole]
   );
 
+  const handlePortalLogout = () => {
+    setActiveRole(null);
+    setTab("dashboard");
+  };
+
   if (!activeRole) {
     return <AuthGate onLogin={(role) => {
       setActiveRole(role);
@@ -351,12 +358,11 @@ export function PharmacyPortalView() {
                 <Plus className="size-4" /> Créer une pharmacie
               </Button>
             )}
-            <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => {
-              setActiveRole(null);
-              setTab("dashboard");
-            }}>
-              Déconnexion
-            </Button>
+            <LogoutConfirmDialog onConfirm={handlePortalLogout}>
+              <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-50">
+                <LogOut className="size-4" /> Déconnexion
+              </Button>
+            </LogoutConfirmDialog>
           </div>
         </div>
       </section>
@@ -768,15 +774,31 @@ export function PharmacyPortalView() {
           {tab === "settings" && (
             <SectionCard title="Paramètres pharmacie" icon={Settings}>
               <div className="grid gap-3 md:grid-cols-2">
-                {["Modifier mot de passe", "Gérer notifications", "Sécurité du compte", "Confidentialité", "Aide", "Support", "Déconnexion"].map((item) => (
-                  <button key={item} className="flex items-center justify-between rounded-xl border border-border bg-white p-4 text-left font-bold text-foreground hover:border-brand/40 hover:bg-brand-light/40">
-                    <span className="flex items-center gap-2">
-                      {item === "Déconnexion" ? <Lock className="size-4 text-red-600" /> : <Settings className="size-4 text-brand" />}
-                      {item}
-                    </span>
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  </button>
-                ))}
+                {["Modifier mot de passe", "Gérer notifications", "Sécurité du compte", "Confidentialité", "Aide", "Support", "Déconnexion"].map((item) => {
+                  const isLogout = item === "Déconnexion";
+                  const actionButton = (
+                    <button
+                      type="button"
+                      className="flex items-center justify-between rounded-xl border border-border bg-white p-4 text-left font-bold text-foreground hover:border-brand/40 hover:bg-brand-light/40"
+                    >
+                      <span className="flex items-center gap-2">
+                        {isLogout ? <LogOut className="size-4 text-red-600" /> : <Settings className="size-4 text-brand" />}
+                        {item}
+                      </span>
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </button>
+                  );
+
+                  if (isLogout) {
+                    return (
+                      <LogoutConfirmDialog key={item} onConfirm={handlePortalLogout}>
+                        {actionButton}
+                      </LogoutConfirmDialog>
+                    );
+                  }
+
+                  return <div key={item}>{actionButton}</div>;
+                })}
               </div>
             </SectionCard>
           )}

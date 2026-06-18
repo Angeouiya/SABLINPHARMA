@@ -22,6 +22,7 @@ import { Logo } from "@/components/logo";
 import { InventorySyncPanel } from "@/components/views/inventory-sync-panels";
 import { ProfessionalRequestsPanel } from "@/components/views/professional-requests-panel";
 import { ProfessionalActionButton } from "@/components/shared/professional-action-button";
+import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -548,9 +549,11 @@ function AdminShell({ page, pharmacyId, children }: { page: AdminPage; pharmacyI
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <PharmacySelector currentSlug={pharmacyId} />
-            <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={logout}>
-              <LogOut className="size-4" /> Déconnexion
-            </Button>
+            <LogoutConfirmDialog onConfirm={logout}>
+              <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-50">
+                <LogOut className="size-4" /> Déconnexion
+              </Button>
+            </LogoutConfirmDialog>
           </div>
         </div>
       </header>

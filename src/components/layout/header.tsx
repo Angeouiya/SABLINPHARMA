@@ -30,6 +30,7 @@ import {
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
 import { NotificationDropdown } from "@/components/shared/notification-dropdown";
+import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
 import { useNotifications } from "@/store/notifications";
 import { useCredits } from "@/store/credits";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,7 @@ export function Header() {
   const credits = useCredits((s) => s.credits);
   const { unread, fetch: fetchNotifs, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const visibleNavItems = user ? NAV_ITEMS : NAV_ITEMS.filter((item) => !AUTH_ONLY_VIEWS.includes(item.view));
 
   useEffect(() => {
@@ -85,6 +87,12 @@ export function Header() {
         view === "settings" ||
         view === "notifications" ||
         view === "requests"));
+
+  const confirmLogout = async () => {
+    const { logout } = useAuth.getState();
+    await logout();
+    go("home");
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/90">
@@ -199,10 +207,8 @@ export function Header() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={async () => {
-                    const { logout } = useAuth.getState();
-                    await logout();
-                    go("home");
+                  onSelect={() => {
+                    setLogoutConfirmOpen(true);
                   }}
                   className="text-red-600 focus:text-red-700"
                 >
@@ -365,11 +371,7 @@ export function Header() {
             )}
             {user ? (
               <button
-                onClick={async () => {
-                  const { logout } = useAuth.getState();
-                  await logout();
-                  go("home");
-                }}
+                onClick={() => setLogoutConfirmOpen(true)}
                 className="mt-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
               >
                 <LogOut className="size-4" /> Se déconnecter
@@ -389,6 +391,12 @@ export function Header() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <LogoutConfirmDialog
+        open={logoutConfirmOpen}
+        onOpenChange={setLogoutConfirmOpen}
+        onConfirm={confirmLogout}
+      />
     </header>
   );
 }

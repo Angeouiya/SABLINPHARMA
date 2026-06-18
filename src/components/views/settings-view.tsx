@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Loader } from "@/components/shared/loader";
+import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
 import type { UserSettings } from "@/lib/types";
@@ -529,13 +530,14 @@ export function SettingsView() {
           {/* Logout */}
           <Card className="border-border/70">
             <CardContent className="px-6 py-5">
-              <Button
-                variant="outline"
-                className="w-full justify-center gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                onClick={handleLogout}
-              >
-                Se déconnecter
-              </Button>
+              <LogoutConfirmDialog onConfirm={handleLogout}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-center gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  Se déconnecter
+                </Button>
+              </LogoutConfirmDialog>
             </CardContent>
           </Card>
 

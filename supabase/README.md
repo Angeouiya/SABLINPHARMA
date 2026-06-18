@@ -1,6 +1,6 @@
 # SABLIN PHARMA Supabase
 
-Project ref: `umockhnaabuxdmeeyszy`
+Project ref: `pztpdigzgukntmvfsqmt`
 
 Ce dossier contient les migrations PostgreSQL/Supabase de production.
 
@@ -16,7 +16,7 @@ npm run db:supabase:push:url -- "$DATABASE_URL"
 ou avec un projet Supabase lié :
 
 ```bash
-npx supabase link --project-ref umockhnaabuxdmeeyszy
+npx supabase link --project-ref pztpdigzgukntmvfsqmt
 npm run db:supabase:push
 ```
 

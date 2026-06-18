@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+db/
+dev*.log
+*.log
+.playwright-cli/
+tool-results/
+download/
+upload/
+agent-ctx/
+examples/
+mini-services/

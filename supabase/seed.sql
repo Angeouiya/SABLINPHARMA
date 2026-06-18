@@ -1,0 +1,2 @@
+-- Seed SQL intentionally empty.
+-- SABLIN PHARMA uses `npm run db:seed` so Prisma can hash passwords and create relational demo data safely.

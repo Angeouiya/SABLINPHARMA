@@ -1,6 +1,52 @@
 import { PrismaClient } from "@prisma/client";
+import { randomBytes, scryptSync } from "crypto";
 
 const db = new PrismaClient();
+const TABLES = [
+  "AuditLog",
+  "SecurityNotification",
+  "PasswordResetToken",
+  "ProfessionalSessionRecord",
+  "ProfessionalInvitation",
+  "ProfessionalPharmacyMembership",
+  "ProfessionalAccount",
+  "ProfessionalSetting",
+  "ProfessionalActionLog",
+  "RequestRefund",
+  "RequestDispute",
+  "RequestStatusHistory",
+  "ContactUnlock",
+  "PharmacyRequestResponse",
+  "PharmacyRequest",
+  "InventoryConflict",
+  "ProductMapping",
+  "InventorySyncRow",
+  "InventorySyncJob",
+  "InventoryConnection",
+  "EnrichmentProviderConfig",
+  "EnrichmentCandidate",
+  "EnrichmentJob",
+  "InventoryImportRow",
+  "MedicationDescription",
+  "MedicationImage",
+  "MedicationAlias",
+  "MedicationAddRequest",
+  "PharmacyImport",
+  "PharmacyMedication",
+  "PharmacyMedia",
+  "PassOrdonnance",
+  "CreditTransaction",
+  "UserSettings",
+  "Favorite",
+  "SearchHistory",
+  "Notification",
+  "Payment",
+  "Subscription",
+  "Pharmacy",
+  "Medication",
+  "Category",
+  "User",
+] as const;
 
 type MedSeed = {
   name: string;
@@ -132,6 +178,12 @@ function slugify(s: string) {
     .replace(/(^-|-$)/g, "");
 }
 
+function hashUserPassword(password: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
 async function main() {
   console.log("Seeding SABLIN PHARMA database...");
 
@@ -157,14 +209,9 @@ async function main() {
     "/images/pharmacies/pharmacy-4.png",
   ];
 
-  // Clean
-  await db.pharmacyMedication.deleteMany();
-  await db.medication.deleteMany();
-  await db.category.deleteMany();
-  await db.pharmacy.deleteMany();
-  await db.payment.deleteMany();
-  await db.subscription.deleteMany();
-  await db.user.deleteMany();
+  await db.$executeRawUnsafe(
+    `TRUNCATE TABLE ${TABLES.map((table) => `"${table}"`).join(", ")} RESTART IDENTITY CASCADE;`
+  );
 
   // Categories
   const catMap: Record<string, string> = {};
@@ -227,6 +274,59 @@ async function main() {
     }
   }
   console.log(`✓ ${links} liens pharmacie-médicament`);
+
+  await db.user.create({
+    data: {
+      name: "Demo SABLIN",
+      email: "demo@sablinpharma.ci",
+      phone: "+225 07 00 00 00 01",
+      password: hashUserPassword("Demo@12345"),
+      commune: "Cocody",
+      credits: 10,
+      notifications: {
+        create: [
+          {
+            type: "success",
+            title: "Recharge réussie",
+            message: "Votre portefeuille contient 10 crédits SABLIN.",
+            icon: "Coins",
+            link: "wallet",
+          },
+          {
+            type: "info",
+            title: "Pass Ordonnance Unique",
+            message: "Le Pass Ordonnance Unique coûte 500 FCFA et expire après comparaison.",
+            icon: "ClipboardList",
+            link: "prescription",
+          },
+        ],
+      },
+      settings: {
+        create: {
+          pushAlerts: true,
+          dutyAlerts: true,
+          priceAlerts: true,
+          promoAlerts: false,
+          emailRecap: false,
+          language: "fr",
+          theme: "light",
+          defaultCommune: "Cocody",
+        },
+      },
+      creditTransactions: {
+        create: {
+          type: "recharge",
+          amount: 10,
+          description: "Solde démo initial",
+          fcfaEquivalent: 1000,
+          balanceBefore: 0,
+          balanceAfter: 10,
+          status: "réussi",
+        },
+      },
+    },
+  });
+  console.log("✓ utilisateur démo public");
 
   console.log("Seed terminé ✓");
 }

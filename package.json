@@ -11,7 +11,11 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:supabase:push": "supabase db push --include-all",
+    "db:supabase:push:url": "supabase db push --include-all --db-url",
+    "db:supabase:check": "prisma validate && prisma generate"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -90,6 +94,7 @@
     "eslint-config-next": "^16.1.1",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   }
 }

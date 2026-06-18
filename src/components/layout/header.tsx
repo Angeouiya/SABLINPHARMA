@@ -34,6 +34,7 @@ import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
 import { useNotifications } from "@/store/notifications";
 import { useCredits } from "@/store/credits";
 import { cn } from "@/lib/utils";
+import { primaryUserContact } from "@/lib/user-contact";
 import type { View } from "@/lib/types";
 
 const NAV_ITEMS: { label: string; view: View }[] = [
@@ -170,7 +171,7 @@ export function Header() {
                   <div className="flex flex-col gap-0.5">
                     <span className="font-bold">{user.name}</span>
                     <span className="text-xs font-normal text-muted-foreground">
-                      {user.email}
+                      {primaryUserContact(user)}
                     </span>
                     <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-md bg-brand-light px-2 py-0.5 text-[10px] font-bold text-brand-dark">
                       <Coins className="size-3" /> Solde : {credits} crédit{credits > 1 ? "s" : ""}

@@ -186,9 +186,11 @@ export function ProfileView() {
                       <Phone className="size-3.5" /> {user.phone}
                     </span>
                   )}
-                  <span className="flex items-center gap-1">
-                    <Mail className="size-3.5" /> {user.email}
-                  </span>
+                  {user.email && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="size-3.5" /> {user.email}
+                    </span>
+                  )}
                   {user.commune && (
                     <span className="flex items-center gap-1">
                       <MapPin className="size-3.5" /> {user.commune}

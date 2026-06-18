@@ -128,7 +128,7 @@ export interface PharmacyMedication {
 export interface User {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   commune: string | null;
   avatarColor?: string;

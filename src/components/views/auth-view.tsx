@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   Mail,
   Lock,
@@ -45,6 +45,7 @@ import {
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
 import { cn } from "@/lib/utils";
+import { emailIsValid, normalizeEmail, normalizePhone, phoneIsValid } from "@/lib/user-contact";
 import type { User as AuthUser } from "@/lib/types";
 
 const COMMUNES = [
@@ -68,15 +69,6 @@ const BENEFITS = [
   { icon: Timer, text: "Consultez les pharmacies de garde 24/7" },
   { icon: Heart, text: "Gardez vos recherches et pharmacies en favoris" },
 ];
-
-function emailIsValid(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
-function phoneIsValid(phone: string): boolean {
-  const cleaned = phone.replace(/[\s-]/g, "");
-  return /^(\+225)?\d{8,10}$/.test(cleaned);
-}
 
 export function AuthView() {
   const { params, navigate } = useNav();
@@ -102,6 +94,23 @@ export function AuthView() {
   const [showRegConfirm, setShowRegConfirm] = useState(false);
   const [regLoading, setRegLoading] = useState(false);
   const [regErrors, setRegErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("authError");
+    if (!authError) return;
+
+    const message =
+      authError === "google_not_configured"
+        ? "La connexion Google n'est pas encore configurée."
+        : authError === "google_email_unverified"
+        ? "Votre compte Google doit avoir une adresse e-mail vérifiée."
+        : "Connexion Google impossible. Réessayez ou utilisez téléphone/Gmail.";
+
+    toast.error(message);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   // ---------- Login ----------
   function validateLogin() {
@@ -136,14 +145,14 @@ export function AuthView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: isEmail ? loginIdentifier : `${loginIdentifier.replace(/\s/g, "")}@phone.ci`,
+          identifier: isEmail ? normalizeEmail(loginIdentifier) : normalizePhone(loginIdentifier),
           password: loginPassword,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 401) {
-          setLoginErrors({ password: "E-mail ou mot de passe incorrect." });
+          setLoginErrors({ password: "Identifiant ou mot de passe incorrect." });
         } else {
           toast.error(data?.error ?? "Connexion impossible.");
         }
@@ -164,14 +173,15 @@ export function AuthView() {
   function validateRegister() {
     const errors: Record<string, string> = {};
     if (!regName.trim()) errors.name = "Le nom complet est obligatoire.";
-    if (!regEmail.trim()) {
-      errors.email = "L'e-mail est obligatoire.";
-    } else if (!emailIsValid(regEmail)) {
+    const hasEmail = !!regEmail.trim();
+    const hasPhone = !!regPhone.trim();
+    if (!hasEmail && !hasPhone) {
+      errors.contact = "Saisissez votre numéro de téléphone, votre Gmail, ou les deux.";
+    }
+    if (hasEmail && !emailIsValid(regEmail)) {
       errors.email = "Format d'e-mail invalide.";
     }
-    if (!regPhone.trim()) {
-      errors.phone = "Le téléphone est obligatoire.";
-    } else if (!phoneIsValid(regPhone)) {
+    if (hasPhone && !phoneIsValid(regPhone)) {
       errors.phone = "Numéro invalide. Ex : 07 00 00 00 00";
     }
     if (!regCommune) errors.commune = "Veuillez sélectionner votre commune.";
@@ -201,16 +211,19 @@ export function AuthView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: regName,
-          email: regEmail,
+          email: normalizeEmail(regEmail),
           password: regPassword,
-          phone: regPhone,
+          phone: normalizePhone(regPhone),
           commune: regCommune,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 409) {
-          setRegErrors({ email: "Un compte existe déjà avec cet e-mail." });
+          const field = data?.field === "phone" ? "phone" : "email";
+          setRegErrors({ [field]: data?.error ?? "Un compte existe déjà avec ces informations." });
+        } else if (data?.field === "phone" || data?.field === "email") {
+          setRegErrors({ [data.field]: data?.error ?? "Information invalide." });
         } else {
           toast.error(data?.error ?? "Inscription impossible.");
         }
@@ -227,9 +240,13 @@ export function AuthView() {
     }
   }
 
+  function handleGoogleAuth() {
+    window.location.href = "/api/auth/google/start";
+  }
+
   function handleQuickAuth(provider: string) {
     toast.info(`${provider} bientôt disponible.`, {
-      description: "Utilisez l'e-mail/téléphone pour le moment.",
+      description: "Utilisez le formulaire téléphone ou Gmail pour le moment.",
     });
   }
 
@@ -402,7 +419,7 @@ export function AuthView() {
                       type="button"
                       variant="outline"
                       className="h-11"
-                      onClick={() => handleQuickAuth("Connexion Google")}
+                      onClick={handleGoogleAuth}
                     >
                       <GoogleIcon /> Google
                     </Button>
@@ -437,8 +454,8 @@ export function AuthView() {
                       Créer votre compte
                     </h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Quelques informations suffisent pour profiter de tous les
-                      services SABLIN PHARMA.
+                      Renseignez votre téléphone, votre Gmail, ou les deux pour
+                      profiter de tous les services SABLIN PHARMA.
                     </p>
                   </div>
 
@@ -470,29 +487,38 @@ export function AuthView() {
                           setRegPhone(v);
                           if (regErrors.phone)
                             setRegErrors((e) => ({ ...e, phone: "" }));
+                          if (regErrors.contact)
+                            setRegErrors((e) => ({ ...e, contact: "" }));
                         }}
                         error={regErrors.phone}
                         disabled={regLoading}
                         autoComplete="tel"
-                        required
                       />
                       <Field
                         id="reg-email"
-                        label="E-mail"
+                        label="Gmail ou e-mail"
                         icon={Mail}
-                        placeholder="vous@exemple.ci"
+                        placeholder="vous@gmail.com"
                         value={regEmail}
                         onChange={(v) => {
                           setRegEmail(v);
                           if (regErrors.email)
                             setRegErrors((e) => ({ ...e, email: "" }));
+                          if (regErrors.contact)
+                            setRegErrors((e) => ({ ...e, contact: "" }));
                         }}
                         error={regErrors.email}
                         disabled={regLoading}
                         autoComplete="email"
-                        required
                       />
                     </div>
+                    {regErrors.contact ? (
+                      <FieldError msg={regErrors.contact} />
+                    ) : (
+                      <p className="-mt-2 text-xs font-medium text-muted-foreground">
+                        Au moins un contact est requis : téléphone, Gmail/e-mail, ou les deux.
+                      </p>
+                    )}
 
                     {/* Commune */}
                     <div className="space-y-1.5">
@@ -656,7 +682,7 @@ export function AuthView() {
                       type="button"
                       variant="outline"
                       className="h-11"
-                      onClick={() => handleQuickAuth("Inscription Google")}
+                      onClick={handleGoogleAuth}
                     >
                       <GoogleIcon /> Google
                     </Button>

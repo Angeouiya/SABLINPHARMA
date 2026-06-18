@@ -85,6 +85,7 @@ export function ProfileView() {
   const { user, logout } = useAuth();
   const credits = useCredits((s) => s.credits);
   const hasPass = useCredits((s) => s.hasPass);
+  const passStatus = useCredits((s) => s.passStatus);
   const transactions = useCredits((s) => s.transactions);
   const unreadCount = useNotifications((s) => s.unread);
   const notifications = useNotifications((s) => s.notifications);
@@ -107,7 +108,7 @@ export function ProfileView() {
   if (!user) {
     return (
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col items-center justify-center px-4 py-12">
-        <Card className="w-full border-border/70 p-8 text-center shadow-premium">
+        <Card className="w-full border-border/70 p-8 text-center shadow-avance">
           <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-full bg-brand-light">
             <CircleUser className="size-10 text-brand" />
           </div>
@@ -121,7 +122,7 @@ export function ProfileView() {
           <div className="mt-6 flex flex-col gap-2.5">
             <Button
               onClick={() => navigate("auth", { authMode: "login" })}
-              className="h-11 w-full bg-brand-gradient text-base font-semibold text-white shadow-premium transition-all hover:opacity-95 hover:shadow-premium-lg"
+              className="h-11 w-full bg-brand text-base font-semibold text-white shadow-avance transition-all hover:opacity-95 hover:shadow-avance-lg"
             >
               Se connecter
             </Button>
@@ -165,8 +166,8 @@ export function ProfileView() {
       </button>
 
       {/* ============ PROFILE CARD ============ */}
-      <Card className="overflow-hidden border-border/70 py-0 shadow-premium">
-        <div className="relative bg-brand-gradient">
+      <Card className="overflow-hidden border-border/70 py-0 shadow-avance">
+        <div className="relative bg-brand">
           <div className="absolute inset-0 bg-dotted-white opacity-15" />
           <div className="absolute -right-12 -top-12 size-44 rounded-full bg-white/10 blur-3xl" />
           <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
@@ -218,7 +219,7 @@ export function ProfileView() {
       </Card>
 
       {/* ============ MON PORTEFEUILLE ============ */}
-      <Card className="mt-6 border-border/70 bg-brand-light p-6 shadow-premium">
+      <Card className="mt-6 border-border/70 bg-brand-light p-6 shadow-avance">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2.5">
@@ -233,7 +234,7 @@ export function ProfileView() {
                   Crédits SABLIN PHARMA
                   {hasPass && (
                     <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                      <ClipboardList className="size-2.5" /> Pass Ordonnance
+                      <ClipboardList className="size-2.5" /> Pass Ordonnance Unique
                     </span>
                   )}
                 </p>
@@ -269,7 +270,7 @@ export function ProfileView() {
               onClick={() => navigate("payment", { passOrdonnance: true })}
               className="border-amber-500/50 bg-amber-50 text-amber-900 hover:bg-amber-100"
             >
-              <ClipboardList className="size-4" /> Acheter un Pass Ordonnance
+              <ClipboardList className="size-4" /> Acheter un Pass Ordonnance Unique
             </Button>
             <Button
               variant="outline"
@@ -283,7 +284,7 @@ export function ProfileView() {
       </Card>
 
       {/* ============ COMPRENDRE MES CRÉDITS ============ */}
-      <Card className="mt-6 border-border/70 p-6 shadow-premium">
+      <Card className="mt-6 border-border/70 p-6 shadow-avance">
         <div className="flex items-center gap-2.5">
           <span className="flex size-10 items-center justify-center rounded-xl bg-brand text-white">
             <Coins className="size-5" />
@@ -451,7 +452,7 @@ export function ProfileView() {
           <section>
             <SectionTitle icon={CheckCircle2} title="Mes accès SABLIN PHARMA" />
             <div className="grid gap-4 sm:grid-cols-2">
-              {/* Bloc : Fonctionnalités gratuites */}
+              {/* Bloc : Fonctionnalités couvertes */}
               <Card className="border-success/30 bg-success-light/20 p-5">
                 <div className="flex items-center gap-2.5">
                   <span className="flex size-10 items-center justify-center rounded-xl bg-success text-white">
@@ -459,7 +460,7 @@ export function ProfileView() {
                   </span>
                   <div>
                     <h3 className="text-base font-bold text-foreground">
-                      Fonctionnalités gratuites
+                      Fonctionnalités couvertes
                     </h3>
                     <p className="text-xs text-muted-foreground">
                       Accessibles à tous, sans crédits
@@ -571,8 +572,35 @@ export function ProfileView() {
                 <li className="flex items-start gap-3 text-sm text-foreground/85">
                   <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
                   <span>
+                    Sans crédit, la comparaison des prix et les confirmations sont verrouillées.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <Lock className="mt-0.5 size-4 shrink-0 text-danger" />
+                  <span>
                     Sans crédit, vous ne pouvez pas envoyer une demande de conseil.
                   </span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <ClipboardList className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <span>
+                    Sans Pass Ordonnance Unique actif, une ordonnance ne peut pas être traitée avec pass.
+                  </span>
+                </li>
+                <li className="flex items-start gap-3 text-sm text-foreground/85">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <span>
+                    Un pass utilisé est expiré et ne peut jamais être réutilisé pour une nouvelle ordonnance.
+                  </span>
+                </li>
+                <li className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                  <span className="font-semibold text-foreground">Statut actuel du pass</span>
+                  <Badge className={cn(
+                    "border-0",
+                    hasPass ? "bg-success text-white" : "bg-muted text-foreground"
+                  )}>
+                    {hasPass ? "Pass actif" : passStatus === "expired" ? "Pass expiré" : "Aucun pass"}
+                  </Badge>
                 </li>
                 <li className="flex items-start gap-3 rounded-xl bg-success-light/40 p-3 text-sm font-bold text-foreground">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
@@ -636,7 +664,7 @@ export function ProfileView() {
             {savedPrescriptions.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2">
                 {savedPrescriptions.slice(0, 4).map((rx) => (
-                  <Card key={rx.id} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+                  <Card key={rx.id} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-avance">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
                         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
@@ -833,7 +861,7 @@ function FavPharmacyCard({ fav }: { fav: FavoriteItem }) {
   const { navigate } = useNav();
   const meta = fav.meta ? JSON.parse(fav.meta) : null;
   return (
-    <Card className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+    <Card className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-avance">
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
           <MapPin className="size-5" />
@@ -910,7 +938,7 @@ function FictivePrescriptions() {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {items.map((rx) => (
-        <Card key={rx.id} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+        <Card key={rx.id} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-avance">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
@@ -948,7 +976,7 @@ function FictiveFavorites() {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {items.map((p, i) => (
-        <Card key={i} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium">
+        <Card key={i} className="border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-avance">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
               <MapPin className="size-5" />

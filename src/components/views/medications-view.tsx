@@ -222,7 +222,7 @@ export function MedicationsView() {
       </div>
 
       {/* ============ SEARCH ZONE ============ */}
-      <Card className="mt-6 border-border/70 p-4 shadow-premium sm:p-5">
+      <Card className="mt-6 border-border/70 p-4 shadow-avance sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
@@ -251,7 +251,7 @@ export function MedicationsView() {
           </div>
           <Button
             size="lg"
-            className="h-12 shrink-0 bg-brand-gradient text-white hover:opacity-90"
+            className="h-12 shrink-0 bg-brand text-white hover:opacity-90"
             onClick={() => {
               const q = query.trim();
               if (q) navigate("medications", { query: q });
@@ -309,7 +309,7 @@ export function MedicationsView() {
                       }))
                     }
                     className={cn(
-                      "group flex flex-col items-center gap-2.5 rounded-2xl border p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-premium",
+                      "group flex flex-col items-center gap-2.5 rounded-2xl border p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-avance",
                       active
                         ? "border-brand bg-brand-light"
                         : "border-border/60 bg-background hover:border-brand/30"

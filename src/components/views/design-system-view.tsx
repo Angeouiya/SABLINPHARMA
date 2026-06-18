@@ -218,8 +218,8 @@ const SECTIONS = [
   { id: "formulaire", label: "Formulaire" },
 ] as const;
 
-const premiumBenefits = [
-  "Estimations d'ordonnance illimitées et prioritaires",
+const avanceBenefits = [
+  "Estimations d'ordonnance par crédits et prioritaires",
   "Alertes de prix et de stock en temps réel",
   "Notifications de pharmacie de garde personnalisées",
   "Accès anticipé aux nouveaux médicaments référencés",
@@ -302,7 +302,7 @@ export function DesignSystemView() {
   return (
     <div className="min-h-screen bg-background">
       {/* ─────────── Hero ─────────── */}
-      <header className="relative overflow-hidden bg-brand-gradient">
+      <header className="relative overflow-hidden bg-brand">
         <div className="bg-dotted-white absolute inset-0 opacity-30" />
         <div className="relative mx-auto max-w-6xl px-4 py-12 sm:py-16">
           <button
@@ -323,7 +323,7 @@ export function DesignSystemView() {
                 <p className="max-w-xl text-sm leading-relaxed text-white/85 sm:text-base">
                   L&apos;identité visuelle de SABLIN PHARMA — composants,
                   couleurs, typographie. Une référence vivante pour des
-                  interfaces pharmaceutiques modernes et premium.
+                  interfaces pharmaceutiques modernes et avance.
                 </p>
               </div>
             </div>
@@ -478,13 +478,13 @@ export function DesignSystemView() {
                 <SubTitle>Dégradés & utilitaires</SubTitle>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="overflow-hidden rounded-lg border border-border/60">
-                    <div className="bg-brand-gradient h-16" />
+                    <div className="bg-brand h-16" />
                     <div className="bg-background p-2.5">
                       <p className="text-sm font-semibold text-foreground">
-                        bg-brand-gradient
+                        bg-brand
                       </p>
                       <p className="font-mono text-xs text-muted-foreground">
-                        Hero, en-têtes premium
+                        Hero, en-têtes avance
                       </p>
                     </div>
                   </div>
@@ -577,14 +577,14 @@ export function DesignSystemView() {
               id="boutons"
               eyebrow="Actions"
               title="Boutons"
-              description="Neuf variantes couvrant tous les contextes d'action : principal, gradient premium, contour, secondaire, fantôme, destructeur, succès, avertissement et lien."
+              description="Neuf variantes couvrant tous les contextes d'action : principal, principal, contour, secondaire, fantôme, destructeur, succès, avertissement et lien."
             >
               <div className="space-y-5">
                 <div className="space-y-2">
                   <SubTitle>Variantes</SubTitle>
                   <div className="flex flex-wrap gap-3">
                     <Button variant="default">Default</Button>
-                    <Button variant="brand-gradient">Brand Gradient</Button>
+                    <Button variant="default">Brand</Button>
                     <Button variant="outline">Outline</Button>
                     <Button variant="secondary">Secondary</Button>
                     <Button variant="ghost">Ghost</Button>
@@ -618,13 +618,13 @@ export function DesignSystemView() {
                       <Eye className="size-4" />
                       Voir détails
                     </Button>
-                    <Button variant="brand-gradient">
+                    <Button variant="default">
                       <Crown className="size-4" />
                       Recharger
                     </Button>
                     <Button variant="outline">
                       <ClipboardList className="size-4" />
-                      Estimer ordonnance
+                      Comparer ordonnance
                     </Button>
                     <Button variant="success">
                       <Phone className="size-4" />
@@ -642,7 +642,7 @@ export function DesignSystemView() {
                   <div className="flex flex-wrap items-center gap-3">
                     <Button>Normal</Button>
                     <Button disabled>Désactivé</Button>
-                    <Button variant="brand-gradient" disabled>
+                    <Button variant="default" disabled>
                       <Crown className="size-4" />
                       Crédits désactivé
                     </Button>
@@ -696,7 +696,7 @@ export function DesignSystemView() {
               id="cartes"
               eyebrow="Composants produits"
               title="Cartes"
-              description="Cartes premium pour présenter médicaments et pharmacies. Effets de survol subtils (translation, bordure brand, ombre premium)."
+              description="Cartes avance pour présenter médicaments et pharmacies. Effets de survol subtils (translation, bordure brand, ombre avance)."
             >
               <div className="space-y-6">
                 <div className="space-y-2">
@@ -743,7 +743,7 @@ export function DesignSystemView() {
               id="stats"
               eyebrow="Indicateurs"
               title="Statistiques"
-              description="Blocs de statistiques premium avec icône colorée, valeur en gras et label. Six tonalités disponibles pour s'adapter au contexte."
+              description="Blocs de statistiques avance avec icône colorée, valeur en gras et label. Six tonalités disponibles pour s'adapter au contexte."
             >
               <div className="space-y-5">
                 <div className="space-y-2">
@@ -934,8 +934,8 @@ export function DesignSystemView() {
 
             {/* ─────────── 9. Portefeuille Crédits ─────────── */}
             <section id="portefeuille" className="scroll-mt-24">
-              <Card className="overflow-hidden border-brand/20 py-0 shadow-premium-lg">
-                <div className="relative bg-brand-gradient p-6 text-white">
+              <Card className="overflow-hidden border-brand/20 py-0 shadow-avance-lg">
+                <div className="relative bg-brand p-6 text-white">
                   <div className="bg-dotted-white absolute inset-0 opacity-30" />
                   <div className="relative flex items-start justify-between gap-4">
                     <div className="space-y-1">
@@ -959,13 +959,13 @@ export function DesignSystemView() {
                       500
                     </span>
                     <span className="text-base font-medium text-white/85">
-                      FCFA / mois
+                      FCFA
                     </span>
                   </div>
                 </div>
                 <CardContent className="space-y-5 p-6">
                   <ul className="space-y-2.5">
-                    {premiumBenefits.map((b) => (
+                    {avanceBenefits.map((b) => (
                       <li key={b} className="flex items-start gap-2.5">
                         <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-brand" />
                         <Text size="sm">{b}</Text>
@@ -976,7 +976,7 @@ export function DesignSystemView() {
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button
                       size="lg"
-                      className="flex-1 bg-brand-gradient text-white hover:opacity-90"
+                      className="flex-1 bg-brand text-white hover:opacity-90"
                     >
                       <Crown className="size-4" />
                       Recharger
@@ -1131,7 +1131,7 @@ export function DesignSystemView() {
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <Button
                       type="submit"
-                      className="flex-1 bg-brand-gradient text-white hover:opacity-90"
+                      className="flex-1 bg-brand text-white hover:opacity-90"
                     >
                       <Lock className="size-4" />
                       Envoyer la demande
@@ -1153,7 +1153,7 @@ export function DesignSystemView() {
               <Globe className="size-4 text-brand" />
               <Muted size="sm">
                 SABLIN PHARMA Design System v1.0 — Composants réutilisables
-                pour une plateforme pharmaceutique moderne et premium.
+                pour une plateforme pharmaceutique moderne et avance.
               </Muted>
             </div>
             <div className="flex items-center gap-1.5 rounded-full bg-brand-light px-3 py-1.5">

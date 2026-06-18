@@ -79,7 +79,7 @@ const SERVICES = [
   { icon: Timer, label: "Pharmacie de garde", desc: "Disponible en dehors des heures habituelles" },
   { icon: Baby, label: "Produits bébé", desc: "Lait infantile, couches, soins pédiatriques" },
   { icon: Package, label: "Parapharmacie", desc: "Cosmétiques, compléments, bien-être" },
-  { icon: HeartPulse, label: "Suivi de la tension", desc: "Mesure gratuite de la tension artérielle" },
+  { icon: HeartPulse, label: "Suivi de la tension", desc: "Mesure incluse de la tension artérielle" },
   { icon: Plus, label: "Première urgence", desc: "Pansements, antiseptiques, sérum physiologique" },
 ];
 
@@ -105,6 +105,7 @@ export function PharmacyDetailView() {
   const [pricesUnlocked, setPricesUnlocked] = useState(false);
   const [contactUnlocked, setContactUnlocked] = useState(false);
   const [whatsappUnlocked, setWhatsappUnlocked] = useState(false);
+  const [unlockedPhone, setUnlockedPhone] = useState("");
   const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
   const [showPricesDialog, setShowPricesDialog] = useState(false);
   const [showCompareDialog, setShowCompareDialog] = useState(false);
@@ -114,7 +115,7 @@ export function PharmacyDetailView() {
   const [showAdviceDialog, setShowAdviceDialog] = useState(false);
   const [showConfirmPriceDialog, setShowConfirmPriceDialog] = useState(false);
   const [showConfirmFullDialog, setShowConfirmFullDialog] = useState(false);
-  const { hasPass } = useCredits();
+  const refreshCredits = useCredits((s) => s.fetch);
 
   useEffect(() => {
     if (!params.slug) {
@@ -128,6 +129,7 @@ export function PharmacyDetailView() {
     setPricesUnlocked(false);
     setContactUnlocked(false);
     setWhatsappUnlocked(false);
+    setUnlockedPhone("");
     (async () => {
       try {
         const r = await fetch(`/api/pharmacies/${params.slug}`);
@@ -187,7 +189,7 @@ export function PharmacyDetailView() {
           Cette pharmacie n&apos;existe pas ou le lien est incorrect.
         </p>
         <Button
-          className="mt-4 bg-brand-gradient text-white"
+          className="mt-4 bg-brand text-white"
           onClick={() => navigate("pharmacies")}
         >
           <ChevronLeft className="size-4" /> Retour aux pharmacies
@@ -197,11 +199,25 @@ export function PharmacyDetailView() {
   }
 
   const mapsUrl = `https://www.google.com/maps?q=${pharmacy.latitude},${pharmacy.longitude}`;
-  const phoneHref = `tel:${pharmacy.phone.replace(/\s/g, "")}`;
-  const whatsappHref = `https://wa.me/${pharmacy.phone.replace(/[^0-9]/g, "")}`;
-  const phoneDisplay = pharmacy.phone.replace("+225 ", "");
-  const contactVisible = contactUnlocked || hasPass;
-  const whatsappVisible = whatsappUnlocked || hasPass;
+  const phoneDisplay = unlockedPhone.replace("+225 ", "");
+  const contactVisible = contactUnlocked && !!unlockedPhone;
+  const whatsappVisible = whatsappUnlocked && !!unlockedPhone;
+  const unlockContact = async (action: "phone" | "whatsapp") => {
+    const res = await fetch(`/api/pharmacies/${pharmacy.slug}/contact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error ?? "Contact impossible à débloquer");
+    }
+    setUnlockedPhone(data.phone);
+    if (action === "phone") setContactUnlocked(true);
+    if (action === "whatsapp") setWhatsappUnlocked(true);
+    await refreshCredits();
+    toast.success("Contact débloqué avec succès");
+  };
   const dist = distanceKm(
     ABIDJAN_CENTER.lat,
     ABIDJAN_CENTER.lon,
@@ -227,7 +243,7 @@ export function PharmacyDetailView() {
       </button>
 
       {/* ============ FICHE PHARMACIE (header) ============ */}
-      <Card className="overflow-hidden border-border/70 py-0 shadow-premium">
+      <Card className="overflow-hidden border-border/70 py-0 shadow-avance">
         <div className="relative bg-brand">
           {pharmacy.imageUrl && (
             <img
@@ -303,12 +319,42 @@ export function PharmacyDetailView() {
               {dist <= 5 && (
                 <StatusChip icon={Navigation} label="À proximité" tone="info" />
               )}
-              <StatusChip icon={Truck} label="Livraison disponible" tone="neutral" />
+              <StatusChip icon={CheckCircle2} label="Information et orientation" tone="neutral" />
               <StatusChip icon={Smartphone} label="Paiement mobile" tone="neutral" />
             </div>
           </div>
         </div>
       </Card>
+
+      {pharmacy.publicMedia && pharmacy.publicMedia.length > 0 ? (
+        <Card className="mt-4 border-border/70 p-4 shadow-card">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <Heading level="h2" className="text-lg">Photos publiques validées</Heading>
+              <Muted>Logo, façade, extérieur et couverture visibles côté utilisateur après validation SABLIN.</Muted>
+            </div>
+            <Badge className="border-0 bg-success-light text-success">Images publiques</Badge>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {pharmacy.publicMedia.slice(0, 4).map((media) => (
+              <div key={media.id} className="overflow-hidden rounded-xl border border-border bg-white">
+                <div className="aspect-[4/3] bg-muted">
+                  <img src={media.url} alt={media.title} className="size-full object-cover" />
+                </div>
+                <div className="p-3">
+                  <p className="text-sm font-bold text-foreground">{media.title}</p>
+                  <p className="mt-1 text-xs font-semibold text-muted-foreground">{media.usage ?? media.type}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : (
+        <Card className="mt-4 border-border/70 p-4 shadow-card">
+          <Heading level="h2" className="text-lg">Photo de la pharmacie non disponible</Heading>
+          <Muted>Une photo publique validée par SABLIN PHARMA sera affichée dès qu’elle sera disponible.</Muted>
+        </Card>
+      )}
 
       {/* ============ LAYOUT: infos left + actions/map right ============ */}
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -397,7 +443,7 @@ export function PharmacyDetailView() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <InfoCard icon={MapPin} label="Adresse" value={pharmacy.address} sub={`${pharmacy.commune}, Abidjan`} />
               {/* Téléphone verrouillé tant que non débloqué */}
-              <Card className="border-border/70 p-4 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium">
+              <Card className="border-border/70 p-4 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance">
                 <div className="flex items-start gap-3">
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
                     <Phone className="size-5" />
@@ -413,7 +459,7 @@ export function PharmacyDetailView() {
                         </p>
                         <p className="text-xs text-muted-foreground">Appel direct</p>
                         <Button size="sm" asChild className="bg-brand text-white hover:bg-brand-dark">
-                          <a href={phoneHref}>
+                          <a href={`tel:${unlockedPhone.replace(/\s/g, "")}`}>
                             <Phone className="size-3.5" /> Appeler
                           </a>
                         </Button>
@@ -449,13 +495,13 @@ export function PharmacyDetailView() {
         {/* RIGHT: Actions + Map */}
         <div className="space-y-4">
           {/* Contact actions */}
-          <Card className="border-border/70 p-4 shadow-premium">
+          <Card className="border-border/70 p-4 shadow-avance">
             <h3 className="mb-3 text-sm font-bold text-foreground">Actions rapides</h3>
             <div className="grid grid-cols-2 gap-2">
               {/* Appeler — verrouillé tant que contact non débloqué */}
               {contactVisible ? (
                 <Button size="sm" className="bg-brand text-white hover:bg-brand-dark" asChild>
-                  <a href={phoneHref}>
+                  <a href={`tel:${unlockedPhone.replace(/\s/g, "")}`}>
                     <Phone className="size-4" /> Appeler
                   </a>
                 </Button>
@@ -472,7 +518,7 @@ export function PharmacyDetailView() {
               {/* WhatsApp — verrouillé tant que non débloqué */}
               {whatsappVisible ? (
                 <Button size="sm" variant="outline" asChild>
-                  <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                  <a href={`https://wa.me/${unlockedPhone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer">
                     <MessageCircle className="size-4" /> WhatsApp
                   </a>
                 </Button>
@@ -531,16 +577,11 @@ export function PharmacyDetailView() {
               variant="outline"
               className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
               onClick={() => {
-                if (hasPass) {
-                  toast.success("Comparaison lancée");
-                  navigate("pharmacies");
-                } else {
-                  setShowCompareDialog(true);
-                }
+                setShowCompareDialog(true);
               }}
             >
               <MapPinned className="size-4" /> Comparer avec d'autres pharmacies
-              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.comparePharmacies} className="ml-1" />
+              <CreditCost cost={CREDIT_COSTS.comparePharmacies} className="ml-1" />
             </Button>
 
             {/* Demander conseil — 2 crédits */}
@@ -549,17 +590,11 @@ export function PharmacyDetailView() {
               variant="outline"
               className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
               onClick={() => {
-                if (hasPass) {
-                  toast.success("Demande de conseil envoyée", {
-                    description: "La pharmacie vous répondra par téléphone ou WhatsApp.",
-                  });
-                } else {
-                  setShowAdviceDialog(true);
-                }
+                setShowAdviceDialog(true);
               }}
             >
               <Lightbulb className="size-4" /> Demander conseil
-              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.advicePharmacy} className="ml-1" />
+              <CreditCost cost={CREDIT_COSTS.advicePharmacy} className="ml-1" />
             </Button>
 
             {/* Confirmer disponibilité — 3 crédits */}
@@ -567,17 +602,11 @@ export function PharmacyDetailView() {
               size="sm"
               className="mt-2 w-full bg-brand text-white hover:bg-brand-dark"
               onClick={() => {
-                if (hasPass) {
-                  toast.success("Demande de confirmation envoyée", {
-                    description: "La pharmacie vous rappellera pour confirmer le stock.",
-                  });
-                } else {
-                  setShowConfirmDialog(true);
-                }
+                setShowConfirmDialog(true);
               }}
             >
               <CheckCircle2 className="size-4" /> Confirmer disponibilité
-              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.confirmAvailability} className="ml-1" />
+              <CreditCost cost={CREDIT_COSTS.confirmAvailability} className="ml-1" />
             </Button>
 
             {/* Confirmer prix — 3 crédits */}
@@ -586,17 +615,11 @@ export function PharmacyDetailView() {
               variant="outline"
               className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
               onClick={() => {
-                if (hasPass) {
-                  toast.success("Demande de confirmation de prix envoyée", {
-                    description: "La pharmacie vous confirmera le prix avant votre déplacement.",
-                  });
-                } else {
-                  setShowConfirmPriceDialog(true);
-                }
+                setShowConfirmPriceDialog(true);
               }}
             >
               <Coins className="size-4" /> Confirmer prix
-              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.confirmPrice} className="ml-1" />
+              <CreditCost cost={CREDIT_COSTS.confirmPrice} className="ml-1" />
             </Button>
 
             {/* Confirmation complète — 4 crédits */}
@@ -605,17 +628,11 @@ export function PharmacyDetailView() {
               variant="outline"
               className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
               onClick={() => {
-                if (hasPass) {
-                  toast.success("Demande de confirmation complète envoyée", {
-                    description: "Vérification médicament + prix + disponibilité en cours.",
-                  });
-                } else {
-                  setShowConfirmFullDialog(true);
-                }
+                setShowConfirmFullDialog(true);
               }}
             >
               <CheckCircle2 className="size-4" /> Confirmation complète
-              <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.confirmFull} className="ml-1" />
+              <CreditCost cost={CREDIT_COSTS.confirmFull} className="ml-1" />
             </Button>
           </Card>
 
@@ -667,9 +684,9 @@ export function PharmacyDetailView() {
         </div>
 
         {/* Bannières de déverrouillage créditées : disponibilité + prix */}
-        {(!hasPass || !availabilityUnlocked || !pricesUnlocked) && (
+        {(!availabilityUnlocked || !pricesUnlocked) && (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {!hasPass && !availabilityUnlocked && (
+            {!availabilityUnlocked && (
               <Card className="border-brand/20 p-4">
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start gap-3">
@@ -696,7 +713,7 @@ export function PharmacyDetailView() {
                 </div>
               </Card>
             )}
-            {!hasPass && !pricesUnlocked && (
+            {!pricesUnlocked && (
               <Card className="border-brand/20 p-4">
                 <div className="flex flex-col gap-3">
                   <div className="flex items-start gap-3">
@@ -741,7 +758,7 @@ export function PharmacyDetailView() {
                 <Card
                   key={m.id}
                   className={cn(
-                    "border-border/60 py-0 transition-all hover:border-brand/30 hover:shadow-premium",
+                    "border-border/60 py-0 transition-all hover:border-brand/30 hover:shadow-avance",
                     !m.inStock && "opacity-70"
                   )}
                 >
@@ -776,14 +793,14 @@ export function PharmacyDetailView() {
                       </div>
                     </button>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      {(hasPass || pricesUnlocked) ? (
+                      {pricesUnlocked ? (
                         <Price amount={m.price} size="sm" variant="brand" />
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
                           <Lock className="size-2.5" /> Prix masqué
                         </span>
                       )}
-                      {(hasPass || availabilityUnlocked) ? (
+                      {availabilityUnlocked ? (
                         <MedStatusBadge status={status} />
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
@@ -797,7 +814,7 @@ export function PharmacyDetailView() {
                       className="shrink-0 border-brand/30 text-brand-dark hover:bg-brand-light"
                       onClick={() => {
                         toast.success(`${m.name} ajouté à votre ordonnance`, {
-                          description: "Retrouvez-le dans la page Estimer mon ordonnance.",
+                          description: "Retrouvez-le dans la page Comparer les prix des pharmacies.",
                         });
                       }}
                     >
@@ -825,7 +842,7 @@ export function PharmacyDetailView() {
           {SERVICES.map((s) => (
             <Card
               key={s.label}
-              className="gap-0 border-border/60 p-4 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium"
+              className="gap-0 border-border/60 p-4 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance"
             >
               <div className="flex items-start gap-3">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
@@ -918,9 +935,10 @@ export function PharmacyDetailView() {
         benefits={[
           "Voir le numéro de téléphone",
           "Bouton Appeler débloqué",
-          "Contact accessible pendant 24h",
+          "Contact débloqué après validation",
         ]}
-        onConfirm={() => setContactUnlocked(true)}
+        debitOnConfirm={false}
+        onConfirm={() => unlockContact("phone")}
       />
       <CreditConfirmDialog
         open={showWhatsappDialog}
@@ -933,7 +951,8 @@ export function PharmacyDetailView() {
           "Conversation écrite",
           "Partage de documents possibles",
         ]}
-        onConfirm={() => setWhatsappUnlocked(true)}
+        debitOnConfirm={false}
+        onConfirm={() => unlockContact("whatsapp")}
       />
       <CreditConfirmDialog
         open={showAdviceDialog}
@@ -1074,7 +1093,7 @@ function InfoCard({
   );
   if (href) {
     return (
-      <Card className="border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium">
+      <Card className="border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance">
         <a href={href} className="block">
           {content}
         </a>
@@ -1082,7 +1101,7 @@ function InfoCard({
     );
   }
   return (
-    <Card className="border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium">
+    <Card className="border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance">
       {content}
     </Card>
   );

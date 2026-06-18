@@ -236,7 +236,7 @@ export function PharmaciesView() {
       </div>
 
       {/* ============ SEARCH ZONE ============ */}
-      <Card className="mt-6 border-border/70 p-4 shadow-premium sm:p-5">
+      <Card className="mt-6 border-border/70 p-4 shadow-avance sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
@@ -259,7 +259,7 @@ export function PharmaciesView() {
           </div>
           <Button
             size="lg"
-            className="h-12 shrink-0 bg-brand-gradient text-white hover:opacity-90"
+            className="h-12 shrink-0 bg-brand text-white hover:opacity-90"
           >
             <Search className="size-4" /> Rechercher
           </Button>
@@ -314,7 +314,7 @@ export function PharmaciesView() {
       {/* ============ ON-DUTY SECTION (highlighted) ============ */}
       {!loading && onDutyPharmacies.length > 0 && (
         <section className="mt-6">
-          <Card className="overflow-hidden border-amber-500/30 py-0 shadow-premium">
+          <Card className="overflow-hidden border-amber-500/30 py-0 shadow-avance">
             <div className="flex items-center gap-3 border-b border-amber-500/20 bg-amber-50 px-5 py-3.5">
               <span className="flex size-10 items-center justify-center rounded-xl bg-amber-400 text-amber-950">
                 <Timer className="size-5" />
@@ -653,7 +653,7 @@ function OnDutyMiniCard({ pharma }: { pharma: Pharmacy & { distance?: number } }
   return (
     <button
       onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
-      className="group flex items-center gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all hover:border-brand/30 hover:shadow-premium"
+      className="group flex items-center gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all hover:border-brand/30 hover:shadow-avance"
     >
       <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
         <Plus className="size-5" strokeWidth={3} />
@@ -698,7 +698,7 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
   const todayHours = pharma.hoursWeekday;
 
   return (
-    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg">
+    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-avance-lg">
       {/* Header banner */}
       <div className="relative flex items-center justify-between bg-brand px-4 py-3">
         {pharma.imageUrl && (

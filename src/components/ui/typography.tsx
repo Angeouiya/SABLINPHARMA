@@ -108,7 +108,7 @@ export function Muted({
 }
 
 /* ============================================================
-   Price — affichage premium des montants en FCFA
+   Price — affichage avance des montants en FCFA
    ============================================================ */
 
 interface PriceProps {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { clearSession } from "@/lib/auth/session";
+import { detachSession } from "@/lib/auth/session";
 
 export async function POST() {
-  await clearSession();
-  return NextResponse.json({ ok: true });
+  const response = NextResponse.json({ ok: true });
+  return detachSession(response);
 }

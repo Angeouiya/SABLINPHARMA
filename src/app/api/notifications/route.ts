@@ -87,7 +87,7 @@ export async function GET() {
         {
           userId,
           type: "success",
-          title: "Pass Ordonnance activé",
+          title: "Pass Ordonnance Unique activé",
           message:
             "Votre Pass Ordonnance Unique est actif. Vous pouvez estimer une ordonnance complète.",
           icon: "Receipt",

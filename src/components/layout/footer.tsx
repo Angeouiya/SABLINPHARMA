@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone, MessageCircle, Coins, ChevronRight } from "lucide-react";
+import { HelpCircle, MessageCircle, Coins, ChevronRight } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { useNav } from "@/store/nav";
 import type { View } from "@/lib/types";
@@ -21,24 +21,26 @@ export function Footer() {
               Trouvez vos médicaments et les pharmacies près de chez vous, à toute heure.
             </p>
             <div className="mt-5 flex flex-col gap-2.5">
-              <a
-                href="tel:+2250700000000"
+              <button
+                type="button"
+                onClick={() => go("settings")}
                 className="inline-flex items-center gap-2.5 text-sm font-medium text-foreground hover:text-brand"
               >
-                <span className="flex size-9 items-center justify-center rounded-full bg-brand-light text-brand">
-                  <Phone className="size-4" />
+                <span className="flex size-9 items-center justify-center rounded-md bg-brand-light text-brand">
+                  <HelpCircle className="size-4" />
                 </span>
-                Besoin d&apos;aide ? <span className="font-bold">+225 07 00 00 00 00</span>
-              </a>
-              <a
-                href="#"
+                Aide et support
+              </button>
+              <button
+                type="button"
+                onClick={() => go("settings")}
                 className="inline-flex items-center gap-2.5 text-sm font-medium text-foreground hover:text-brand"
               >
-                <span className="flex size-9 items-center justify-center rounded-full bg-brand-light text-brand">
+                <span className="flex size-9 items-center justify-center rounded-md bg-brand-light text-brand">
                   <MessageCircle className="size-4" />
                 </span>
-                Assistance WhatsApp 24/7
-              </a>
+                Contacter le support
+              </button>
             </div>
           </div>
 

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth/session";
+import { PASS_ORDONNANCE_PRICE } from "@/lib/restrictions";
 
-// Achat du Pass Ordonnance (500 FCFA) — valable pour une seule ordonnance. Expire après utilisation.
-const PASS_PRICE = 500;
+// Achat du Pass Ordonnance Unique (500 FCFA) — valable pour une seule ordonnance. Expire après utilisation.
+const PASS_PRICE = PASS_ORDONNANCE_PRICE;
 
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
 
     // Vérifier qu'il n'a pas déjà un pass actif
     const existing = await db.passOrdonnance.findFirst({
-      where: { userId: user.id, active: true },
+      where: { userId: user.id, active: true, status: { in: ["active", "linked"] } },
     });
     if (existing) {
       return NextResponse.json(
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         active: true,
+        status: "active",
         price: PASS_PRICE,
       },
     });
@@ -58,7 +60,10 @@ export async function POST(req: NextRequest) {
         type: "pass",
         amount: 0,
         description: `Pass Ordonnance Unique — ${PASS_PRICE} FCFA (${provider})`,
+        fcfaEquivalent: PASS_PRICE,
+        balanceBefore: balance,
         balanceAfter: balance,
+        status: "réussi",
       },
     });
 

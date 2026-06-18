@@ -44,7 +44,10 @@ const LINK_VIEWS: View[] = [
   "pharmacies",
   "prescription",
   "subscription",
+  "wallet",
+  "requests",
   "profile",
+  "favorites",
 ];
 
 export function NotificationDropdown() {
@@ -79,43 +82,41 @@ export function NotificationDropdown() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative flex size-10 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+        className="relative flex size-10 items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
         aria-label={`Notifications${unread > 0 ? ` (${unread} non lues)` : ""}`}
       >
         <Bell className="size-5" />
         {unread > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-background">
+          <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold leading-4 text-white ring-2 ring-background">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-80 overflow-hidden rounded-2xl border border-border bg-popover shadow-premium-lg sm:w-96">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-4 py-3">
+        <div className="fixed left-3 right-3 top-16 z-50 w-auto max-w-none overflow-hidden rounded-lg border border-border bg-popover shadow-avance-lg sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+8px)] sm:w-96">
+          <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2.5">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-foreground">Notifications</h3>
+              <h3 className="text-sm font-extrabold text-foreground">Notifications</h3>
               {unread > 0 && (
-                <span className="rounded-full bg-brand px-1.5 py-0.5 text-[10px] font-bold text-white">
-                  {unread} non lue{unread > 1 ? "s" : ""}
+                <span className="rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {unread}
                 </span>
               )}
             </div>
             {unread > 0 && (
               <button
                 onClick={() => markAllRead()}
-                className="flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
+                className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-bold text-brand-dark hover:bg-brand-light"
               >
-                <CheckCheck className="size-3.5" /> Tout lire
+                <CheckCheck className="size-3.5" /> Lu
               </button>
             )}
           </div>
 
-          {/* List */}
           {recent.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-              <span className="flex size-12 items-center justify-center rounded-xl bg-brand-light text-brand">
+              <span className="flex size-11 items-center justify-center rounded-lg bg-brand-light text-brand">
                 <Bell className="size-6" />
               </span>
               <p className="text-sm font-semibold text-foreground">
@@ -126,7 +127,7 @@ export function NotificationDropdown() {
               </p>
             </div>
           ) : (
-            <ul className="max-h-80 divide-y divide-border/50 overflow-y-auto scroll-thin">
+            <ul className="max-h-[360px] divide-y divide-border overflow-y-auto scroll-thin">
               {recent.map((n) => {
                 const Icon = ICONS[n.icon] ?? Bell;
                 const styles = TYPE_STYLES[n.type] ?? TYPE_STYLES.info;
@@ -135,31 +136,31 @@ export function NotificationDropdown() {
                     <button
                       onClick={() => handleOpen(n)}
                       className={cn(
-                        "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent",
+                        "grid w-full grid-cols-[2rem_1fr_auto] items-start gap-2.5 px-3 py-2.5 text-left transition-colors hover:bg-accent",
                         !n.read && "bg-brand-light/20"
                       )}
                     >
                       <span
                         className={cn(
-                          "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                          "flex size-8 shrink-0 items-center justify-center rounded-md",
                           styles.circle
                         )}
                       >
-                        <Icon className="size-4.5" />
+                        <Icon className="size-4" />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <p className="truncate text-xs font-bold text-foreground">
-                            {n.title}
-                          </p>
-                          {!n.read && (
-                            <span className="size-1.5 shrink-0 rounded-full bg-brand" />
-                          )}
-                        </div>
+                        <p className="truncate text-xs font-extrabold text-foreground">
+                          {n.title}
+                        </p>
                         <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                           {n.message}
                         </p>
                       </div>
+                      {!n.read ? (
+                        <span className="mt-1 size-2 rounded-full bg-brand" />
+                      ) : (
+                        <ChevronRight className="mt-0.5 size-4 text-muted-foreground" />
+                      )}
                     </button>
                   </li>
                 );
@@ -167,15 +168,14 @@ export function NotificationDropdown() {
             </ul>
           )}
 
-          {/* Footer */}
           <button
             onClick={() => {
               setOpen(false);
               navigate("notifications");
             }}
-            className="flex w-full items-center justify-center gap-1 border-t border-border/60 bg-muted/30 px-4 py-2.5 text-sm font-semibold text-brand transition-colors hover:bg-brand-light/40"
+            className="flex w-full items-center justify-center gap-1 border-t border-border bg-muted/40 px-3 py-2.5 text-sm font-bold text-brand-dark transition-colors hover:bg-brand-light"
           >
-            Voir toutes les notifications
+            Tout afficher
             <ChevronRight className="size-4" />
           </button>
         </div>

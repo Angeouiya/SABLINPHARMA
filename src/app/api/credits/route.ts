@@ -17,11 +17,13 @@ export async function GET() {
     take: 20,
   });
   const pass = await db.passOrdonnance.findFirst({
-    where: { userId: user.id, active: true },
+    where: { userId: user.id },
+    orderBy: { createdAt: "desc" },
   });
   return NextResponse.json({
     credits: fullUser?.credits ?? 0,
     transactions,
-    hasPass: !!pass,
+    hasPass: !!pass && pass.active && (pass.status === "active" || pass.status === "linked"),
+    passStatus: pass?.status ?? "none",
   });
 }

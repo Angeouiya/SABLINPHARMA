@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { hashPassword, setSession } from "@/lib/auth/session";
+import { attachSession, hashPassword } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
       select: { id: true, name: true, email: true, phone: true, commune: true },
     });
 
-    await setSession(user.id);
-    return NextResponse.json({ user });
+    const response = NextResponse.json({ user });
+    return attachSession(response, user.id);
   } catch (e) {
     return NextResponse.json(
       { error: "Une erreur est survenue lors de l'inscription." },

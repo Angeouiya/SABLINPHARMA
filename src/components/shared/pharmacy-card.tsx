@@ -27,7 +27,7 @@ export function PharmacyCard({ pharma, showPrice }: { pharma: Pharmacy; showPric
       onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
       className="group block w-full text-left"
     >
-      <Card className="gap-0 overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
+      <Card className="gap-0 overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance-lg">
         <div className="relative flex h-32 items-center justify-between overflow-hidden bg-brand-dark px-4">
           {pharma.imageUrl && (
             <img
@@ -35,6 +35,11 @@ export function PharmacyCard({ pharma, showPrice }: { pharma: Pharmacy; showPric
               alt={pharma.name}
               className="absolute inset-0 size-full object-cover"
             />
+          )}
+          {!pharma.imageUrl && (
+            <p className="absolute bottom-3 left-4 right-4 rounded-lg bg-white/15 px-3 py-2 text-xs font-bold text-white">
+              Photo de la pharmacie non disponible
+            </p>
           )}
           <div className="absolute inset-0 bg-black/30" />
           <div className="relative flex items-center gap-3">

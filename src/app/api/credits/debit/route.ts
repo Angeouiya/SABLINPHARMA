@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth/session";
+import { debitCredits, RestrictionError } from "@/lib/restrictions-server";
 
 // Debit credits for a paid action
 export async function POST(req: NextRequest) {
@@ -13,37 +13,20 @@ export async function POST(req: NextRequest) {
     const amount = parseInt(body.amount, 10);
     const description = body.description ?? "Action payante";
 
-    const fullUser = await db.user.findUnique({
-      where: { id: user.id },
-      select: { credits: true },
-    });
-    const balance = fullUser?.credits ?? 0;
+    const result = await debitCredits(user.id, description, amount);
 
-    if (balance < amount) {
+    return NextResponse.json({
+      success: true,
+      balance: result.balance,
+      transaction: result.transaction,
+    });
+  } catch (error) {
+    if (error instanceof RestrictionError) {
       return NextResponse.json(
-        { error: "Solde insuffisant", balance, needed: amount },
-        { status: 402 }
+        { error: error.message, ...error.details },
+        { status: error.status }
       );
     }
-
-    const newBalance = balance - amount;
-    await db.user.update({
-      where: { id: user.id },
-      data: { credits: newBalance },
-    });
-
-    const tx = await db.creditTransaction.create({
-      data: {
-        userId: user.id,
-        type: "debit",
-        amount: -amount,
-        description,
-        balanceAfter: newBalance,
-      },
-    });
-
-    return NextResponse.json({ success: true, balance: newBalance, transaction: tx });
-  } catch {
     return NextResponse.json({ error: "Erreur" }, { status: 500 });
   }
 }

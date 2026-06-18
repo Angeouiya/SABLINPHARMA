@@ -70,7 +70,7 @@
 }
 
 :root {
-  --radius: 0.875rem;
+  --radius: 0.5rem;
 
   /* ===== Brand pharmacy greens ===== */
   --brand: oklch(0.58 0.14 156);            /* vert principal santé */
@@ -79,7 +79,7 @@
   --brand-dark: oklch(0.34 0.08 156);       /* vert foncé (titres) */
 
   /* ===== Surfaces ===== */
-  --background: oklch(0.995 0.004 156);     /* blanc dominant légèrement teinté */
+  --background: oklch(0.985 0.006 156);     /* surface applicative claire */
   --foreground: oklch(0.22 0.02 156);       /* texte foncé */
   --card: oklch(1 0 0);                      /* cartes blanches pures */
   --card-foreground: oklch(0.22 0.02 156);
@@ -89,7 +89,7 @@
   --primary-foreground: oklch(0.99 0.01 156);
   --secondary: oklch(0.96 0.02 156);
   --secondary-foreground: oklch(0.3 0.03 156);
-  --muted: oklch(0.965 0.008 156);          /* gris très clair arrière-plans */
+  --muted: oklch(0.955 0.008 156);          /* gris très clair arrière-plans */
   --muted-foreground: oklch(0.52 0.02 156); /* texte secondaire */
   --accent: oklch(0.95 0.03 156);
   --accent-foreground: oklch(0.32 0.05 156);
@@ -211,15 +211,14 @@
   }
   /* Headings use foreground (dark) for maximum readability on all backgrounds */
   h1, h2, h3, h4, h5, h6 {
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     word-wrap: break-word;
     overflow-wrap: break-word;
   }
-  /* Responsive font sizes — optimized for all breakpoints */
-  h1 { font-size: clamp(1.375rem, 4.5vw, 2.5rem); }
-  h2 { font-size: clamp(1.125rem, 3.5vw, 2rem); }
-  h3 { font-size: clamp(1rem, 3vw, 1.5rem); }
-  h4 { font-size: clamp(0.9rem, 2.5vw, 1.25rem); }
+  h1 { font-size: 2rem; line-height: 2.4rem; }
+  h2 { font-size: 1.5rem; line-height: 2rem; }
+  h3 { font-size: 1.125rem; line-height: 1.6rem; }
+  h4 { font-size: 1rem; line-height: 1.45rem; }
 
   /* Prevent text overflow on all elements */
   p, span, li, td, th, label, button, a {
@@ -255,7 +254,7 @@
 }
 
 @layer utilities {
-  /* ===== Premium scrollbar ===== */
+  /* ===== avance scrollbar ===== */
   .scroll-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -275,30 +274,30 @@
     text-wrap: balance;
   }
 
-  /* ===== Brand solid colors (NO gradients) ===== */
-  .bg-brand-gradient {
+  /* ===== Brand solid colors (couleurs pleines) ===== */
+  .bg-brand {
     background-color: var(--brand);
   }
   .bg-brand-soft {
     background-color: var(--brand-light);
   }
-  .text-brand-gradient {
+  .text-brand-dark {
     color: var(--brand-dark);
   }
 
   /* ===== Glass card ===== */
   .glass-card {
-    background: oklch(1 0 0 / 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: oklch(1 0 0 / 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   /* ===== Shadows ===== */
-  .shadow-premium {
-    box-shadow: 0 1px 2px oklch(0.58 0.14 156 / 0.04), 0 8px 24px oklch(0.58 0.14 156 / 0.08);
+  .shadow-avance {
+    box-shadow: 0 1px 2px oklch(0 0 0 / 0.04), 0 8px 18px oklch(0 0 0 / 0.06);
   }
-  .shadow-premium-lg {
-    box-shadow: 0 4px 12px oklch(0.58 0.14 156 / 0.08), 0 20px 48px oklch(0.58 0.14 156 / 0.12);
+  .shadow-avance-lg {
+    box-shadow: 0 4px 12px oklch(0 0 0 / 0.08), 0 16px 34px oklch(0 0 0 / 0.08);
   }
   .shadow-card {
     box-shadow: 0 1px 3px oklch(0 0 0 / 0.04), 0 1px 2px oklch(0 0 0 / 0.03);

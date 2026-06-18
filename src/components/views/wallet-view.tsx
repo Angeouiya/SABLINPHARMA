@@ -18,6 +18,7 @@ import {
   HelpCircle,
   Pill,
   Search,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,8 +47,7 @@ import {
 } from "@/store/credits";
 import { formatDate, formatFCFA } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-const FCFA_PER_CREDIT = 100;
+import { FCFA_PER_CREDIT } from "@/lib/restrictions";
 
 export function WalletView() {
   const { navigate } = useNav();
@@ -72,7 +72,7 @@ export function WalletView() {
   if (!user) {
     return (
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col items-center justify-center px-4 py-12">
-        <Card className="w-full border-border/70 p-8 text-center shadow-premium">
+        <Card className="w-full border-border/70 p-8 text-center shadow-avance">
           <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-full bg-brand-light">
             <Wallet className="size-10 text-brand" />
           </div>
@@ -80,13 +80,13 @@ export function WalletView() {
             Connectez-vous pour accéder à votre portefeuille
           </h1>
           <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
-            Connectez-vous pour recharger vos crédits, acheter le Pass Ordonnance
+            Connectez-vous pour recharger vos crédits, acheter le Pass Ordonnance Unique
             et suivre votre historique de transactions SABLIN PHARMA.
           </p>
           <div className="mt-6 flex flex-col gap-2.5">
             <Button
               onClick={() => navigate("auth", { authMode: "login" })}
-              className="h-11 w-full bg-brand text-base font-semibold text-white shadow-premium transition-all hover:bg-brand-dark hover:shadow-premium-lg"
+              className="h-11 w-full bg-brand text-base font-semibold text-white shadow-avance transition-all hover:bg-brand-dark hover:shadow-avance-lg"
             >
               Se connecter
             </Button>
@@ -136,7 +136,7 @@ export function WalletView() {
       </header>
 
       {/* ============ VOTRE PORTEFEUILLE DE CRÉDITS ============ */}
-      <Card className="border-border/70 bg-brand-light p-6 shadow-premium sm:p-7">
+      <Card className="border-border/70 bg-brand-light p-6 shadow-avance sm:p-7">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -175,7 +175,7 @@ export function WalletView() {
             </div>
 
             <p className="mt-3 max-w-md text-sm leading-relaxed text-brand-dark/80">
-              Les recherches simples sont gratuites. Les services avancés
+              Les recherches simples sont couvertes. Les services avancés
               utilisent vos crédits, débités uniquement après votre confirmation.
             </p>
 
@@ -196,13 +196,13 @@ export function WalletView() {
             </div>
           </div>
 
-          {/* Pass Ordonnance status badge */}
+          {/* Pass Ordonnance Unique status badge */}
           <div className="shrink-0 rounded-2xl border border-amber-500/30 bg-amber-50 p-4 sm:w-48">
             <div className="flex items-center gap-2">
               <span className="flex size-8 items-center justify-center rounded-lg bg-amber-500 text-white">
                 <ClipboardList className="size-4" />
               </span>
-              <p className="text-sm font-bold text-amber-900">Pass Ordonnance</p>
+              <p className="text-sm font-bold text-amber-900">Pass Ordonnance Unique</p>
             </div>
             {hasPass ? (
               <div className="mt-2">
@@ -210,7 +210,7 @@ export function WalletView() {
                   <CheckCircle2 className="size-3" /> Actif
                 </Badge>
                 <p className="mt-1.5 text-xs text-amber-800">
-                  Estimation complète disponible sans crédits.
+                  Comparaison complète disponible avec ce pass.
                 </p>
               </div>
             ) : (
@@ -223,16 +223,21 @@ export function WalletView() {
       </Card>
 
       {/* ============ MESSAGES PÉDAGOGIQUES ============ */}
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <InfoNote
+          icon={Coins}
+          title="C’est quoi un crédit SABLIN ?"
+          desc="Un crédit SABLIN est une unité interne qui permet de débloquer les services avancés de la plateforme. 1 crédit = 100 FCFA. Le coût est toujours affiché avant validation et aucun crédit n’est débité sans confirmation."
+        />
         <InfoNote
           icon={CheckCircle2}
-          title="Aucun abonnement mensuel"
-          desc="SABLIN PHARMA fonctionne sans abonnement mensuel. Vous payez seulement ce que vous utilisez."
+          title="Aucun paiement obligatoire"
+          desc="SABLIN PHARMA fonctionne à la carte. Vous payez seulement ce que vous utilisez."
         />
         <InfoNote
           icon={Zap}
           title="Vous payez seulement les services avancés"
-          desc="Recherches et consultations restent gratuites."
+          desc="Recherches et consultations restent couvertes."
         />
         <InfoNote
           icon={Coins}
@@ -252,12 +257,12 @@ export function WalletView() {
             <Card
               key={pack.amount}
               className={cn(
-                "relative flex flex-col border-border/70 p-5 transition-all hover:-translate-y-0.5 hover:shadow-premium",
+                "relative flex flex-col border-border/70 p-5 transition-all hover:-translate-y-0.5 hover:shadow-avance",
                 pack.popular && "border-brand/50 ring-1 ring-brand/30"
               )}
             >
               {pack.popular && (
-                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-premium">
+                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-avance">
                   Populaire
                 </span>
               )}
@@ -359,7 +364,7 @@ export function WalletView() {
               </li>
               {[
                 { label: "Ajouter un médicament", cost: 1 },
-                { label: "Estimation complète", cost: 2 },
+                { label: "Comparer les prix", cost: 2 },
                 { label: "Meilleure pharmacie", cost: 1 },
                 { label: "Comparaison des pharmacies", cost: 1 },
               ].map((item) => (
@@ -419,7 +424,7 @@ export function WalletView() {
       {/* ============ PASS ORDONNANCE ============ */}
       <section className="mt-10">
         <SectionTitle icon={ClipboardList} title="Pass Ordonnance Unique" />
-        <Card className="border-amber-500/30 bg-amber-50 p-6 shadow-premium">
+        <Card className="border-amber-500/30 bg-amber-50 p-6 shadow-avance">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2.5">
@@ -428,20 +433,20 @@ export function WalletView() {
                 </span>
                 <div>
                   <h3 className="text-lg font-extrabold text-foreground">
-                    Pass Ordonnance
+                    Pass Ordonnance Unique
                   </h3>
                   <p className="text-sm text-amber-800">
-                    Estimation complète sans crédits, pour usage occasionnel
+                    Comparaison complète avec Pass Ordonnance Unique
                   </p>
                 </div>
               </div>
 
               <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                 {[
-                  "Estimation complète de votre ordonnance",
+                  "Comparaison des prix de votre ordonnance",
                   "Liste des pharmacies disponibles",
                   "Comparaison simple des prix",
-                  "Sauvegarde de l'estimation",
+                  "Sauvegarde du résultat",
                 ].map((b) => (
                   <li
                     key={b}
@@ -461,7 +466,7 @@ export function WalletView() {
               <p className="mt-1 text-3xl font-extrabold tabular-nums text-amber-900">
                 500 FCFA
               </p>
-              <p className="mt-0.5 text-xs text-amber-700">Valable à vie</p>
+              <p className="mt-0.5 text-xs text-amber-700">Expire après comparaison</p>
               <Button
                 onClick={() => navigate("payment", { passOrdonnance: true })}
                 className="mt-4 w-full bg-amber-500 text-white hover:bg-amber-600 sm:w-auto"
@@ -671,7 +676,7 @@ export function WalletView() {
           title="Historique des crédits"
         />
         <Muted className="mb-4">
-          Suivez vos recharges et débits de crédits.
+          Suivez vos recharges et débits de crédits. 1 crédit = {FCFA_PER_CREDIT} FCFA.
         </Muted>
 
         {loading ? (
@@ -702,9 +707,14 @@ export function WalletView() {
         ) : (
           <Card className="divide-y divide-border/40 border-border/70 p-0">
             {transactions.map((t) => {
-              const positive = t.amount >= 0;
-              const balanceBefore = t.balanceAfter - t.amount;
-              const fcfaEquiv = Math.abs(t.amount) * FCFA_PER_CREDIT;
+              const failed = t.status === "échoué";
+              const positive = t.amount > 0;
+              const balanceBefore =
+                typeof t.balanceBefore === "number" ? t.balanceBefore : t.balanceAfter - t.amount;
+              const fcfaEquiv =
+                typeof t.fcfaEquivalent === "number"
+                  ? t.fcfaEquivalent
+                  : Math.abs(t.amount) * FCFA_PER_CREDIT;
               return (
                 <div
                   key={t.id}
@@ -714,13 +724,17 @@ export function WalletView() {
                     <span
                       className={cn(
                         "flex size-10 shrink-0 items-center justify-center rounded-xl",
-                        positive
+                        failed
+                          ? "bg-danger-light text-danger"
+                          : positive
                           ? "bg-success-light text-success"
                           : "bg-brand-light text-brand-dark"
                       )}
                     >
                       {positive ? (
                         <Plus className="size-5" />
+                      ) : failed ? (
+                        <AlertCircle className="size-5" />
                       ) : (
                         <Coins className="size-5" />
                       )}
@@ -745,10 +759,10 @@ export function WalletView() {
                       <p
                         className={cn(
                           "font-bold tabular-nums",
-                          positive ? "text-success" : "text-foreground"
+                          failed ? "text-danger" : positive ? "text-success" : "text-foreground"
                         )}
                       >
-                        {positive ? "+" : "−"}
+                        {positive ? "+" : t.amount < 0 ? "−" : ""}
                         {Math.abs(t.amount)} crédit{Math.abs(t.amount) > 1 ? "s" : ""}
                       </p>
                     </div>
@@ -780,8 +794,9 @@ export function WalletView() {
                       <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                         Statut
                       </p>
-                      <Badge className="border-0 bg-success text-white">
-                        <CheckCircle2 className="size-3" /> Réussie
+                      <Badge className={cn("border-0 text-white", failed ? "bg-danger" : "bg-success")}>
+                        {failed ? <AlertCircle className="size-3" /> : <CheckCircle2 className="size-3" />}
+                        {failed ? "Échouée" : "Réussie"}
                       </Badge>
                     </div>
                   </div>

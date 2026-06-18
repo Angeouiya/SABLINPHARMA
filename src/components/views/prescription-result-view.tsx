@@ -218,7 +218,7 @@ const PAID_ACTION_CONFIG: Record<
     ],
   },
   compare: {
-    title: "Comparer les prix",
+    title: "Comparer les prix dans les pharmacies",
     cost: CREDIT_COSTS.comparePharmacies,
     description:
       "Cette action coûte 1 crédit. Affichez le tableau comparatif détaillé des pharmacies (prix, distance, horaires).",
@@ -243,8 +243,8 @@ const PAID_ACTION_CONFIG: Record<
 
 export function PrescriptionResultView() {
   const { params, navigate } = useNav();
-  const { user, premium } = useAuth();
-  const { hasPass } = useCredits();
+  const { user, avance } = useAuth();
+  const { hasPass, expirePass } = useCredits();
 
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -422,19 +422,26 @@ export function PrescriptionResultView() {
   };
 
   // ===== Actions avancées payantes =====
-  // Si l'utilisateur a un Pass Ordonnance Unique actif, l'action est gratuite (pas de dialog).
+  // Si l'utilisateur a un Pass Ordonnance Unique actif, l'action est incluse (pas de dialog).
   // Sinon, on ouvre un CreditConfirmDialog pour débiter le coût de l'action.
-  const performPaidAction = (action: PaidAction) => {
+  const performPaidAction = async (action: PaidAction) => {
     if (action === "bestPharmacy" && bestOption) {
       navigate("pharmacy-detail", { slug: bestOption.slug });
       toast.success("Accès à la meilleure pharmacie.");
     } else if (action === "compare") {
       const el = document.getElementById("pharmacies-complete");
       el?.scrollIntoView({ behavior: "smooth", block: "start" });
-      toast.success("Comparaison des pharmacies affichée.");
+      if (hasPass) {
+        await expirePass();
+        toast.success("Comparaison terminée. Votre Pass Ordonnance Unique a été utilisé.", {
+          description: "Statut du pass : Expiré",
+        });
+      } else {
+        toast.success("Comparaison des pharmacies affichée.");
+      }
     } else if (action === "confirm") {
       toast.success("Demande de confirmation envoyée à la pharmacie.", {
-        description: "Vous recevrez une réponse sous 24h.",
+        description: "La pharmacie vous répondra dès que possible.",
       });
     }
     setPaidAction(null);
@@ -442,7 +449,7 @@ export function PrescriptionResultView() {
 
   const handlePaidAction = (action: PaidAction) => {
     if (hasPass) {
-      performPaidAction(action);
+      void performPaidAction(action);
     } else {
       setPaidAction(action);
     }
@@ -453,7 +460,7 @@ export function PrescriptionResultView() {
     return (
       <LockedView
         title="Résultat indisponible"
-        message="Veuillez utiliser 2 crédits ou un Pass Ordonnance Unique pour lancer l'estimation complète."
+        message="Veuillez utiliser 2 crédits ou un Pass Ordonnance Unique pour comparer les prix des pharmacies."
         cost={2}
         backLabel="Retour à l'ordonnance"
         backView="prescription"
@@ -593,7 +600,7 @@ export function PrescriptionResultView() {
                 return (
                   <Card
                     key={`${line.medication.slug}-${idx}`}
-                    className="border-border/70 p-4 shadow-card transition-all hover:border-brand/30 hover:shadow-premium"
+                    className="border-border/70 p-4 shadow-card transition-all hover:border-brand/30 hover:shadow-avance"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
@@ -636,7 +643,7 @@ export function PrescriptionResultView() {
           {/* Meilleure option recommandée */}
           {bestOption && (
             <section>
-              <Card className="overflow-hidden border-brand/30 py-0 shadow-premium-lg">
+              <Card className="overflow-hidden border-brand/30 py-0 shadow-avance-lg">
                 <div className="flex items-center gap-3 bg-brand px-5 py-3.5 text-white">
                   <span className="flex size-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
                     <Award className="size-5" />
@@ -983,11 +990,11 @@ export function PrescriptionResultView() {
               </Button>
             )}
 
-            {/* Message Pass Ordonnance */}
+            {/* Message Pass Ordonnance Unique */}
             {hasPass && (
               <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
                 <span className="inline-flex items-center gap-1 font-bold text-amber-700">
-                  <Crown className="size-3" /> Pass Ordonnance Unique actif — actions gratuites
+                  <Crown className="size-3" /> Pass Ordonnance Unique actif — actions couvertes
                 </span>
               </p>
             )}
@@ -1003,8 +1010,8 @@ export function PrescriptionResultView() {
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
               {hasPass
-                ? "Toutes les actions avancées sont gratuites avec votre Pass Ordonnance Unique."
-                : "Chaque action avancée utilise des crédits. Achetez un Pass Ordonnance Unique pour un usage illimité."}
+                ? "Toutes les actions avancées sont couvertes avec votre Pass Ordonnance Unique."
+                : "Chaque action avancée utilise des crédits. Achetez un Pass Ordonnance Unique pour un usage unique."}
             </p>
 
             <div className="mt-3 space-y-2">
@@ -1016,7 +1023,7 @@ export function PrescriptionResultView() {
               >
                 <span className="flex items-center gap-1.5">
                   <TrendingDown className="size-3.5" />
-                  {hasPass ? "Comparer les prix" : "Comparer les prix — 1 crédit"}
+                  {hasPass ? "Comparer les prix dans les pharmacies" : "Comparer les prix dans les pharmacies — 1 crédit"}
                 </span>
                 <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.comparePharmacies} />
               </Button>
@@ -1062,7 +1069,7 @@ export function PrescriptionResultView() {
           </Card>
 
           {/* Credits upsell */}
-          {!premium && (
+          {!avance && (
             <Card className="overflow-hidden border-amber-500/30 py-0">
               <div className="bg-amber-50 p-4">
                 <div className="flex items-center gap-2">
@@ -1076,7 +1083,7 @@ export function PrescriptionResultView() {
                 </div>
                 <ul className="mt-3 space-y-1 text-xs text-foreground/80">
                   <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="size-3.5 text-amber-500" /> Estimations illimitées
+                    <CheckCircle2 className="size-3.5 text-amber-500" /> Estimations par crédits
                   </li>
                   <li className="flex items-center gap-1.5">
                     <CheckCircle2 className="size-3.5 text-amber-500" /> Comparateur avancé
@@ -1118,7 +1125,7 @@ export function PrescriptionResultView() {
         description={paidAction ? PAID_ACTION_CONFIG[paidAction].description : ""}
         benefits={paidAction ? PAID_ACTION_CONFIG[paidAction].benefits : []}
         onConfirm={() => {
-          if (paidAction) performPaidAction(paidAction);
+          if (paidAction) void performPaidAction(paidAction);
         }}
       />
     </div>
@@ -1219,10 +1226,9 @@ function FullPharmacyCard({
 }) {
   const { navigate } = useNav();
   const mapsUrl = `https://www.google.com/maps?q=${pharma.latitude},${pharma.longitude}`;
-  const phoneHref = `tel:${pharma.phone.replace(/\s/g, "")}`;
 
   return (
-    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
+    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance-lg">
       <div className="flex items-center justify-between bg-brand px-4 py-2.5">
         <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
           <CheckCircle2 className="size-2.5" /> Ordonnance complète
@@ -1312,7 +1318,7 @@ function PartialPharmacyCard({
   const mapsUrl = `https://www.google.com/maps?q=${pharma.latitude},${pharma.longitude}`;
 
   return (
-    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
+    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance-lg">
       <div className="flex items-center justify-between bg-muted px-4 py-2.5">
         <span className="inline-flex items-center gap-1 rounded-full bg-warning-light px-2 py-0.5 text-[10px] font-bold text-warning-foreground">
           <AlertTriangle className="size-2.5" /> Disponibilité partielle

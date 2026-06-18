@@ -35,7 +35,7 @@ export function MedicationCard({ med }: { med: Medication }) {
   return (
     <Card
       onClick={() => navigate("medication-detail", { slug: med.slug })}
-      className="group gap-0 cursor-pointer overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg"
+      className="group gap-0 cursor-pointer overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-avance-lg"
     >
       {/* Header visual */}
       <div className="relative flex h-32 items-center justify-center overflow-hidden bg-brand-light">
@@ -48,7 +48,7 @@ export function MedicationCard({ med }: { med: Medication }) {
         ) : (
           <>
             <div className="absolute inset-0 opacity-[0.07] bg-dotted" />
-            <div className="relative flex size-16 items-center justify-center rounded-2xl bg-background shadow-premium">
+            <div className="relative flex size-16 items-center justify-center rounded-2xl bg-background shadow-avance">
               {med.category ? (
                 <CategoryIcon
                   name={med.category.iconName}
@@ -70,6 +70,11 @@ export function MedicationCard({ med }: { med: Medication }) {
         )}
         <span className="absolute bottom-2 left-2">
           <MedicationStatusBadge status={status} />
+        </span>
+        <span className="absolute bottom-2 right-2">
+          <Badge className="border-0 bg-white text-[10px] font-bold text-brand-dark shadow-sm">
+            {med.imageBadge ?? "Image illustrative"}
+          </Badge>
         </span>
       </div>
 
@@ -141,6 +146,14 @@ export function MedicationRow({ med }: { med: Medication }) {
               className="border-amber-500/40 bg-amber-50 px-1.5 py-0 text-[9px] font-semibold text-amber-700"
             >
               Rx
+            </Badge>
+          )}
+          {med.informationBadge && (
+            <Badge
+              variant="outline"
+              className="border-brand/30 bg-white px-1.5 py-0 text-[9px] font-semibold text-brand-dark"
+            >
+              {med.informationBadge}
             </Badge>
           )}
           <MedicationStatusBadge status={status} />

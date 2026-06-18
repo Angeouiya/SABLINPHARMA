@@ -5,11 +5,12 @@ import { getSessionUser } from "@/lib/auth/session";
 export async function GET() {
   const user = await getSessionUser();
   if (!user) {
-    return NextResponse.json({ user: null, subscription: null });
+    return NextResponse.json({ user: null, pass: null });
   }
 
-  const subscription = await db.subscription.findUnique({
+  const pass = await db.passOrdonnance.findFirst({
     where: { userId: user.id },
+    orderBy: { createdAt: "desc" },
   });
 
   const fullUser = await db.user.findUnique({
@@ -17,13 +18,12 @@ export async function GET() {
     select: { credits: true },
   });
 
-  const isPremium =
-    !!subscription &&
-    subscription.status === "active" &&
-    (!subscription.endDate || new Date(subscription.endDate) > new Date());
-
   return NextResponse.json({
     user: { ...user, credits: fullUser?.credits ?? 0 },
-    subscription: isPremium ? subscription : null,
+    pass:
+      pass && pass.active && (pass.status === "active" || pass.status === "linked")
+        ? pass
+        : null,
+    passStatus: pass?.status ?? "none",
   });
 }

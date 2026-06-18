@@ -37,6 +37,7 @@ import { useAuth } from "@/store/auth";
 import { useCredits, CREDIT_PACKS } from "@/store/credits";
 import { formatFCFA, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { FCFA_PER_CREDIT } from "@/lib/restrictions";
 
 type Provider = "wave" | "orange" | "mtn" | "moov";
 type PaymentState = "idle" | "pending" | "success" | "failed" | "cancelled";
@@ -142,7 +143,6 @@ export function PaymentView() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
 
   const formattedPhone = useMemo(() => {
     const digits = phone.replace(/\D/g, "").slice(0, 10);
@@ -172,7 +172,7 @@ export function PaymentView() {
   if (!user) {
     return (
       <div className="mx-auto flex min-h-[60vh] w-full max-w-md items-center px-4 py-12">
-        <Card className="w-full border-border/70 p-8 text-center shadow-premium">
+        <Card className="w-full border-border/70 p-8 text-center shadow-avance">
           <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-brand-light text-brand">
             <Lock className="size-7" />
           </span>
@@ -221,7 +221,6 @@ export function PaymentView() {
         const now = new Date();
         setTransactionRef(ref);
         setPaymentDate(now.toISOString());
-        setExpiryDate("");
         setState("success");
         setShowSuccess(true);
         toast.success("Recharge réussie !", {
@@ -240,15 +239,12 @@ export function PaymentView() {
         await fetchCredits();
         const ref = `SPL-PASS-${Date.now()}`;
         const now = new Date();
-        const exp = new Date();
-        exp.setDate(exp.getDate() + 30);
         setTransactionRef(ref);
         setPaymentDate(now.toISOString());
-        setExpiryDate(exp.toISOString());
         setState("success");
         setShowSuccess(true);
-        toast.success("Pass Ordonnance activé !", {
-          description: "Vos estimations d'ordonnance sont désormais gratuites.",
+        toast.success("Pass Ordonnance Unique activé !", {
+          description: "Votre Pass Ordonnance Unique est actif pour une seule ordonnance.",
         });
       }
     } catch (err) {
@@ -284,7 +280,7 @@ export function PaymentView() {
           </button>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-brand text-white shadow-premium">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-brand text-white shadow-avance">
               {mode === "pass" ? (
                 <Receipt className="size-6" />
               ) : (
@@ -301,8 +297,8 @@ export function PaymentView() {
           <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
             {mode === "pass" ? (
               <>
-                Profitez d&apos;estimations d&apos;ordonnance gratuites pendant 30 jours.
-                Idéal pour un usage occasionnel sans engagement.
+                Achetez un Pass Ordonnance Unique valable pour une seule ordonnance.
+                Le pass expire après estimation et comparaison.
               </>
             ) : (
               <>
@@ -310,6 +306,9 @@ export function PaymentView() {
                 ce que vous consommez.
               </>
             )}
+          </p>
+          <p className="mt-2 text-sm font-bold text-brand-dark">
+            1 crédit = {FCFA_PER_CREDIT} FCFA. Aucun paiement mensuel.
           </p>
         </div>
       </section>
@@ -326,7 +325,7 @@ export function PaymentView() {
             </h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {/* Pass Ordonnance card */}
+            {/* Pass Ordonnance Unique card */}
             <button
               type="button"
               onClick={() => setMode("pass")}
@@ -344,8 +343,8 @@ export function PaymentView() {
                 <Receipt className="size-4" />
               </span>
               <div>
-                <p className="text-sm font-bold text-foreground">Pass Ordonnance</p>
-                <p className="text-[11px] text-muted-foreground">Estimations gratuites · 30 jours</p>
+                <p className="text-sm font-bold text-foreground">Pass Ordonnance Unique</p>
+                <p className="text-[11px] text-muted-foreground">Une seule ordonnance · Expire après comparaison</p>
               </div>
               <p className="mt-1 text-base font-extrabold text-brand-dark">{formatFCFA(PASS_PRICE)}</p>
               {hasPass ? (
@@ -393,7 +392,7 @@ export function PaymentView() {
         {/* ============ SECTION RECHARGER MES CRÉDITS (visible si mode=recharge) ============ */}
         {mode === "recharge" && (
           <section className="mb-6">
-            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+            <Card className="border-border/70 p-5 shadow-avance sm:p-6">
               <div className="mb-4 flex items-center gap-2">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
                   <Coins className="size-4" />
@@ -453,7 +452,7 @@ export function PaymentView() {
         {/* ============ SECTION PASS ORDONNANCE (visible si mode=pass) ============ */}
         {mode === "pass" && (
           <section className="mb-6">
-            <Card className="border-brand/20 p-5 shadow-premium sm:p-6">
+            <Card className="border-brand/20 p-5 shadow-avance sm:p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
                   <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-brand text-white">
@@ -461,15 +460,14 @@ export function PaymentView() {
                   </span>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-base font-bold text-foreground">Pass Ordonnance</h2>
+                      <h2 className="text-base font-bold text-foreground">Pass Ordonnance Unique</h2>
                       <Badge className="border-0 bg-brand text-white">
                         {formatFCFA(PASS_PRICE)}
                       </Badge>
                     </div>
                     <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                      Profitez d&apos;estimations d&apos;ordonnance gratuites et illimitées
-                      pendant 30 jours. Idéal pour un usage occasionnel sans recharger
-                      vos crédits.
+                      Utilisez le Pass Ordonnance Unique pour estimer et comparer une seule ordonnance.
+                      Après la comparaison finale, le pass expire automatiquement.
                     </p>
                     {hasPass && (
                       <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-success-light px-2 py-0.5 text-[11px] font-bold text-success">
@@ -481,7 +479,7 @@ export function PaymentView() {
                 <div className="shrink-0 text-right">
                   <CreditCost cost={0} />
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Soit 0 crédit par estimation
+                    Aucun crédit débité pour cette ordonnance
                   </p>
                 </div>
               </div>
@@ -524,7 +522,7 @@ export function PaymentView() {
           {/* LEFT — Payment form */}
           <div className="space-y-6">
             {/* Moyens de paiement */}
-            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+            <Card className="border-border/70 p-5 shadow-avance sm:p-6">
               <div className="mb-4 flex items-center gap-2">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
                   <Smartphone className="size-4" />
@@ -572,7 +570,7 @@ export function PaymentView() {
             </Card>
 
             {/* Formulaire de paiement */}
-            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+            <Card className="border-border/70 p-5 shadow-avance sm:p-6">
               <div className="mb-4 flex items-center gap-2">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
                   <CreditCard className="size-4" />
@@ -655,7 +653,7 @@ export function PaymentView() {
 
                 {/* Bouton Payer maintenant */}
                 <Button
-                  className="h-12 w-full bg-brand text-base font-semibold text-white shadow-premium hover:bg-brand-dark"
+                  className="h-12 w-full bg-brand text-base font-semibold text-white shadow-avance hover:bg-brand-dark"
                   onClick={handlePay}
                   disabled={state === "pending" || (mode === "pass" && hasPass)}
                 >
@@ -706,7 +704,7 @@ export function PaymentView() {
 
           {/* RIGHT — Récapitulatif (sticky) */}
           <div className="lg:sticky lg:top-24 lg:self-start">
-            <Card className="border-border/70 p-5 shadow-premium sm:p-6">
+            <Card className="border-border/70 p-5 shadow-avance sm:p-6">
               <div className="flex items-center gap-2">
                 <Receipt className="size-4 text-brand" />
                 <h2 className="text-base font-bold text-foreground">
@@ -730,7 +728,7 @@ export function PaymentView() {
                   <p className="text-sm font-bold text-foreground">{currentShortLabel}</p>
                   <p className="text-xs text-muted-foreground">
                     {mode === "pass"
-                      ? "Validité 30 jours · Activation immédiate"
+                      ? "Une seule ordonnance · Activation immédiate"
                       : `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits · Activation immédiate`}
                   </p>
                 </div>
@@ -748,10 +746,18 @@ export function PaymentView() {
                   <span className="text-muted-foreground">Montant</span>
                   <span className="font-semibold text-foreground">{formatFCFA(currentAmount)}</span>
                 </div>
+                {mode === "recharge" && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Règle crédits</span>
+                    <span className="font-semibold text-foreground">
+                      1 crédit = {FCFA_PER_CREDIT} FCFA
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Durée</span>
                   <span className="font-semibold text-foreground">
-                    {mode === "pass" ? "30 jours" : "Illimité"}
+                    {mode === "pass" ? "Une ordonnance" : "À la carte"}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -889,7 +895,7 @@ export function PaymentView() {
               </h2>
               <p className="relative mt-1 text-sm text-white/85">
                 {mode === "pass"
-                  ? "Pass Ordonnance activé avec succès"
+                  ? "Pass Ordonnance Unique activé avec succès"
                   : "Recharge de crédits effectuée avec succès"}
               </p>
             </div>
@@ -900,13 +906,11 @@ export function PaymentView() {
                 <DetailItem label="Montant payé" value={formatFCFA(currentAmount)} />
                 <DetailItem label="Date de paiement" value={paymentDate ? formatDate(paymentDate) : "—"} />
                 <DetailItem
-                  label={mode === "recharge" ? "Crédits obtenus" : "Date d'expiration"}
+                  label={mode === "recharge" ? "Crédits obtenus" : "Validité du pass"}
                   value={
                     mode === "recharge"
                       ? `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits`
-                      : expiryDate
-                        ? formatDate(expiryDate)
-                        : "—"
+                      : "Une seule ordonnance"
                   }
                 />
                 <DetailItem label="Moyen de paiement" value={PROVIDERS.find((p) => p.id === provider)?.label ?? "—"} />

@@ -234,7 +234,7 @@ export function HistoryView() {
                     return (
                       <Card
                         key={item.id}
-                        className="group flex cursor-pointer items-center gap-3 border-border/70 p-3 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg"
+                        className="group flex cursor-pointer items-center gap-3 border-border/70 p-3 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance-lg"
                         onClick={() => handleItemClick(item, navigate)}
                       >
                         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">

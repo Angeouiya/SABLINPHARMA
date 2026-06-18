@@ -1,0 +1,236 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { hasPharmacyPermission, requirePharmacyPermission } from "@/lib/pharmacy-access";
+import { matchMedicationInReferential, normalizeImportedRow, seedDefaultEnrichmentProviders } from "@/lib/medication-enrichment";
+import { writeAudit } from "@/lib/professional-auth";
+
+function getKind(req: NextRequest) {
+  return req.headers.get("x-sablin-session-kind") === "admin" ? "admin" : "pharmacy";
+}
+
+async function ensureAccess(req: NextRequest, pharmacySlug?: string | null) {
+  const isAdmin = getKind(req) === "admin";
+  return requirePharmacyPermission(req, isAdmin ? "admin.medications.read" : "pharmacy.inventory.read", { pharmacySlug });
+}
+
+export async function GET(req: NextRequest) {
+  await seedDefaultEnrichmentProviders();
+  const { searchParams } = new URL(req.url);
+  const pharmacySlug = searchParams.get("pharmacySlug");
+  const access = await ensureAccess(req, pharmacySlug);
+  if (access.response) return access.response;
+  const isAdmin = hasPharmacyPermission(access.role, "admin.medications.read");
+  const whereRows = isAdmin
+    ? pharmacySlug
+      ? { pharmacy: { slug: pharmacySlug } }
+      : {}
+    : { pharmacy: { slug: access.session?.activePharmacySlug ?? access.session?.pharmacySlug } };
+
+  const [rows, jobs, candidates, images, descriptions, providers] = await Promise.all([
+    db.inventoryImportRow.findMany({
+      where: whereRows,
+      include: {
+        pharmacy: { select: { name: true, slug: true } },
+        medication: { select: { id: true, name: true, slug: true, dosage: true, form: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+    }),
+    db.enrichmentJob.findMany({
+      where: isAdmin ? {} : { inventoryImportRow: whereRows },
+      include: { medication: true, inventoryImportRow: { include: { pharmacy: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+    }),
+    db.enrichmentCandidate.findMany({
+      where: isAdmin ? {} : { job: { inventoryImportRow: whereRows } },
+      include: {
+        job: { include: { inventoryImportRow: { include: { pharmacy: true } } } },
+        proposedMedication: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    db.medicationImage.findMany({
+      where: isAdmin ? {} : { validationStatus: { in: ["En attente", "À vérifier"] } },
+      include: { medication: true },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+    }),
+    db.medicationDescription.findMany({
+      where: isAdmin ? {} : { validationStatus: { in: ["Brouillon automatique", "À vérifier"] } },
+      include: { medication: true },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+    }),
+    db.enrichmentProviderConfig.findMany({ orderBy: [{ providerType: "asc" }, { priority: "asc" }] }),
+  ]);
+
+  return NextResponse.json({
+    rows,
+    jobs,
+    candidates,
+    images,
+    descriptions,
+    providers,
+    rules: {
+      automaticPublication:
+        "Publication automatique uniquement pour un médicament déjà référencé, correspondance exacte, dosage et forme identiques, image déjà validée et licence validée.",
+      warning:
+        "Une image web inconnue ou sans licence ne peut jamais être publiée automatiquement.",
+    },
+  });
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const pharmacySlug = String(body.pharmacySlug ?? "").trim() || null;
+  const access = await ensureAccess(req, pharmacySlug);
+  if (access.response) return access.response;
+  const normalized = normalizeImportedRow({
+    lineNumber: Number(body.lineNumber ?? 1),
+    name: String(body.name ?? ""),
+    genericName: String(body.genericName ?? body.dci ?? ""),
+    dosage: String(body.dosage ?? ""),
+    form: String(body.form ?? ""),
+    packaging: String(body.packaging ?? ""),
+    manufacturer: String(body.manufacturer ?? ""),
+    barcode: String(body.barcode ?? ""),
+    remark: String(body.remark ?? ""),
+  });
+  const { best, candidates } = await matchMedicationInReferential(normalized);
+  const job = await db.enrichmentJob.create({
+    data: {
+      medicationId: best.medicationId ?? null,
+      provider: "Référentiel interne SABLIN PHARMA",
+      status: best.level === "Correspondance certaine" ? "Validé" : "Validation requise",
+      query: [normalized.commercialName, normalized.dosage, normalized.form, normalized.packaging, normalized.manufacturer].filter(Boolean).join(" "),
+      confidenceScore: best.score,
+      attempts: 1,
+      startedAt: new Date(),
+      completedAt: new Date(),
+    },
+  });
+  for (const candidate of candidates) {
+    await db.enrichmentCandidate.create({
+      data: {
+        jobId: job.id,
+        candidateType: "medication_match",
+        proposedMedicationId: candidate.medicationId ?? null,
+        score: candidate.score,
+        matchDetails: JSON.stringify(candidate),
+        status: candidate.level === "Correspondance certaine" ? "Validé" : "À vérifier",
+      },
+    });
+  }
+  await writeAudit({
+    req,
+    platform: access.session?.kind ?? "pharmacy",
+    action: "enrichment-started",
+    entityType: "enrichment-job",
+    entityId: job.id,
+    actorAccountId: access.session?.accountId,
+    actorName: access.session?.name,
+    actorRole: access.role ?? undefined,
+    newValue: { normalized, best },
+  });
+  return NextResponse.json({ job, best }, { status: 201 });
+}
+
+export async function PATCH(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const action = String(body.action ?? "").trim();
+  const access = requirePharmacyPermission(req, "admin.medications.update");
+  if (access.response) return access.response;
+
+  if (action === "validate-match") {
+    const candidate = await db.enrichmentCandidate.findUnique({
+      where: { id: String(body.candidateId ?? "") },
+      include: { job: { include: { inventoryImportRow: true } }, proposedMedication: true },
+    });
+    if (!candidate?.proposedMedicationId) return NextResponse.json({ error: "Candidat introuvable." }, { status: 404 });
+    await db.enrichmentCandidate.update({
+      where: { id: candidate.id },
+      data: { status: "Validé", reviewedBy: access.session?.name ?? access.role ?? null, reviewedAt: new Date() },
+    });
+    if (candidate.job.inventoryImportRowId) {
+      await db.inventoryImportRow.update({
+        where: { id: candidate.job.inventoryImportRowId },
+        data: {
+          medicationId: candidate.proposedMedicationId,
+          matchScore: candidate.score,
+          matchLevel: candidate.score >= 95 ? "Correspondance certaine" : "Correspondance probable",
+          status: "Validé",
+          enrichmentRequired: false,
+        },
+      });
+    }
+    await db.enrichmentJob.update({ where: { id: candidate.jobId }, data: { medicationId: candidate.proposedMedicationId, status: "Validé", completedAt: new Date() } });
+    await writeAudit({ req, platform: "admin", action: "enrichment-match-validated", entityType: "enrichment-candidate", entityId: candidate.id, actorAccountId: access.session?.accountId, actorName: access.session?.name, actorRole: access.role ?? undefined });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "refuse-candidate") {
+    await db.enrichmentCandidate.update({
+      where: { id: String(body.candidateId ?? "") },
+      data: { status: "Refusé", reviewedBy: access.session?.name ?? access.role ?? null, reviewedAt: new Date() },
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "validate-image" || action === "publish-image") {
+    const image = await db.medicationImage.update({
+      where: { id: String(body.imageId ?? "") },
+      data: {
+        validationStatus: action === "publish-image" ? "Publiée" : "Validée",
+        validatedBy: access.session?.name ?? access.role ?? null,
+        validatedAt: new Date(),
+        isPrimary: Boolean(body.isPrimary),
+        commercialUseAllowed: Boolean(body.commercialUseAllowed ?? true),
+      },
+    });
+    if (image.isPrimary || action === "publish-image") {
+      await db.medication.update({
+        where: { id: image.medicationId },
+        data: { imageUrl: image.url, verificationStatus: "Validé", verifiedAt: new Date(), verifiedBy: access.session?.name ?? access.role ?? null },
+      });
+    }
+    return NextResponse.json({ image });
+  }
+
+  if (action === "validate-description" || action === "publish-description") {
+    const description = await db.medicationDescription.update({
+      where: { id: String(body.descriptionId ?? "") },
+      data: {
+        validationStatus: action === "publish-description" ? "Publiée" : "Validée",
+        validatedBy: access.session?.name ?? access.role ?? null,
+        validatedAt: new Date(),
+      },
+    });
+    if (action === "publish-description") {
+      await db.medication.update({
+        where: { id: description.medicationId },
+        data: { shortDescription: description.shortText, description: description.longText ?? description.shortText, verifiedAt: new Date(), verifiedBy: access.session?.name ?? access.role ?? null },
+      });
+    }
+    return NextResponse.json({ description });
+  }
+
+  if (action === "relaunch") {
+    const job = await db.enrichmentJob.update({
+      where: { id: String(body.jobId ?? "") },
+      data: { status: "Analyse", attempts: { increment: 1 }, startedAt: new Date(), errorMessage: null },
+    });
+    return NextResponse.json({ job });
+  }
+
+  if (action === "publish-medication") {
+    const medication = await db.medication.update({
+      where: { id: String(body.medicationId ?? "") },
+      data: { verificationStatus: "Publié", status: "Actif", verifiedAt: new Date(), verifiedBy: access.session?.name ?? access.role ?? null },
+    });
+    return NextResponse.json({ medication });
+  }
+
+  return NextResponse.json({ error: "Action d’enrichissement inconnue." }, { status: 400 });
+}

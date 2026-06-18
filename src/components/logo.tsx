@@ -46,7 +46,7 @@ export function Logo({ className, showText = true, size = 40, variant = "default
         alt="SABLIN PHARMA"
         className={cn(
           "object-contain",
-          variant === "light" && "rounded-xl bg-white px-2.5 py-1.5 shadow-premium",
+          variant === "light" && "rounded-xl bg-white px-2.5 py-1.5 shadow-avance",
           className
         )}
         style={{ height: `${size}px`, width: "auto" }}

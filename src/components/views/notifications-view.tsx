@@ -226,142 +226,135 @@ export function NotificationsView() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl px-3 py-4 sm:px-5 lg:px-6 lg:py-6">
       <button
         onClick={() => navigate("home")}
-        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-brand"
+        className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-brand"
       >
         <ChevronLeft className="size-4" /> Accueil
       </button>
 
-      {/* Header */}
-      <div className="flex flex-col gap-2">
-        <Eyebrow>Alertes et informations</Eyebrow>
-        <div className="flex flex-wrap items-center gap-3">
-          <Heading level="h1">Notifications</Heading>
-          {unread > 0 && (
-            <Badge className="bg-brand text-white">
-              {unread} non lue{unread > 1 ? "s" : ""}
-            </Badge>
-          )}
-        </div>
-        <Muted>
-          Restez informé des disponibilités de médicaments, pharmacies de garde,
-          crédits, paiements et ordonnances.
-        </Muted>
-      </div>
+      <Card className="overflow-hidden border-border/80 p-0 shadow-card">
+        <div className="border-b border-border bg-card px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <Eyebrow>Centre d'alertes</Eyebrow>
+              <div className="mt-1 flex items-center gap-2">
+                <Heading level="h1" className="text-2xl sm:text-3xl">
+                  Notifications
+                </Heading>
+                {unread > 0 && (
+                  <Badge className="rounded-md bg-brand text-white">
+                    {unread}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleMarkAll}
+                disabled={unread === 0}
+              >
+                <CheckCheck className="size-4" /> Tout lire
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearAll}
+                disabled={notifications.length === 0 || clearing}
+              >
+                {clearing ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
+                Effacer
+              </Button>
+            </div>
+          </div>
 
-      {/* Actions bar */}
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleMarkAll}
-          disabled={unread === 0}
-        >
-          <CheckCheck className="size-4" /> Tout marquer comme lu
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleClearAll}
-          disabled={notifications.length === 0 || clearing}
-        >
-          {clearing ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Trash2 className="size-4" />
-          )}
-          Effacer tout
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="mt-5 flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        {FILTERS.map((f) => {
-          const active = filter === f.key;
-          const count = counts[f.key];
-          return (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors",
-                active
-                  ? "border-brand bg-brand text-white"
-                  : "border-border bg-background text-foreground/70 hover:border-brand/40 hover:text-brand"
-              )}
-            >
-              <f.icon className="size-3.5" />
-              {f.label}
-              {count > 0 && (
-                <span
+          <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {FILTERS.map((f) => {
+              const active = filter === f.key;
+              const count = counts[f.key];
+              return (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
                   className={cn(
-                    "ml-0.5 rounded-full px-1.5 py-0 text-[10px] font-bold",
-                    active ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-bold transition-colors",
+                    active
+                      ? "border-brand bg-brand text-white"
+                      : "border-border bg-background text-foreground/70 hover:border-brand/40 hover:text-brand"
                   )}
                 >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+                  <f.icon className="size-3.5" />
+                  {f.label}
+                  {count > 0 && (
+                    <span
+                      className={cn(
+                        "ml-0.5 rounded px-1 py-0 text-[10px] font-bold",
+                        active ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      {/* Notifications list */}
-      <div className="mt-5">
         {loading ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 p-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-2xl" />
+              <Skeleton key={i} className="h-20 rounded-lg" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <Card className="border-border/70">
-            <EmptyState
-              icon={Inbox}
-              title="Aucune notification"
-              description={
-                filter === "unread"
-                  ? "Vous avez lu toutes vos notifications. De nouvelles alertes apparaîtront ici."
-                  : "Vous n'avez pas de notification dans cette catégorie pour le moment."
-              }
-              action={{
-                label: "Retour à l'accueil",
-                onClick: () => navigate("home"),
-              }}
-            />
-          </Card>
+          <EmptyState
+            icon={Inbox}
+            title="Aucune notification"
+            description={
+              filter === "unread"
+                ? "Toutes vos notifications sont lues."
+                : "Aucune alerte dans cette catégorie."
+            }
+            action={{
+              label: "Retour à l'accueil",
+              onClick: () => navigate("home"),
+            }}
+          />
         ) : (
-          <div className="flex flex-col gap-2.5">
+          <div className="divide-y divide-border">
             {filtered.map((n) => {
               const Icon = ICONS[n.icon] ?? Bell;
               const styles = TYPE_STYLES[n.type] ?? TYPE_STYLES.info;
               const action = getAction(n);
               return (
-                <Card
+                <div
                   key={n.id}
                   className={cn(
-                    "group border-border/70 p-4 transition-all hover:border-brand/30 hover:shadow-premium",
+                    "group px-3 py-3 transition-colors hover:bg-accent/70 sm:px-4",
                     !n.read && "bg-brand-light/20"
                   )}
                 >
-                  <div className="flex items-start gap-3">
-                    {/* Icon */}
+                  <div className="grid grid-cols-[2.5rem_1fr] gap-3 sm:grid-cols-[2.75rem_1fr_auto]">
                     <span
                       className={cn(
-                        "flex size-11 shrink-0 items-center justify-center rounded-xl",
+                        "flex size-10 shrink-0 items-center justify-center rounded-md",
                         styles.circle
                       )}
                     >
                       <Icon className="size-5" />
                     </span>
 
-                    {/* Content */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-bold text-foreground">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-extrabold text-foreground">
                           {n.title}
                         </p>
                         {!n.read && (
@@ -372,20 +365,19 @@ export function NotificationsView() {
                         )}
                         <Badge
                           variant="outline"
-                          className="border-border/60 px-1.5 py-0 text-[9px] font-semibold text-muted-foreground"
+                          className="rounded px-1.5 py-0 text-[9px] font-bold text-muted-foreground"
                         >
                           {styles.label}
                         </Badge>
                       </div>
-                      <p className="mt-1 text-sm leading-relaxed break-words text-muted-foreground">
+                      <p className="mt-1 line-clamp-2 text-sm leading-snug text-muted-foreground">
                         {n.message}
                       </p>
                       <p className="mt-1.5 text-xs text-muted-foreground/70">
                         {formatDate(n.createdAt)}
                       </p>
 
-                      {/* Actions */}
-                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 sm:hidden">
                         {action && (
                           <Button
                             size="sm"
@@ -400,34 +392,55 @@ export function NotificationsView() {
                             <ArrowRight className="size-3" />
                           </Button>
                         )}
-                        {!n.read && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-muted-foreground hover:text-brand"
-                            onClick={() => {
-                              markRead(n.id);
-                              toast.success("Marqué comme lu");
-                            }}
-                          >
-                            <CheckCheck className="size-3.5" /> Marquer comme lu
-                          </Button>
-                        )}
                         <button
                           onClick={() => handleRemove(n.id)}
-                          className="ml-auto flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-red-600"
+                          className="ml-auto flex items-center gap-1 text-xs font-bold text-muted-foreground transition-colors hover:text-red-600"
                         >
                           <Trash2 className="size-3.5" /> Supprimer
                         </button>
                       </div>
                     </div>
+
+                    <div className="hidden min-w-36 flex-col items-end gap-2 sm:flex">
+                      {action && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-brand/30 text-brand-dark hover:bg-brand-light"
+                          onClick={() => {
+                            if (!n.read) markRead(n.id);
+                            navigate(action.view);
+                          }}
+                        >
+                          Ouvrir
+                          <ArrowRight className="size-3" />
+                        </Button>
+                      )}
+                      {!n.read && (
+                        <button
+                          className="text-xs font-bold text-brand hover:underline"
+                          onClick={() => {
+                            markRead(n.id);
+                            toast.success("Marqué comme lu");
+                          }}
+                        >
+                          Marquer lu
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleRemove(n.id)}
+                        className="text-xs font-bold text-muted-foreground transition-colors hover:text-red-600"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

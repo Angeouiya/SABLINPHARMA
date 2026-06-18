@@ -1,58 +1,62 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth/session";
+import { PASS_ORDONNANCE_PRICE } from "@/lib/restrictions";
 
 export async function GET() {
   const user = await getSessionUser();
   if (!user) {
-    return NextResponse.json({ subscription: null });
+    return NextResponse.json({ subscription: null, pass: null });
   }
-  const subscription = await db.subscription.findUnique({
+  const pass = await db.passOrdonnance.findFirst({
     where: { userId: user.id },
+    orderBy: { createdAt: "desc" },
   });
-  const isPremium =
-    !!subscription &&
-    subscription.status === "active" &&
-    (!subscription.endDate || new Date(subscription.endDate) > new Date());
-  return NextResponse.json({ subscription: isPremium ? subscription : null });
+  return NextResponse.json({
+    subscription: null,
+    pass:
+      pass && pass.active && (pass.status === "active" || pass.status === "linked")
+        ? pass
+        : null,
+    passStatus: pass?.status ?? "none",
+  });
 }
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json(
-      { error: "Vous devez être connecté pour vous abonner." },
+      { error: "Vous devez être connecté pour acheter un Pass Ordonnance Unique." },
       { status: 401 }
     );
   }
   try {
     const body = await req.json();
     const reference = body.reference ?? `SPL-${Date.now()}`;
-    const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + 1);
 
-    const subscription = await db.subscription.upsert({
-      where: { userId: user.id },
-      update: {
-        status: "active",
-        amount: 500,
-        startDate: new Date(),
-        endDate,
-      },
-      create: {
+    const existing = await db.passOrdonnance.findFirst({
+      where: { userId: user.id, active: true, status: { in: ["active", "linked"] } },
+    });
+    if (existing) {
+      return NextResponse.json(
+        { error: "Vous avez déjà un Pass Ordonnance Unique actif." },
+        { status: 400 }
+      );
+    }
+
+    const pass = await db.passOrdonnance.create({
+      data: {
         userId: user.id,
-        plan: "premium",
+        active: true,
         status: "active",
-        amount: 500,
-        startDate: new Date(),
-        endDate,
+        price: PASS_ORDONNANCE_PRICE,
       },
     });
 
     await db.payment.create({
       data: {
         userId: user.id,
-        amount: 500,
+        amount: PASS_ORDONNANCE_PRICE,
         method: body.method ?? "mobile_money",
         provider: body.provider ?? "orange",
         reference,
@@ -60,10 +64,28 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ subscription });
+    const fullUser = await db.user.findUnique({
+      where: { id: user.id },
+      select: { credits: true },
+    });
+
+    await db.creditTransaction.create({
+      data: {
+        userId: user.id,
+        type: "pass",
+        amount: 0,
+        description: `Pass Ordonnance Unique — ${PASS_ORDONNANCE_PRICE} FCFA (${body.provider ?? "orange"})`,
+        fcfaEquivalent: PASS_ORDONNANCE_PRICE,
+        balanceBefore: fullUser?.credits ?? 0,
+        balanceAfter: fullUser?.credits ?? 0,
+        status: "réussi",
+      },
+    });
+
+    return NextResponse.json({ subscription: null, pass, hasPass: true });
   } catch {
     return NextResponse.json(
-      { error: "Erreur lors de l'activation de l'abonnement." },
+      { error: "Erreur lors de l'activation du Pass Ordonnance Unique." },
       { status: 500 }
     );
   }

@@ -236,7 +236,7 @@ export function AuthView() {
   return (
     <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-2">
       {/* ---------- Left brand panel ---------- */}
-      <aside className="relative hidden overflow-hidden bg-brand-gradient lg:flex lg:flex-col lg:justify-between lg:p-12">
+      <aside className="relative hidden overflow-hidden bg-brand lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="absolute inset-0 bg-dotted-white opacity-20" />
         <div className="absolute -right-24 -top-24 size-72 rounded-full bg-white/10 blur-3xl" />
         <div className="absolute -bottom-32 -left-20 size-80 rounded-full bg-emerald-300/10 blur-3xl" />
@@ -308,7 +308,7 @@ export function AuthView() {
 
               {/* ---------- LOGIN ---------- */}
               <TabsContent value="login" className="mt-6">
-                <Card className="border-border/70 p-6 shadow-premium sm:p-7">
+                <Card className="border-border/70 p-6 shadow-avance sm:p-7">
                   <div className="mb-5">
                     <h2 className="text-xl font-bold tracking-tight text-brand-dark">
                       Connexion à votre compte
@@ -374,7 +374,7 @@ export function AuthView() {
                     <Button
                       type="submit"
                       disabled={loginLoading}
-                      className="h-11 w-full bg-brand-gradient text-base font-semibold text-white shadow-premium transition-all hover:opacity-95 hover:shadow-premium-lg"
+                      className="h-11 w-full bg-brand text-base font-semibold text-white shadow-avance transition-all hover:opacity-95 hover:shadow-avance-lg"
                     >
                       {loginLoading ? (
                         <>
@@ -431,7 +431,7 @@ export function AuthView() {
 
               {/* ---------- REGISTER ---------- */}
               <TabsContent value="register" className="mt-6">
-                <Card className="border-border/70 p-6 shadow-premium sm:p-7">
+                <Card className="border-border/70 p-6 shadow-avance sm:p-7">
                   <div className="mb-5">
                     <h2 className="text-xl font-bold tracking-tight text-brand-dark">
                       Créer votre compte
@@ -628,7 +628,7 @@ export function AuthView() {
                     <Button
                       type="submit"
                       disabled={regLoading}
-                      className="h-11 w-full bg-brand-gradient text-base font-semibold text-white shadow-premium transition-all hover:opacity-95 hover:shadow-premium-lg"
+                      className="h-11 w-full bg-brand text-base font-semibold text-white shadow-avance transition-all hover:opacity-95 hover:shadow-avance-lg"
                     >
                       {regLoading ? (
                         <>

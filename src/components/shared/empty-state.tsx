@@ -40,7 +40,7 @@ export function EmptyState({
         </p>
       )}
       {action && (
-        <Button className="mt-2 bg-brand-gradient text-white hover:opacity-90" onClick={action.onClick}>
+        <Button className="mt-2 bg-brand text-white hover:opacity-90" onClick={action.onClick}>
           {action.label}
         </Button>
       )}

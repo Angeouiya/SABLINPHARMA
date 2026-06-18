@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth/session";
+import { CREDIT_PACKS, FCFA_PER_CREDIT } from "@/lib/restrictions";
 
 // Recharge credits via Mobile Money (mock)
-const PACKS: Record<number, { credits: number; label: string }> = {
-  200: { credits: 2, label: "Pack Découverte" },
-  500: { credits: 6, label: "Pack Standard" },
-  1000: { credits: 13, label: "Pack Plus" },
-  2000: { credits: 28, label: "Pack Famille" },
-};
+const PACKS = Object.fromEntries(CREDIT_PACKS.map((pack) => [pack.amount, pack]));
 
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
@@ -28,7 +24,8 @@ export async function POST(req: NextRequest) {
       where: { id: user.id },
       select: { credits: true },
     });
-    const balance = (fullUser?.credits ?? 0) + pack.credits;
+    const balanceBefore = fullUser?.credits ?? 0;
+    const balance = balanceBefore + pack.credits;
 
     await db.user.update({
       where: { id: user.id },
@@ -41,7 +38,10 @@ export async function POST(req: NextRequest) {
         type: "recharge",
         amount: pack.credits,
         description: `${pack.label} — ${amount} FCFA (${body.provider ?? "mobile_money"})`,
+        fcfaEquivalent: pack.credits * FCFA_PER_CREDIT,
+        balanceBefore,
         balanceAfter: balance,
+        status: "réussi",
       },
     });
 

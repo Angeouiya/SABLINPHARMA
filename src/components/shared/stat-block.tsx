@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 /* ============================================================
    SABLIN PHARMA — StatBlock
-   Bloc de statistique premium avec icône, valeur, label.
+   Bloc de statistique avance avec icône, valeur, label.
    ============================================================ */
 
 interface StatBlockProps {
@@ -40,7 +40,7 @@ export function StatBlock({
   return (
     <Card
       className={cn(
-        "gap-0 border-border/60 py-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-premium",
+        "gap-0 border-border/60 py-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-avance",
         className
       )}
     >

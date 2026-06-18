@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { verifyPassword, setSession } from "@/lib/auth/session";
+import { attachSession, verifyPassword } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,8 +23,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await setSession(user.id);
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: {
         id: user.id,
         name: user.name,
@@ -33,6 +32,7 @@ export async function POST(req: NextRequest) {
         commune: user.commune,
       },
     });
+    return attachSession(response, user.id);
   } catch {
     return NextResponse.json(
       { error: "Une erreur est survenue lors de la connexion." },

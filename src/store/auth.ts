@@ -6,9 +6,10 @@ import type { User } from "@/lib/types";
 
 interface AuthState {
   user: User | null;
-  premium: boolean;
+  avance: boolean;
   setUser: (user: User | null) => void;
-  setPremium: (premium: boolean) => void;
+  setPassActive: (active: boolean) => void;
+  setavance: (avance: boolean) => void;
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
 }
@@ -17,25 +18,26 @@ export const useAuth = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      premium: false,
+      avance: false,
       setUser: (user) => set({ user }),
-      setPremium: (premium) => set({ premium }),
+      setPassActive: (active) => set({ avance: active }),
+      setavance: (avance) => set({ avance }),
       logout: async () => {
         try {
           await fetch("/api/auth/logout", { method: "POST" });
         } catch {
           /* noop */
         }
-        set({ user: null, premium: false });
+        set({ user: null, avance: false });
       },
       fetchMe: async () => {
         try {
           const res = await fetch("/api/me");
           if (res.ok) {
             const data = await res.json();
-            set({ user: data.user, premium: !!data.subscription });
+            set({ user: data.user, avance: !!data.pass });
           } else {
-            set({ user: null, premium: false });
+            set({ user: null, avance: false });
           }
         } catch {
           /* noop */
@@ -44,7 +46,7 @@ export const useAuth = create<AuthState>()(
     }),
     {
       name: "sablin-auth",
-      partialize: (s) => ({ user: s.user, premium: s.premium }),
+      partialize: (s) => ({ user: s.user, avance: s.avance }),
     }
   )
 );

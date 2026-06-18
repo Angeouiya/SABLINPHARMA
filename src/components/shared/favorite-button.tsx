@@ -45,13 +45,14 @@ export function FavoriteButton({
     toast.success(added ? "Ajouté à vos favoris" : "Retiré de vos favoris");
     setBusy(false);
   };
+  const buttonSize = size === "md" ? "default" : size;
 
   if (variant === "button") {
     return (
       <Button
         type="button"
         variant={active ? "default" : "outline"}
-        size={size}
+        size={buttonSize}
         onClick={handle}
         disabled={busy}
         className={cn(

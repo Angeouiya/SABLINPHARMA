@@ -1,11 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth/session";
+import { CREDIT_COSTS } from "@/lib/restrictions";
+import { validatePassOrdonnance } from "@/lib/restrictions-server";
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser();
+    if (!user) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
     const body = await req.json();
+    const rawItems = body.items ?? [];
     const items: { medicationId?: string; slug?: string; quantity?: number }[] =
-      body.items ?? [];
+      Array.isArray(rawItems) ? rawItems : [];
+    const ordonnanceId =
+      typeof body.ordonnanceId === "string"
+        ? body.ordonnanceId
+        : items
+            .map((item) => `${item.medicationId ?? item.slug ?? "unknown"}:${item.quantity ?? 1}`)
+            .sort()
+            .join("|");
+
+    const activePass = await db.passOrdonnance.findFirst({
+      where: {
+        userId: user.id,
+        active: true,
+        status: { in: ["active", "linked"] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    const recentPaidEstimate = await db.creditTransaction.findFirst({
+      where: {
+        userId: user.id,
+        type: "debit",
+        amount: -CREDIT_COSTS.estimatePrescription,
+        status: "réussi",
+        createdAt: { gte: new Date(Date.now() - 15 * 60 * 1000) },
+        OR: [
+          { description: { contains: "Estimer" } },
+          { description: { contains: "ordonnance" } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!activePass && !recentPaidEstimate) {
+      return NextResponse.json(
+        {
+          error:
+            "Résultat indisponible. Utilisez vos crédits ou un Pass Ordonnance Unique pour débloquer cette estimation.",
+        },
+        { status: 402 }
+      );
+    }
+
+    if (activePass) {
+      const passValidation = await validatePassOrdonnance(user.id, ordonnanceId);
+      if (!passValidation.allowed) {
+        return NextResponse.json({ error: passValidation.message }, { status: 402 });
+      }
+    }
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -14,7 +69,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const lines = [];
+    const lines: Array<{
+      medication: {
+        id: string;
+        name: string;
+        slug: string;
+        form: string;
+        dosage: string;
+        packSize: string;
+        requiresRx: boolean;
+      };
+      quantity: number;
+      unitMin: number;
+      unitMax: number;
+      lineMin: number;
+      lineMax: number;
+      pharmacyCount: number;
+    }> = [];
     let totalMin = 0;
     let totalMax = 0;
     let availablePharmacies = new Set<string>();

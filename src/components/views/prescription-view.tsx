@@ -128,7 +128,7 @@ const STATUS_CONFIG = {
 
 export function PrescriptionView() {
   const { navigate } = useNav();
-  const { user, premium } = useAuth();
+  const { user, avance } = useAuth();
   const { credits, hasPass } = useCredits();
   const [showCreditDialog, setShowCreditDialog] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -276,7 +276,7 @@ export function PrescriptionView() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // L'édition reste gratuite ; un ajout est payant (1 crédit) sauf si Pass Ordonnance Unique actif.
+    // L'édition reste incluse ; un ajout est payant (1 crédit) sauf si Pass Ordonnance Unique actif.
     if (!editingSlug && !hasPass) {
       setShowAddDialog(true);
       return;
@@ -323,6 +323,8 @@ export function PrescriptionView() {
     const outStock = items.filter((i) => itemStatus(i) === "out-of-stock").length;
     return { total, totalUnits, totalCost, available, lowStock, toConfirm, outStock };
   }, [items]);
+
+  const canUsePrescription = !!user && (credits > 0 || hasPass);
 
   const handleEstimate = async () => {
     if (items.length === 0) {
@@ -408,17 +410,21 @@ export function PrescriptionView() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       {/* ============ ACCÈS VERROUILLÉ ============ */}
-      {credits === 0 && !hasPass && (
+      {!canUsePrescription && (
         <LockedView
-          title="Le service Ordonnance nécessite des crédits ou un Pass Ordonnance Unique actif"
-          message="L'ajout de médicaments et l'estimation d'ordonnance sont des services avancés qui nécessitent des crédits."
+          title={user ? "Service Ordonnance verrouillé" : "Connectez-vous pour utiliser le service Ordonnance"}
+          message={
+            user
+              ? "Pour utiliser le service Ordonnance, achetez un Pass Ordonnance Unique à 500 FCFA ou utilisez vos crédits SABLIN."
+              : "Le service Ordonnance est lié à votre compte SABLIN PHARMA. Connectez-vous pour consulter votre solde, vos crédits et votre Pass Ordonnance Unique."
+          }
           cost={1}
           backLabel="Retour à l'accueil"
           backView="home"
         />
       )}
 
-      {credits !== 0 || hasPass ? (
+      {canUsePrescription ? (
         <>
       {/* Back link */}
       <button
@@ -429,8 +435,8 @@ export function PrescriptionView() {
       </button>
 
       {/* ============ INTRO ============ */}
-      <Card className="overflow-hidden border-brand/20 py-0 shadow-premium">
-        <div className="relative bg-brand-gradient">
+      <Card className="overflow-hidden border-brand/20 py-0 shadow-avance">
+        <div className="relative bg-brand">
           <div className="absolute inset-0 bg-dotted-white opacity-15" />
           <div className="absolute -right-12 -top-12 size-44 rounded-full bg-white/10 blur-3xl" />
           <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
@@ -481,7 +487,7 @@ export function PrescriptionView() {
         <div className="space-y-6">
           {/* Form */}
           {showForm && (
-            <Card className="border-border/70 p-5 shadow-premium animate-fade-up">
+            <Card className="border-border/70 p-5 shadow-avance animate-fade-up">
               <div className="mb-4 flex items-center gap-2">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
                   <Plus className="size-4" />
@@ -514,7 +520,7 @@ export function PrescriptionView() {
                     )}
                   </div>
                   {showSuggestions && suggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-premium-lg">
+                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-avance-lg">
                       <ul className="max-h-60 overflow-y-auto scroll-thin py-1">
                         {suggestions.map((s) => (
                           <li key={s.id}>
@@ -711,7 +717,7 @@ export function PrescriptionView() {
               <EmptyState
                 icon={ClipboardList}
                 title="Aucun médicament ajouté"
-                description="Cliquez sur « Ajouter un médicament » pour commencer à constituer votre ordonnance. Vous pourrez ensuite estimer le coût total."
+                description="Cliquez sur « Ajouter un médicament » pour constituer votre ordonnance. Vous pourrez ensuite comparer les prix des pharmacies."
                 action={{
                   label: "Ajouter un médicament",
                   onClick: () => {
@@ -729,7 +735,7 @@ export function PrescriptionView() {
                   return (
                     <Card
                       key={item.slug}
-                      className="border-border/60 py-0 transition-all hover:border-brand/30 hover:shadow-premium"
+                      className="border-border/60 py-0 transition-all hover:border-brand/30 hover:shadow-avance"
                     >
                       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
                         {/* Icon + index */}
@@ -863,7 +869,7 @@ export function PrescriptionView() {
         {/* RIGHT: Recap */}
         <div className="space-y-4">
           {/* Summary card (sticky) */}
-          <Card className="sticky top-24 border-border/70 p-5 shadow-premium">
+          <Card className="sticky top-24 border-border/70 p-5 shadow-avance">
             <div className="flex items-center gap-2">
               <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
                 <Calculator className="size-4" />
@@ -925,7 +931,7 @@ export function PrescriptionView() {
               ) : (
                 <>
                   <Calculator className="size-4" />
-                  {hasPass ? "Estimer le coût" : "Estimer le coût — 2 crédits"}
+                  {hasPass ? "Comparer les prix des pharmacies" : "Comparer les prix des pharmacies — 2 crédits"}
                   <CreditCost cost={hasPass ? 0 : CREDIT_COSTS.estimatePrescription} className="ml-1.5" />
                 </>
               )}
@@ -935,13 +941,14 @@ export function PrescriptionView() {
             <p className="mt-2 text-center text-[11px] leading-snug text-muted-foreground">
               {hasPass ? (
                 <span className="inline-flex items-center gap-1 font-bold text-amber-700">
-                  <Crown className="size-3" /> Pass Ordonnance Unique actif — actions gratuites
+                  <Crown className="size-3" /> Pass Ordonnance Unique actif — actions couvertes
                 </span>
               ) : (
                 <>
                   L&apos;ajout d&apos;un médicament coûte{" "}
-                  <span className="font-bold text-brand-dark">1 crédit</span>. L&apos;estimation
-                  complète coûte <span className="font-bold text-brand-dark">2 crédits</span>.
+                  <span className="font-bold text-brand-dark">1 crédit</span>. La comparaison
+                  des prix des pharmacies coûte <span className="font-bold text-brand-dark">2 crédits</span>.
+                  {" "}1 crédit = 100 FCFA.
                 </>
               )}
             </p>
@@ -975,7 +982,7 @@ export function PrescriptionView() {
           </Card>
 
           {/* Credits upsell */}
-          {!premium && (
+          {!avance && (
             <Card className="overflow-hidden border-amber-500/30 py-0">
               <div className="bg-amber-50 p-4">
                 <div className="flex items-center gap-2">
@@ -989,7 +996,7 @@ export function PrescriptionView() {
                 </div>
                 <ul className="mt-3 space-y-1 text-xs text-foreground/80">
                   <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="size-3.5 text-amber-500" /> Estimations illimitées
+                    <CheckCircle2 className="size-3.5 text-amber-500" /> Estimations par crédits
                   </li>
                   <li className="flex items-center gap-1.5">
                     <CheckCircle2 className="size-3.5 text-amber-500" /> Ordonnances sauvegardées
@@ -1029,7 +1036,7 @@ export function PrescriptionView() {
                 </div>
               </div>
               <Button
-                className="shrink-0 bg-brand-gradient text-white hover:opacity-90"
+                className="shrink-0 bg-brand text-white hover:opacity-90"
                 onClick={() => navigate("pharmacies")}
               >
                 Voir les résultats <ArrowRight className="size-4" />
@@ -1062,9 +1069,9 @@ export function PrescriptionView() {
       <CreditConfirmDialog
         open={showCreditDialog}
         onOpenChange={setShowCreditDialog}
-        title="Estimer mon ordonnance"
+        title="Comparer les prix des pharmacies"
         cost={CREDIT_COSTS.estimatePrescription}
-        description="Obtenez le total estimatif, les médicaments disponibles, les pharmacies recommandées et les options de comparaison"
+        description="Comparez les prix des pharmacies, le total estimatif, les médicaments disponibles et les pharmacies recommandées."
         benefits={[
           "Coût total estimatif min/max",
           "Médicaments disponibles",
@@ -1084,7 +1091,7 @@ export function PrescriptionView() {
         benefits={[
           "Ajouter le médicament à votre liste",
           "Modifier la quantité et la durée",
-          "Supprimer gratuitement à tout moment",
+          "Supprimer inclusement à tout moment",
         ]}
         onConfirm={performAdd}
       />

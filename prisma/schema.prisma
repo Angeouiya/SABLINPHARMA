@@ -28,6 +28,10 @@ model User {
   settings     UserSettings?
   creditTransactions CreditTransaction[]
   passOrdonnances   PassOrdonnance[]
+  pharmacyRequests PharmacyRequest[]
+  contactUnlocks ContactUnlock[]
+  requestDisputes RequestDispute[]
+  requestRefunds RequestRefund[]
 }
 
 model Category {
@@ -49,33 +53,148 @@ model Medication {
   category    Category @relation(fields: [categoryId], references: [id])
   form        String // comprimé, sirop, gélule, pommade, suppositoire, injectable
   dosage      String // ex: 500 mg, 250 mg/5 mL
+  dosageUnit  String?
   packSize    String // ex: Boîte de 20, Flacon 100 mL
+  packaging   String?
+  presentation String?
+  manufacturer String?
+  barcode     String?
+  country     String   @default("Côte d'Ivoire")
+  referenceCode String?
+  verificationStatus String @default("À vérifier") // À vérifier, Validé, Publié, Archivé, Conflit
+  verifiedAt  DateTime?
+  verifiedBy  String?
+  confidenceLevel Int @default(0)
+  status      String   @default("Actif") // Actif, Inactif
   description String
+  shortDescription String?
   imageUrl    String?
   requiresRx  Boolean  @default(false)
   avgPrice    Int // FCFA
   createdAt   DateTime @default(now())
   pharmacies  PharmacyMedication[]
+  addRequests MedicationAddRequest[]
+  aliases     MedicationAlias[]
+  images      MedicationImage[]
+  descriptions MedicationDescription[]
+  enrichmentJobs EnrichmentJob[]
+  importRows  InventoryImportRow[]
+  inventorySyncRows InventorySyncRow[]
+  productMappings ProductMapping[]
+  inventoryConflicts InventoryConflict[]
+  pharmacyRequests PharmacyRequest[]
+  proposedCandidates EnrichmentCandidate[] @relation("CandidateMedication")
+
+  @@index([genericName])
+  @@index([dosage])
+  @@index([form])
+  @@index([manufacturer])
+  @@index([barcode])
 }
 
 model Pharmacy {
   id              String               @id @default(cuid())
   name            String
+  tradeName       String?
   slug            String               @unique
   address         String
   commune         String
+  district        String?
   phone           String
+  whatsapp        String?
+  professionalEmail String?
+  managerName     String?
+  managerRole     String?
+  authorizationNumber String?
+  landmark        String?
+  coverageZone    String?
+  description     String?
+  creationSource  String               @default("Création administrateur") // Inscription pharmacie, Création administrateur
+  accountStatus   String               @default("Validée") // En attente de validation, Validée, Refusée, Suspendue, Incomplète
+  publicationStatus String             @default("Publiée") // Brouillon, Non publiée, Publiée, Masquée, Archivée
+  publishProvisional Boolean            @default(false)
+  dataQuality     String               @default("Données à jour")
+  servicesCsv     String?
+  internalIdentifier String?
+  internalNotes   String?
+  validationComment String?
+  suspensionReason String?
+  validatedAt     DateTime?
+  validatedBy     String?
+  publicationUpdatedAt DateTime?
+  dataFreshnessWarningDays Int          @default(3)
+  dataFreshnessStaleDays Int            @default(5)
+  qualityScore    Int                  @default(0)
+  lastDataUpdate  DateTime?
+  timezone        String               @default("Africa/Abidjan")
+  hoursMonday     String?
+  hoursTuesday    String?
+  hoursWednesday  String?
+  hoursThursday   String?
+  hoursFriday     String?
+  hoursSaturdayDetailed String?
+  hoursSundayDetailed String?
   hoursWeekday    String
   hoursSaturday   String
   hoursSunday     String
+  specialHoursMessage String?
   isOpen247       Boolean              @default(false)
+  exceptionalClosureStart DateTime?
+  exceptionalClosureEnd DateTime?
+  exceptionalOpeningMessage String?
   isOnDuty        Boolean              @default(false) // pharmacie de garde
+  dutyPeriod      String?
+  dutyStartAt     DateTime?
+  dutyEndAt       DateTime?
   latitude        Float
   longitude       Float
   rating          Float                @default(4.5)
   imageUrl        String?
   createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @default(now()) @updatedAt
   medications     PharmacyMedication[]
+  media           PharmacyMedia[]
+  professionalActions ProfessionalActionLog[]
+  imports         PharmacyImport[]
+  importRows      InventoryImportRow[]
+  inventoryConnections InventoryConnection[]
+  inventorySyncJobs InventorySyncJob[]
+  inventorySyncRows InventorySyncRow[]
+  productMappings ProductMapping[]
+  inventoryConflicts InventoryConflict[]
+  userRequests PharmacyRequest[]
+  contactUnlocks ContactUnlock[]
+  medicationAddRequests MedicationAddRequest[]
+  professionalMemberships ProfessionalPharmacyMembership[]
+  professionalInvitations ProfessionalInvitation[]
+  auditLogs       AuditLog[]
+}
+
+model PharmacyMedia {
+  id              String   @id @default(cuid())
+  pharmacyId      String
+  type            String   // logo, facade, exterior, interior, counter, sign, cover, authorization_document
+  title           String
+  description     String?
+  altText         String?
+  url             String
+  visibility      String   @default("public") // public, admin_only, internal
+  usage           String?
+  validationStatus String  @default("En attente") // En attente, Validée, Refusée, Masquée, Archivée
+  displayOrder    Int      @default(0)
+  isPrimary       Boolean  @default(false)
+  isPublic        Boolean  @default(false)
+  isValidated     Boolean  @default(false)
+  containsSensitiveData Boolean @default(false)
+  uploadedByRole  String   @default("Administrateur SABLIN")
+  uploadedByName  String?
+  originalFileName String?
+  mimeType        String?
+  fileSize        Int?
+  rejectedReason  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  pharmacy        Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
 }
 
 model PharmacyMedication {
@@ -84,15 +203,718 @@ model PharmacyMedication {
   medicationId String
   price        Int // FCFA
   inStock      Boolean    @default(true)
+  availabilityStatus String @default("Disponible") // Disponible, Stock faible, Rupture, À confirmer
+  dataSource   String     @default("Saisie administrateur")
+  reliabilityLevel String  @default("Confirmé") // Confirmé, À vérifier, Ancien, Incomplet
+  internalQuantity Int?
+  lowStockThreshold Int?
+  autoStatusEnabled Boolean @default(false)
+  publicationStatus String  @default("Publiée") // Brouillon, Publiée, Retirée, À vérifier
+  priceUpdatedAt DateTime?
+  priceSource   String?
+  priceReliabilityLevel String @default("Confirmé")
+  pricePublicationStatus String @default("Publiée")
+  modifiedByRole String?
+  modifiedByName String?
+  verifiedAt   DateTime?
+  verifiedBy   String?
+  internalRemark String?
+  remark       String?
+  lastUpdatedAt DateTime  @default(now())
   pharmacy     Pharmacy   @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
   medication   Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+}
+
+model PharmacyImport {
+  id          String   @id @default(cuid())
+  pharmacyId  String
+  fileName    String
+  fileType    String   @default("CSV")
+  authorRole  String
+  authorName  String?
+  source      String   @default("Import pharmacie")
+  status      String   @default("En préparation") // En préparation, En cours, Terminé, Terminé avec erreurs, Échoué, Annulé
+  totalRows   Int      @default(0)
+  validRows   Int      @default(0)
+  invalidRows Int      @default(0)
+  recognizedMedications Int @default(0)
+  unknownMedications Int @default(0)
+  duplicateRows Int    @default(0)
+  missingPrices Int    @default(0)
+  invalidPrices Int    @default(0)
+  invalidStatuses Int  @default(0)
+  missingDosages Int   @default(0)
+  missingForms Int     @default(0)
+  reportJson   String?
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  pharmacy    Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  rows        InventoryImportRow[]
+}
+
+model MedicationAddRequest {
+  id          String   @id @default(cuid())
+  pharmacyId  String?
+  medicationId String?
+  proposedName String
+  genericName String?
+  dosage      String?
+  form        String?
+  packaging   String?
+  manufacturer String?
+  photoUrl    String?
+  remark      String?
+  status      String   @default("En attente") // En attente, En analyse, Validée, Refusée, Fusionnée avec un médicament existant
+  createdByRole String  @default("Pharmacien responsable")
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+  pharmacy    Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  medication  Medication? @relation(fields: [medicationId], references: [id], onDelete: SetNull)
+}
+
+model MedicationAlias {
+  id              String   @id @default(cuid())
+  medicationId    String
+  alias           String
+  normalizedAlias String
+  source          String   @default("Référentiel SABLIN PHARMA")
+  language        String   @default("fr")
+  createdAt       DateTime @default(now())
+  medication      Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  @@index([normalizedAlias])
+  @@index([medicationId])
+}
+
+model MedicationImage {
+  id              String   @id @default(cuid())
+  medicationId    String
+  url             String
+  storagePath     String?
+  originalUrl     String?
+  sourceName      String   @default("SABLIN PHARMA")
+  sourceUrl       String?
+  imageType       String   @default("placeholder") // official, pharmacy_photo, web_candidate, placeholder
+  licenseType     String   @default("Image interne SABLIN PHARMA")
+  licenseUrl      String?
+  attributionText String?
+  commercialUseAllowed Boolean @default(false)
+  modificationAllowed Boolean @default(false)
+  isPrimary       Boolean @default(false)
+  isPlaceholder   Boolean @default(false)
+  width           Int?
+  height          Int?
+  fileHash        String?
+  perceptualHash  String?
+  confidenceScore Int     @default(0)
+  validationStatus String @default("À vérifier") // En attente, Licence vérifiée, Validée, Refusée, Publiée, Archivée
+  validatedBy     String?
+  validatedAt     DateTime?
+  createdAt       DateTime @default(now())
+  medication       Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  @@index([medicationId])
+  @@index([fileHash])
+  @@index([perceptualHash])
+  @@index([validationStatus])
+}
+
+model MedicationDescription {
+  id              String   @id @default(cuid())
+  medicationId    String
+  shortText       String
+  longText        String?
+  sourceName      String
+  sourceUrl       String?
+  sourceVersion   String?
+  generatedByAI   Boolean @default(false)
+  validationStatus String @default("À vérifier") // Brouillon automatique, À vérifier, Validée, Refusée, Publiée, Archivée
+  confidenceScore Int     @default(0)
+  validatedBy     String?
+  validatedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  medication      Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  @@index([medicationId])
+  @@index([validationStatus])
+}
+
+model InventoryImportRow {
+  id              String   @id @default(cuid())
+  importId        String
+  pharmacyId      String
+  lineNumber      Int
+  originalJson    String
+  normalizedJson  String
+  correctionJson  String?
+  medicationId    String?
+  matchScore      Int     @default(0)
+  matchLevel      String  @default("Aucune correspondance")
+  status          String  @default("En attente") // En attente, Analyse, Validation requise, Validé, Publié, Échec
+  errorsJson      String?
+  warningsJson    String?
+  enrichmentRequired Boolean @default(true)
+  processedBy     String   @default("Moteur SABLIN PHARMA")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  import          PharmacyImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  pharmacy        Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medication      Medication? @relation(fields: [medicationId], references: [id], onDelete: SetNull)
+  enrichmentJobs  EnrichmentJob[]
+
+  @@index([importId])
+  @@index([pharmacyId])
+  @@index([medicationId])
+  @@index([matchLevel])
+  @@index([status])
+}
+
+model EnrichmentJob {
+  id              String   @id @default(cuid())
+  medicationId    String?
+  inventoryImportRowId String?
+  provider        String
+  status          String   @default("En attente") // En attente, Analyse, Recherche interne, Recherche externe, Candidats trouvés, Validation requise, Validé, Publié, Échec, Annulé
+  query           String
+  confidenceScore Int      @default(0)
+  attempts        Int      @default(0)
+  maxAttempts     Int      @default(3)
+  errorMessage    String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  medication      Medication? @relation(fields: [medicationId], references: [id], onDelete: SetNull)
+  inventoryImportRow InventoryImportRow? @relation(fields: [inventoryImportRowId], references: [id], onDelete: SetNull)
+  candidates      EnrichmentCandidate[]
+
+  @@index([status])
+  @@index([provider])
+  @@index([medicationId])
+  @@index([inventoryImportRowId])
+}
+
+model EnrichmentCandidate {
+  id              String   @id @default(cuid())
+  jobId           String
+  candidateType   String   // medication_match, image, description, license
+  proposedMedicationId String?
+  imageUrl        String?
+  sourceUrl       String?
+  sourceName      String?
+  licenseType     String?
+  score           Int      @default(0)
+  matchDetails    String?
+  status          String   @default("À vérifier") // À vérifier, Validé, Refusé, Publié, Archivé
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+  job             EnrichmentJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  proposedMedication Medication? @relation("CandidateMedication", fields: [proposedMedicationId], references: [id], onDelete: SetNull)
+
+  @@index([jobId])
+  @@index([candidateType])
+  @@index([status])
+  @@index([proposedMedicationId])
+}
+
+model EnrichmentProviderConfig {
+  id              String   @id @default(cuid())
+  providerType    String   // MedicationDataProvider, ImageSearchProvider, LicenseVerificationProvider, DescriptionProvider
+  name            String   @unique
+  priority        Int      @default(10)
+  active          Boolean  @default(false)
+  quotaDaily      Int      @default(0)
+  requestLimit    Int      @default(0)
+  timeoutMs       Int      @default(8000)
+  maxRetries      Int      @default(2)
+  lastSuccessAt   DateTime?
+  lastErrorAt     DateTime?
+  lastErrorMessage String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([providerType])
+  @@index([active])
+}
+
+model InventoryConnection {
+  id              String   @id @default(cuid())
+  pharmacyId      String
+  connectorType   String
+  name            String
+  status          String   @default("En attente")
+  configurationEncrypted String?
+  primaryMethod   String   @default("Saisie manuelle")
+  fallbackMethod  String?
+  frequency       String   @default("Manuelle")
+  lastSyncAt      DateTime?
+  nextSyncAt      DateTime?
+  lastSuccessAt   DateTime?
+  lastErrorAt     DateTime?
+  lastErrorMessage String?
+  healthStatus    String   @default("À configurer")
+  lastRowsReceived Int     @default(0)
+  lastRowsValid    Int     @default(0)
+  lastRowsRejected Int     @default(0)
+  lastRecognizedMedications Int @default(0)
+  lastUnknownMedications Int @default(0)
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  pharmacy        Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  jobs            InventorySyncJob[]
+  mappings        ProductMapping[]
+
+  @@index([pharmacyId])
+  @@index([connectorType])
+  @@index([status])
+}
+
+model InventorySyncJob {
+  id              String   @id @default(cuid())
+  pharmacyId      String
+  connectionId    String?
+  status          String   @default("Planifiée")
+  triggerType     String   @default("manual")
+  priority        Int      @default(5)
+  scheduledAt     DateTime?
+  nextRetryAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  totalRows       Int      @default(0)
+  validRows       Int      @default(0)
+  invalidRows     Int      @default(0)
+  recognizedMedications Int @default(0)
+  unknownMedications Int @default(0)
+  createdProducts Int      @default(0)
+  updatedProducts Int      @default(0)
+  outOfStockProducts Int   @default(0)
+  priceChanges    Int      @default(0)
+  conflicts       Int      @default(0)
+  warnings        Int      @default(0)
+  errorMessage    String?
+  attempts        Int      @default(0)
+  createdBy       String?
+  reportJson      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  pharmacy        Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  connection      InventoryConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  rows            InventorySyncRow[]
+  conflictItems   InventoryConflict[]
+
+  @@index([pharmacyId])
+  @@index([connectionId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model InventorySyncRow {
+  id              String   @id @default(cuid())
+  syncJobId       String
+  pharmacyId      String
+  sourceProductId String?
+  originalData    String
+  normalizedData  String
+  medicationId    String?
+  matchingScore   Int      @default(0)
+  status          String   @default("À vérifier")
+  errors          String?
+  warnings        String?
+  actionTaken     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  syncJob         InventorySyncJob @relation(fields: [syncJobId], references: [id], onDelete: Cascade)
+  pharmacy        Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medication      Medication? @relation(fields: [medicationId], references: [id], onDelete: SetNull)
+
+  @@index([syncJobId])
+  @@index([pharmacyId])
+  @@index([medicationId])
+  @@index([status])
+  @@index([sourceProductId])
+}
+
+model ProductMapping {
+  id              String   @id @default(cuid())
+  pharmacyId      String
+  connectionId    String?
+  sourceSystem    String
+  sourceProductId String
+  sourceBarcode   String?
+  medicationId    String
+  confidenceScore Int      @default(0)
+  status          String   @default("À vérifier")
+  validatedBy     String?
+  validatedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  pharmacy        Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  connection      InventoryConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  medication      Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+
+  @@unique([pharmacyId, sourceSystem, sourceProductId])
+  @@index([sourceBarcode])
+  @@index([medicationId])
+  @@index([status])
+}
+
+model InventoryConflict {
+  id              String   @id @default(cuid())
+  pharmacyId      String
+  syncJobId       String?
+  medicationId    String?
+  conflictType    String
+  currentValue    String?
+  incomingValue   String?
+  currentSource   String?
+  incomingSource  String?
+  riskLevel       String   @default("À vérifier")
+  status          String   @default("Ouvert")
+  proposedAction  String?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  resolution      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  pharmacy        Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  syncJob         InventorySyncJob? @relation(fields: [syncJobId], references: [id], onDelete: SetNull)
+  medication      Medication? @relation(fields: [medicationId], references: [id], onDelete: SetNull)
+
+  @@index([pharmacyId])
+  @@index([syncJobId])
+  @@index([medicationId])
+  @@index([conflictType])
+  @@index([status])
+}
+
+model PharmacyRequest {
+  id                String   @id @default(cuid())
+  reference         String   @unique
+  userId            String
+  pharmacyId        String
+  medicationId      String?
+  prescriptionId    String?
+  requestType       String
+  serviceName       String
+  status            String   @default("Nouvelle")
+  priority          String   @default("Normale")
+  userMessage       String?
+  requestedQuantity String?
+  dosage            String?
+  form              String?
+  packaging         String?
+  preferredResponse String?
+  creditCost        Int
+  fcfaEquivalent    Int
+  transactionId     String?
+  idempotencyKey    String?  @unique
+  assignedToId      String?
+  assignedToName    String?
+  assignedAt        DateTime?
+  assignedBy        String?
+  acceptedAt        DateTime?
+  receivedAt        DateTime?
+  expiresAt         DateTime
+  respondedAt       DateTime?
+  closedAt          DateTime?
+  refundEligible    Boolean  @default(false)
+  disputeAllowedUntil DateTime?
+  internalNotes     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacy          Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medication        Medication? @relation(fields: [medicationId], references: [id], onDelete: SetNull)
+  responses         PharmacyRequestResponse[]
+  history           RequestStatusHistory[]
+  disputes          RequestDispute[]
+  refunds           RequestRefund[]
+
+  @@index([reference])
+  @@index([userId])
+  @@index([pharmacyId])
+  @@index([status])
+  @@index([requestType])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@index([transactionId])
+}
+
+model PharmacyRequestResponse {
+  id                 String   @id @default(cuid())
+  requestId          String
+  responderId        String?
+  responderName      String?
+  responderRole      String
+  availabilityStatus String?
+  confirmedPrice     Int?
+  packaging          String?
+  responseMessage    String
+  validUntil         DateTime?
+  dataSource         String   @default("Saisie pharmacie")
+  updateInventory    Boolean  @default(false)
+  oldInventoryValue  String?
+  newInventoryValue  String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  request            PharmacyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([createdAt])
+}
+
+model ContactUnlock {
+  id             String   @id @default(cuid())
+  userId         String
+  pharmacyId     String
+  unlockType     String
+  creditCost     Int
+  fcfaEquivalent Int      @default(0)
+  transactionId  String?
+  idempotencyKey String?  @unique
+  unlockedAt     DateTime @default(now())
+  expiresAt      DateTime
+  status         String   @default("Actif")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacy       Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([pharmacyId])
+  @@index([unlockType])
+  @@index([expiresAt])
+  @@index([transactionId])
+}
+
+model RequestStatusHistory {
+  id             String   @id @default(cuid())
+  requestId      String
+  previousStatus String?
+  newStatus      String
+  changedBy      String?
+  changedByRole  String?
+  reason         String?
+  createdAt      DateTime @default(now())
+  request        PharmacyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([createdAt])
+}
+
+model RequestDispute {
+  id                String   @id @default(cuid())
+  requestId         String
+  userId            String
+  reason            String
+  description       String
+  status            String   @default("Nouveau")
+  assignedAdminId   String?
+  resolution        String?
+  refundTransactionId String?
+  createdAt         DateTime @default(now())
+  resolvedAt        DateTime?
+  request           PharmacyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model RequestRefund {
+  id             String   @id @default(cuid())
+  requestId      String
+  userId         String
+  creditAmount   Int
+  fcfaEquivalent Int      @default(0)
+  reason         String
+  status         String   @default("En attente")
+  idempotencyKey String   @unique
+  transactionId  String?
+  processedBy    String?
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+  request        PharmacyRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ProfessionalActionLog {
+  id          String   @id @default(cuid())
+  scope       String   // admin, pharmacy
+  action      String
+  label       String
+  entityType  String?
+  entityId    String?
+  pharmacyId  String?
+  pharmacySlug String?
+  actorRole   String?
+  status      String   @default("réussi")
+  message     String?
+  details     String?
+  oldValue    String?
+  newValue    String?
+  source      String?
+  sessionId   String?
+  comment     String?
+  createdAt   DateTime @default(now())
+  pharmacy    Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+}
+
+model ProfessionalSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedBy   String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
+
+model ProfessionalAccount {
+  id              String   @id @default(cuid())
+  kind            String   // pharmacy, admin
+  name            String
+  email           String?  @unique
+  phone           String?  @unique
+  passwordHash    String?
+  role            String
+  permissionsJson String   @default("[]")
+  status          String   @default("ACTIVE") // PENDING, ACTIVE, SUSPENDED, BLOCKED, ARCHIVED, DELETED
+  mustResetPassword Boolean @default(false)
+  twoFactorEnabled Boolean @default(false)
+  twoFactorRecommended Boolean @default(false)
+  sessionVersion  Int      @default(1)
+  lastLoginAt     DateTime?
+  lastPasswordChangeAt DateTime?
+  suspendedReason String?
+  internalNotes   String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  memberships     ProfessionalPharmacyMembership[]
+  invitationsSent ProfessionalInvitation[] @relation("InvitationCreator")
+  sessions        ProfessionalSessionRecord[]
+  passwordResets  PasswordResetToken[]
+  auditLogs       AuditLog[]
+}
+
+model ProfessionalPharmacyMembership {
+  id              String   @id @default(cuid())
+  accountId       String
+  pharmacyId      String
+  role            String
+  permissionsJson String   @default("[]")
+  status          String   @default("Actif") // Invité, Actif, Suspendu, Révoqué, Expiré
+  attachedBy      String?
+  startedAt       DateTime @default(now())
+  endedAt         DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  account         ProfessionalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  pharmacy        Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, pharmacyId])
+}
+
+model ProfessionalInvitation {
+  id              String   @id @default(cuid())
+  pharmacyId      String?
+  email           String?
+  phone           String?
+  name            String
+  role            String
+  permissionsJson String   @default("[]")
+  tokenHash       String
+  status          String   @default("En attente") // En attente, Acceptée, Expirée, Annulée, Renvoyée
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdByAccountId String?
+  createdByRole   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  pharmacy        Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  createdByAccount ProfessionalAccount? @relation("InvitationCreator", fields: [createdByAccountId], references: [id], onDelete: SetNull)
+}
+
+model ProfessionalSessionRecord {
+  id              String   @id @default(cuid())
+  accountId       String
+  kind            String
+  role            String
+  status          String   @default("ACTIVE") // ACTIVE, REVOKED, EXPIRED
+  sessionVersion  Int
+  activePharmacyId String?
+  userAgent       String?
+  ipAddress       String?
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  revokedBy       String?
+  account         ProfessionalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id              String   @id @default(cuid())
+  accountId       String
+  tokenHash       String   @unique
+  status          String   @default("ACTIVE") // ACTIVE, USED, EXPIRED, REVOKED
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdAt       DateTime @default(now())
+  account         ProfessionalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model SecurityNotification {
+  id              String   @id @default(cuid())
+  platform        String
+  recipientAccountId String?
+  recipientUserId String?
+  pharmacyId      String?
+  type            String
+  title           String
+  message         String
+  status          String   @default("non_lue")
+  createdAt       DateTime @default(now())
+}
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  platform        String
+  action          String
+  entityType      String?
+  entityId        String?
+  pharmacyId      String?
+  actorAccountId  String?
+  actorName       String?
+  actorRole       String?
+  result          String   @default("réussi")
+  oldValue        String?
+  newValue        String?
+  ipAddress       String?
+  userAgent       String?
+  sessionId       String?
+  comment         String?
+  createdAt       DateTime @default(now())
+  pharmacy        Pharmacy? @relation(fields: [pharmacyId], references: [id], onDelete: SetNull)
+  actorAccount    ProfessionalAccount? @relation(fields: [actorAccountId], references: [id], onDelete: SetNull)
 }
 
 model Subscription {
   id        String   @id @default(cuid())
   userId    String   @unique
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan      String   @default("premium")
+  plan      String   @default("pass")
   status    String   @default("active") // active, pending, expired
   amount    Int      @default(500)
   startDate DateTime @default(now())
@@ -171,7 +993,10 @@ model CreditTransaction {
   type        String   // "recharge" | "debit" | "pass"
   amount      Int      // positive for recharge, negative for debit
   description String
+  fcfaEquivalent Int   @default(0)
+  balanceBefore Int    @default(0)
   balanceAfter Int
+  status      String   @default("réussi") // réussi, annulé, échoué
   createdAt   DateTime @default(now())
 }
 
@@ -180,7 +1005,10 @@ model PassOrdonnance {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   active    Boolean  @default(true)
+  status    String   @default("active") // active, linked, used, expired
+  ordonnanceId String?
   price     Int      @default(500)
+  usedAt    DateTime?
   createdAt DateTime @default(now())
 }
 

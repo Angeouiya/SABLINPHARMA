@@ -1,59 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Search,
-  ClipboardList,
   ChevronRight,
-  Timer,
-  Plus,
-  MapPin,
-  Phone,
-  Lock,
-  Navigation,
-  CheckCircle2,
-  ShieldAlert,
-  Zap,
-  Pill,
-  Headphones,
-  ArrowRight,
+  ClipboardList,
+  Clock,
   Coins,
+  MapPin,
+  Pill,
+  Plus,
+  Search,
+  ShieldAlert,
+  Timer,
   Wallet,
 } from "lucide-react";
-import { Logo } from "@/components/logo";
 import { SearchBar } from "@/components/shared/search-bar";
 import { SectionHeader } from "@/components/shared/section-header";
-import { StatBlock } from "@/components/shared/stat-block";
 import { MedicationStatusBadge } from "@/components/shared/status-badge";
 import { GoogleMap } from "@/components/shared/google-map";
-import { AlertMessage } from "@/components/shared/alert-message";
-import { CreditCost, PassBadge } from "@/components/shared/credit-cost";
+import { CreditCost } from "@/components/shared/credit-cost";
 import { CategoryIcon } from "@/components/category-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
+import { Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
-import { formatFCFA, distanceKm } from "@/lib/format";
+import { distanceKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Category, Medication, Pharmacy } from "@/lib/types";
 
-// Abidjan center reference for distance display
 const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
 
-// The 7 categories requested, mapped to DB slugs with friendly names
 const HOME_CATEGORIES: { slug: string; fallbackName: string }[] = [
-  { slug: "douleur-fievre", fallbackName: "Douleur & Fièvre" },
-  { slug: "antibiotiques", fallbackName: "Antibiotiques" },
-  { slug: "respiratoire", fallbackName: "Toux & Rhume" },
+  { slug: "douleur-fievre", fallbackName: "Douleur" },
+  { slug: "antibiotiques", fallbackName: "Antibio" },
+  { slug: "respiratoire", fallbackName: "Toux" },
   { slug: "vitamines", fallbackName: "Vitamines" },
   { slug: "digestif", fallbackName: "Digestion" },
-  { slug: "dermatologie", fallbackName: "Peau & Soins" },
-  { slug: "mere-enfant", fallbackName: "Bébé & Maman" },
+  { slug: "dermatologie", fallbackName: "Peau" },
+  { slug: "mere-enfant", fallbackName: "Maman" },
 ];
 
-// Deterministic status assignment for the "recently searched" table
 function medStatus(med: Medication): "available" | "low-stock" | "out-of-stock" {
   const hash = med.slug.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
   const pct = hash % 10;
@@ -93,637 +81,219 @@ export function HomeView() {
     };
   }, []);
 
-  // Filter to the 7 requested categories, in the defined order
-  const homeCategories = HOME_CATEGORIES.map((hc) => {
-    const found = categories.find((c) => c.slug === hc.slug);
-    return found ? { ...found, name: hc.fallbackName } : null;
-  }).filter(Boolean) as Category[];
+  const homeCategories = useMemo(
+    () =>
+      HOME_CATEGORIES.map((hc) => {
+        const found = categories.find((c) => c.slug === hc.slug);
+        return found ? { ...found, name: hc.fallbackName } : null;
+      }).filter(Boolean) as Category[],
+    [categories]
+  );
 
-  // Top 6 meds for the "recently searched" table
-  const recentMeds = popularMeds.slice(0, 6);
+  const openDutyCount = onDuty.filter((p) => p.openNow || p.isOpen247).length;
 
   return (
-    <div className="flex flex-col">
-      {/* ========================================================
-          1. HERO
-          ======================================================== */}
-      <section className="relative overflow-hidden bg-brand-gradient">
-        <div className="absolute inset-0 bg-dotted-white opacity-20" />
-        <div className="absolute -right-20 -top-20 size-72 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-32 -left-20 size-80 rounded-full bg-emerald-300/10 blur-3xl" />
-
-        <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[1.1fr_1fr] lg:items-center lg:gap-12 lg:px-8 lg:py-20">
-          <div className="text-white">
-            {/* Logo prominent */}
-            <div className="mb-5 hidden items-center gap-2.5 lg:flex">
-              <Logo size={44} variant="light" />
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-3 py-4 sm:px-5 lg:px-6 lg:py-6">
+      <section className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+        <Card className="border-border/80 bg-card p-4 shadow-avance sm:p-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase text-brand">SABLIN PHARMA</p>
+                <h1 className="mt-1 text-2xl font-extrabold text-foreground sm:text-3xl">
+                  Trouvez vos médicaments plus rapidement en Côte d'Ivoire
+                </h1>
+              </div>
+              <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border bg-muted/50 text-center">
+                <Kpi value={`${popularMeds.length}+`} label="Médocs" />
+                <Kpi value={`${onDuty.length}`} label="Garde" />
+                <Kpi value="100 F" label="Crédit" />
+              </div>
             </div>
 
-            <h1 className="mt-4 text-3xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-4xl lg:text-5xl">
-              Trouvez vos médicaments{" "}
-              <span className="text-amber-300">plus rapidement</span>{" "}
-              en Côte d&apos;Ivoire
-            </h1>
+            <SearchBar
+              variant="hero"
+              placeholder="Médicament, DCI, dosage..."
+            />
 
-            <p className="mt-4 max-w-lg text-sm leading-relaxed break-words text-white/85 sm:text-base">
-              Recherchez un médicament, trouvez une pharmacie disponible près de chez vous,
-              consultez les pharmacies ouvertes ou de garde, et estimez le coût de votre
-              ordonnance. Simple, rapide et fiable.
-            </p>
-
-            {/* Large search bar */}
-            <div className="mt-6 max-w-xl">
-              <SearchBar
-                variant="hero"
-                placeholder="Rechercher un médicament (ex : Paracétamol)..."
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <QuickAction
+                icon={Pill}
+                label="Médicaments"
+                onClick={() => navigate("medications")}
+              />
+              <QuickAction
+                icon={Timer}
+                label="De garde"
+                onClick={() => navigate("pharmacies", { filter: "on-duty" })}
+              />
+              <QuickAction
+                icon={ClipboardList}
+                label="Ordonnance"
+                onClick={() => navigate("prescription")}
+              />
+              <QuickAction
+                icon={Wallet}
+                label="Crédits"
+                onClick={() => navigate("wallet")}
               />
             </div>
+          </div>
+        </Card>
 
-            {/* Secondary action button */}
-            <div className="mt-3 flex flex-wrap gap-2.5">
+        <Card className="border-brand/20 bg-brand p-3 text-white shadow-avance sm:p-5">
+          <div className="flex h-full flex-col gap-3 sm:gap-4">
+            <div className="flex items-start justify-between gap-3">
+              <span className="flex size-9 items-center justify-center rounded-lg bg-white/15 sm:size-10">
+                <Coins className="size-4 sm:size-5" />
+              </span>
+              <Badge className="border-0 bg-white text-brand-dark">Prépayé</Badge>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white/80">Portefeuille</p>
+              <p className="mt-1 text-xl font-extrabold sm:text-2xl">1 crédit = 100 FCFA</p>
+              <p className="mt-1 text-xs text-white/75">
+                Les services avancés se valident action par action.
+              </p>
+            </div>
+            <div className="mt-auto grid grid-cols-2 gap-2 lg:grid-cols-1">
               <Button
-                size="lg"
+                size="sm"
+                className="bg-white text-brand-dark hover:bg-white/90 sm:h-10"
+                onClick={() => navigate("wallet")}
+              >
+                <Coins className="size-4" /> Recharger
+              </Button>
+              <Button
+                size="sm"
                 variant="outline"
-                className="border-amber-300/50 bg-amber-400/20 text-white backdrop-blur-sm hover:bg-amber-400/30 hover:text-white"
+                className="border-white/35 bg-transparent text-white hover:bg-white/10 hover:text-white sm:h-10"
                 onClick={() => navigate("payment", { passOrdonnance: true })}
               >
-                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance
+                <ClipboardList className="size-4" /> Pass
               </Button>
-              <Button
-                size="lg"
-                variant="ghost"
-                className="text-white hover:bg-white/10 hover:text-white"
-                onClick={() => navigate("pharmacies", { filter: "on-duty" })}
-              >
-                <Timer className="size-4" /> Pharmacies de garde
-              </Button>
-            </div>
-
-            {/* Popular searches */}
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-white/70">Recherches populaires :</span>
-              {["Paracétamol", "Amoxicilline", "Vitamine C", "Coartem"].map((p) => (
-                <button
-                  key={p}
-                  onClick={() => navigate("medications", { query: p })}
-                  className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Hero visual */}
-          <div className="relative hidden lg:block">
-            <div className="relative overflow-hidden rounded-3xl border border-white/20 shadow-2xl">
-              <img
-                src="/images/hero-pharmacy.png"
-                alt="Pharmacie moderne à Abidjan"
-                className="aspect-[4/3] w-full object-cover"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-black/60 p-5">
-                <div className="flex items-center gap-3 rounded-2xl bg-white/95 p-3 backdrop-blur-sm">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-brand-light text-brand">
-                    <Plus className="size-6" strokeWidth={3} />
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-foreground">Pharmacie de la Riviera</p>
-                    <p className="text-xs text-muted-foreground">Cocody · Ouvert maintenant</p>
-                  </div>
-                  <Badge className="border-0 bg-amber-400 text-[10px] font-bold text-amber-950">
-                    <Timer className="size-3" /> De garde
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            {/* Floating badge */}
-            <div className="absolute -left-4 top-6 hidden rounded-2xl bg-white p-3 shadow-premium-lg xl:block">
-              <div className="flex items-center gap-2">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-success-light text-success">
-                  <CheckCircle2 className="size-5" />
-                </span>
-                <div>
-                  <p className="text-xs font-bold text-foreground">12 pharmacies</p>
-                  <p className="text-[10px] text-muted-foreground">de garde ce soir</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================
-          2. CONFIANCE — chiffres clés
-          ======================================================== */}
-      <section className="border-b border-border/60 bg-background">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatBlock
-              icon={Plus}
-              tone="brand"
-              value="12"
-              label="Pharmacies partenaires"
-            />
-            <StatBlock
-              icon={Pill}
-              tone="success"
-              value="33+"
-              label="Médicaments référencés"
-            />
-            <StatBlock
-              icon={Search}
-              tone="info"
-              value="15 000+"
-              label="Recherches effectuées"
-            />
-            <StatBlock
-              icon={MapPin}
-              tone="warning"
-              value="12"
-              label="Communes couvertes"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================
-          2.5. COMMENT FONCTIONNE SABLIN PHARMA
-          ======================================================== */}
-      <section className="border-b border-border/60 bg-background">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-          <div className="mx-auto max-w-2xl text-center">
-            <Eyebrow>Comment ça marche</Eyebrow>
-            <Heading level="h2" className="mt-2">
-              Comment fonctionne SABLIN PHARMA ?
-            </Heading>
-            <Muted className="mt-2" size="md">
-              Simple, rapide et transparent.
-            </Muted>
-          </div>
-
-          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-3">
-            {/* Étape 1 */}
-            <Card className="gap-0 border-border/70 p-6 text-center shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
-              <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
-                <Search className="size-6" />
-              </span>
-              <h3 className="mt-4 text-base font-extrabold text-foreground">
-                1. Recherchez gratuitement
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
-                Recherchez gratuitement des informations simples.
-              </p>
-            </Card>
-
-            {/* Étape 2 */}
-            <Card className="gap-0 border-border/70 p-6 text-center shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
-              <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
-                <Coins className="size-6" />
-              </span>
-              <h3 className="mt-4 text-base font-extrabold text-foreground">
-                2. Utilisez vos crédits
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
-                Utilisez vos crédits pour débloquer les services avancés.
-              </p>
-            </Card>
-
-            {/* Étape 3 */}
-            <Card className="gap-0 border-border/70 p-6 text-center shadow-card transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg">
-              <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
-                <Wallet className="size-6" />
-              </span>
-              <h3 className="mt-4 text-base font-extrabold text-foreground">
-                3. Rechargez vos crédits
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
-                Rechargez à partir de 200 FCFA ou achetez un Pass Ordonnance Unique à 500 FCFA.
-              </p>
-            </Card>
-          </div>
-
-          <div className="mt-8">
-            <AlertMessage variant="info">
-              Les recherches simples sont accessibles. Les services avancés comme l&rsquo;ordonnance, les disponibilités réelles, la comparaison et les confirmations nécessitent des crédits.
-            </AlertMessage>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================
-          C'EST QUOI UN CRÉDIT SABLIN ?
-          ======================================================== */}
-      <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <Card className="border-brand/20 bg-brand-light/20 p-6 sm:p-8">
-          <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
-            <div>
-              <Eyebrow>Comprendre les crédits</Eyebrow>
-              <Heading level="h2" className="mt-2">
-                C&apos;est quoi un crédit SABLIN ?
-              </Heading>
-              <p className="mt-3 text-sm leading-relaxed break-words text-foreground/80 sm:text-base">
-                Un crédit SABLIN est une unité interne qui vous permet de débloquer les services
-                avancés de la plateforme.{" "}
-                <span className="font-bold text-brand-dark">1 crédit = 100 FCFA.</span>{" "}
-                Vous rechargez vos crédits une seule fois, puis vous les utilisez uniquement
-                lorsque vous effectuez une action importante.
-              </p>
-              <p className="mt-2 text-sm leading-relaxed break-words text-muted-foreground">
-                Les recherches simples restent accessibles. Les crédits servent à débloquer les
-                services avancés comme l&apos;ordonnance, les contacts pharmacies, les
-                confirmations, les comparaisons et les disponibilités précises.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => navigate("wallet")}>
-                  <Coins className="size-4" /> Recharger mes crédits
-                </Button>
-                <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => navigate("wallet")}>
-                  Voir les services payants
-                </Button>
-              </div>
-            </div>
-
-            {/* Règle 1 crédit = 100 FCFA */}
-            <div className="flex flex-col gap-3">
-              <div className="rounded-xl border border-brand/30 bg-background p-5 text-center shadow-card">
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Règle officielle
-                </p>
-                <p className="mt-2 text-3xl font-extrabold text-brand-dark">
-                  1 crédit = 100 FCFA
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Aucun crédit n&apos;est débité sans votre confirmation.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-background p-3 text-center shadow-card">
-                  <p className="text-lg font-extrabold text-foreground">200 F</p>
-                  <p className="text-xs text-muted-foreground">= 2 crédits</p>
-                </div>
-                <div className="rounded-lg bg-background p-3 text-center shadow-card">
-                  <p className="text-lg font-extrabold text-foreground">500 F</p>
-                  <p className="text-xs text-muted-foreground">= 6 crédits</p>
-                </div>
-                <div className="rounded-lg bg-background p-3 text-center shadow-card">
-                  <p className="text-lg font-extrabold text-foreground">1 000 F</p>
-                  <p className="text-xs text-muted-foreground">= 13 crédits</p>
-                </div>
-                <div className="rounded-lg bg-background p-3 text-center shadow-card">
-                  <p className="text-lg font-extrabold text-foreground">2 000 F</p>
-                  <p className="text-xs text-muted-foreground">= 28 crédits</p>
-                </div>
-              </div>
             </div>
           </div>
         </Card>
       </section>
 
-      {/* ========================================================
-          EXEMPLES D'UTILISATION DES CRÉDITS
-          ======================================================== */}
-      <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mb-6 text-center">
-          <Eyebrow>Concret</Eyebrow>
-          <Heading level="h2" className="mt-2">
-            Exemples d&apos;utilisation des crédits
-          </Heading>
-          <Muted className="mt-2">
-            Chaque service avancé a un coût clair, affiché avant validation.
-          </Muted>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { label: "Voir le contact d'une pharmacie", cost: 1, fcfa: 100 },
-            { label: "Voir les pharmacies qui possèdent un médicament", cost: 1, fcfa: 100 },
-            { label: "Ajouter un médicament à une ordonnance", cost: 1, fcfa: 100 },
-            { label: "Estimer une ordonnance complète", cost: 2, fcfa: 200 },
-            { label: "Demander conseil à une pharmacie", cost: 2, fcfa: 200 },
-            { label: "Confirmer une disponibilité avant déplacement", cost: 3, fcfa: 300 },
-            { label: "Confirmation complète (médicament + prix + dispo)", cost: 4, fcfa: 400 },
-          ].map((item) => (
-            <Card key={item.label} className="flex items-center justify-between gap-3 border-border/70 p-4 shadow-card">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">≈ {item.fcfa} FCFA</p>
-              </div>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-light px-2.5 py-1 text-xs font-bold text-brand-dark">
-                <Coins className="size-3" /> {item.cost} crédit{item.cost > 1 ? "s" : ""}
-              </span>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* ========================================================
-          3. CATÉGORIES
-          ======================================================== */}
-      <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <SectionHeader
-          title="Catégories de médicaments"
-          subtitle="Explorez nos familles de produits santé en un clic"
-          icon={<Pill className="size-5" />}
-          action={{ label: "Voir tout", onClick: () => navigate("medications") }}
-        />
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-          {loading
-            ? Array.from({ length: 7 }).map((_, i) => (
-                <Skeleton key={i} className="h-28 rounded-2xl" />
-              ))
-            : homeCategories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => navigate("medications", { category: cat.slug })}
-                  className="group flex flex-col items-center gap-3 rounded-2xl border border-border/60 bg-background p-5 text-center shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg"
-                >
-                  <span
-                    className="flex size-14 items-center justify-center rounded-2xl transition-transform group-hover:scale-110"
-                    style={{ backgroundColor: `${cat.color}14` }}
-                  >
-                    <CategoryIcon name={cat.iconName} size={28} color={cat.color} />
-                  </span>
-                  <span className="text-sm font-bold leading-tight text-foreground">
-                    {cat.name}
-                  </span>
-                </button>
-              ))}
-        </div>
-      </section>
-
-      {/* ========================================================
-          4. PHARMACIES DE GARDE PROCHES
-          ======================================================== */}
-      <section className="bg-brand-soft/40">
-        <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+      <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <Card className="border-border/80 p-4 shadow-card">
           <SectionHeader
-            title="Pharmacies de garde proches"
-            subtitle="Ouvertes maintenant près de chez vous à Abidjan"
-            icon={<Timer className="size-5" />}
-            action={{
-              label: "Voir toutes",
-              onClick: () => navigate("pharmacies", { filter: "on-duty" }),
-            }}
+            title="Catégories"
+            icon={<Pill className="size-4" />}
+            action={{ label: "Tout", onClick: () => navigate("medications") }}
           />
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-7 lg:grid-cols-4">
             {loading
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-56 rounded-2xl" />
+              ? Array.from({ length: 7 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 rounded-lg" />
                 ))
-              : onDuty.length > 0 ? (
-                onDuty.map((p) => (
-                  <DutyPharmacyCard key={p.id} pharma={p} />
-                ))
-              ) : (
-                <Card className="col-span-full p-8 text-center text-sm text-muted-foreground">
-                  Aucune pharmacie de garde pour le moment.
-                </Card>
-              )}
+              : homeCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => navigate("medications", { category: cat.slug })}
+                    className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-background px-2 py-3 text-center transition-colors hover:border-brand/40 hover:bg-brand-light"
+                  >
+                    <span
+                      className="flex size-9 items-center justify-center rounded-md"
+                      style={{ backgroundColor: `${cat.color}16` }}
+                    >
+                      <CategoryIcon name={cat.iconName} size={20} color={cat.color} />
+                    </span>
+                    <span className="line-clamp-1 text-[11px] font-bold text-foreground">
+                      {cat.name}
+                    </span>
+                  </button>
+                ))}
           </div>
+        </Card>
 
-          {/* Carte Google Maps des pharmacies de garde */}
-          {onDuty.length > 0 && (
-            <Card className="mt-6 overflow-hidden border-brand/20 py-0">
+        <Card className="overflow-hidden border-border/80 p-0 shadow-card">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <SectionHeader
+              title="Pharmacies de garde"
+              icon={<Timer className="size-4" />}
+              action={{
+                label: "Carte",
+                onClick: () => navigate("pharmacies", { filter: "on-duty" }),
+              }}
+            />
+          </div>
+          <div className="grid gap-3 p-4 md:grid-cols-[1fr_220px]">
+            <div className="flex flex-col gap-2">
+              {loading
+                ? Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-20 rounded-lg" />
+                  ))
+                : onDuty.slice(0, 3).map((p) => (
+                    <DutyPharmacyRow key={p.id} pharma={p} />
+                  ))}
+              {!loading && onDuty.length === 0 && (
+                <p className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                  Aucune pharmacie de garde disponible.
+                </p>
+              )}
+            </div>
+            <div className="hidden overflow-hidden rounded-lg border border-border md:block">
               <GoogleMap
-                lat={onDuty[0].latitude}
-                lng={onDuty[0].longitude}
+                lat={onDuty[0]?.latitude ?? ABIDJAN_CENTER.lat}
+                lng={onDuty[0]?.longitude ?? ABIDJAN_CENTER.lon}
                 zoom={13}
                 label="Pharmacies de garde Abidjan"
-                title="Carte des pharmacies de garde"
-                className="h-64 sm:h-72"
+                title={`${openDutyCount} pharmacies ouvertes`}
+                className="h-full min-h-60"
               />
-            </Card>
-          )}
-        </div>
+            </div>
+          </div>
+        </Card>
       </section>
 
-      {/* ========================================================
-          5. ORDONNANCE AVEC CRÉDITS + CRÉDITS SABLIN
-          ======================================================== */}
-      <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <div className="grid gap-5 lg:grid-cols-2">
-          {/* Ordonnance avec crédits */}
-          <Card className="relative overflow-hidden border-brand/20 bg-brand-light py-0">
-            <div className="relative flex h-full flex-col gap-4 p-6">
-              <div className="flex items-center gap-3">
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-brand text-white">
-                  <ClipboardList className="size-6" />
-                </span>
-                <Eyebrow>Services avancés</Eyebrow>
-              </div>
-              <div>
-                <Heading level="h3">Ordonnance avec crédits</Heading>
-                <p className="mt-1.5 text-sm leading-relaxed break-words text-muted-foreground">
-                  Ajoutez vos médicaments, estimez votre ordonnance et trouvez les
-                  pharmacies adaptées grâce aux crédits SABLIN.
-                </p>
-              </div>
-              <ul className="space-y-2 text-sm text-foreground/85">
-                <li className="flex items-center justify-between gap-2">
-                  <span>Accès au module Ordonnance</span>
-                  <PassBadge />
-                </li>
-                <li className="flex items-center justify-between gap-2">
-                  <span>Ajouter un médicament</span>
-                  <CreditCost cost={1} />
-                </li>
-                <li className="flex items-center justify-between gap-2">
-                  <span>Estimation complète</span>
-                  <CreditCost cost={2} />
-                </li>
-                <li className="flex items-center justify-between gap-2">
-                  <span>Meilleure pharmacie</span>
-                  <CreditCost cost={1} />
-                </li>
-                <li className="flex items-center justify-between gap-2">
-                  <span>Comparaison prix/distance</span>
-                  <CreditCost cost={1} />
-                </li>
-                <li className="flex items-center justify-between gap-2">
-                  <span>Confirmation avant déplacement</span>
-                  <CreditCost cost={3} />
-                </li>
-              </ul>
-              <Button
-                className="mt-auto w-full bg-brand text-white hover:bg-brand-dark"
-                size="lg"
-                onClick={() => navigate("wallet")}
-              >
-                <Coins className="size-4" /> Recharger mes crédits
-              </Button>
-              <Button
-                className="w-full border-amber-500/50 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                size="lg"
-                variant="outline"
-                onClick={() => navigate("payment", { passOrdonnance: true })}
-              >
-                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance Unique — 500 FCFA
-              </Button>
-            </div>
-          </Card>
+      <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+        <Card className="overflow-hidden border-border/80 p-0 shadow-card">
+          <div className="border-b border-border px-4 py-3">
+            <SectionHeader
+              title="Médicaments suivis"
+              icon={<Search className="size-4" />}
+              action={{ label: "Voir", onClick: () => navigate("medications") }}
+            />
+          </div>
+          <div className="divide-y divide-border">
+            {loading
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="p-3">
+                    <Skeleton className="h-12 rounded-lg" />
+                  </div>
+                ))
+              : popularMeds.slice(0, 6).map((m) => (
+                  <MedicationAppRow key={m.id} med={m} />
+                ))}
+          </div>
+        </Card>
 
-          {/* Crédits SABLIN */}
-          <Card className="relative overflow-hidden border-brand/20 bg-background py-0">
-            <div className="relative flex h-full flex-col gap-4 p-6">
-              <div className="flex items-center gap-3">
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-brand text-white">
-                  <Wallet className="size-6" />
-                </span>
-                <Eyebrow>Crédits prépayés</Eyebrow>
-              </div>
-              <div>
-                <Heading level="h3">Crédits SABLIN</Heading>
-                <p className="mt-1.5 text-sm leading-relaxed break-words text-muted-foreground">
-                  Rechargez vos crédits et payez uniquement les services avancés que
-                  vous utilisez.
-                </p>
-              </div>
-              <ul className="space-y-2 text-sm text-foreground/85">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Sans engagement mensuel
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Crédits utilisables sur tous les services avancés
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Recharge à partir de 200 FCFA
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="size-4 shrink-0 text-brand" /> Pass Ordonnance Unique à 500 FCFA pour usage ponctuel
-                </li>
-              </ul>
-              <Button
-                className="mt-auto w-full bg-brand text-white hover:bg-brand-dark"
-                size="lg"
-                onClick={() => navigate("wallet")}
-              >
-                <Coins className="size-4" /> Recharger mes crédits
-              </Button>
-              <Button
-                className="w-full border-amber-500/50 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                size="lg"
-                variant="outline"
-                onClick={() => navigate("payment", { passOrdonnance: true })}
-              >
-                <ClipboardList className="size-4" /> Acheter un Pass Ordonnance Unique — 500 FCFA
-              </Button>
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      {/* ========================================================
-          6. MÉDICAMENTS RÉCEMMENT RECHERCHÉS — tableau
-          ======================================================== */}
-      <section className="bg-brand-soft/40">
-        <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+        <Card className="border-border/80 p-4 shadow-card">
           <SectionHeader
-            title="Médicaments récemment recherchés"
-            subtitle="Prix indicatifs et disponibilité dans nos pharmacies partenaires"
-            icon={<Zap className="size-5" />}
-            action={{ label: "Voir tout", onClick: () => navigate("medications") }}
+            title="Services"
+            icon={<Plus className="size-4" />}
+            action={{ label: "Wallet", onClick: () => navigate("wallet") }}
           />
-          <Card className="mt-6 overflow-hidden border-border/60 py-0 shadow-premium">
-            <div className="overflow-x-auto scroll-thin">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="border-b border-border/60 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="px-5 py-3.5 font-semibold">Médicament</th>
-                    <th className="px-5 py-3.5 font-semibold">Dosage</th>
-                    <th className="px-5 py-3.5 font-semibold">Forme</th>
-                    <th className="px-5 py-3.5 font-semibold">Prix indicatif</th>
-                    <th className="px-5 py-3.5 font-semibold">Pharmacies</th>
-                    <th className="px-5 py-3.5 font-semibold">Statut</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {loading ? (
-                    Array.from({ length: 6 }).map((_, i) => (
-                      <tr key={i}>
-                        <td colSpan={6} className="px-5 py-3">
-                          <Skeleton className="h-6 w-full" />
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    recentMeds.map((m) => {
-                      const status = medStatus(m);
-                      return (
-                        <tr
-                          key={m.id}
-                          onClick={() => navigate("medication-detail", { slug: m.slug })}
-                          className="cursor-pointer transition-colors hover:bg-accent/40"
-                        >
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-foreground">{m.name}</span>
-                              {m.requiresRx && (
-                                <ShieldAlert className="size-3.5 text-amber-500" />
-                              )}
-                            </div>
-                            <span className="text-xs text-muted-foreground">{m.genericName}</span>
-                          </td>
-                          <td className="px-5 py-3.5 text-muted-foreground">{m.dosage}</td>
-                          <td className="px-5 py-3.5 text-muted-foreground">{m.form}</td>
-                          <td className="px-5 py-3.5">
-                            <Price amount={m.avgPrice} size="sm" variant="brand" />
-                          </td>
-                          <td className="px-5 py-3.5 text-muted-foreground">
-                            {m.pharmacyCount} dispo
-                          </td>
-                          <td className="px-5 py-3.5">
-                            <MedicationStatusBadge status={status} />
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      {/* ========================================================
-          7. SUPPORT
-          ======================================================== */}
-      <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <Card className="relative overflow-hidden border-brand/20 bg-brand-gradient py-0">
-          <div className="absolute inset-0 bg-dotted-white opacity-15" />
-          <div className="absolute -right-16 -top-16 size-56 rounded-full bg-white/10 blur-3xl" />
-          <div className="relative flex flex-col items-center gap-6 p-8 text-center text-white sm:flex-row sm:p-10 sm:text-left">
-            <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
-              <Headphones className="size-8" />
-            </span>
-            <div className="flex-1">
-              <h3 className="text-xl font-extrabold text-foreground sm:text-2xl">
-                Besoin d&apos;aide ?
-              </h3>
-              <p className="mt-1.5 max-w-xl text-sm leading-relaxed break-words text-white/85 sm:text-base">
-                Notre équipe vous accompagne pour trouver vos médicaments plus facilement.
-                Disponible 24h/24 pour vous orienter vers la pharmacie la plus proche.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2.5 sm:flex-row">
-              <Button
-                variant="outline"
-                size="lg"
-                className="border-white/30 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
-                asChild
-              >
-                <a href="tel:+2250700000000">
-                  <Phone className="size-4" /> Appeler
-                </a>
-              </Button>
-              <Button
-                size="lg"
-                className="bg-white text-brand-dark hover:bg-white/90"
-                onClick={() => navigate("pharmacies", { filter: "on-duty" })}
-              >
-                Contacter le support <ArrowRight className="size-4" />
-              </Button>
-            </div>
+          <div className="mt-4 grid gap-2">
+            <ServiceLine label="Contact pharmacie" cost={1} />
+            <ServiceLine label="Disponibilité médicament" cost={1} />
+            <ServiceLine label="Comparer ordonnance" cost={2} />
+            <ServiceLine label="Confirmation complète" cost={4} />
+          </div>
+          <div className="mt-4 rounded-lg border border-brand/20 bg-brand-light p-3">
+            <p className="text-sm font-bold text-brand-dark">Ordonnance rapide</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Ajoutez les médicaments, comparez les prix, puis choisissez la pharmacie.
+            </p>
+            <Button
+              className="mt-3 w-full bg-brand text-white hover:bg-brand-dark"
+              onClick={() => navigate("prescription")}
+            >
+              Ouvrir <ChevronRight className="size-4" />
+            </Button>
           </div>
         </Card>
       </section>
@@ -731,12 +301,36 @@ export function HomeView() {
   );
 }
 
-/* ========================================================
-   DutyPharmacyCard — carte pharmacie de garde enrichie
-   Affiche : nom, commune, quartier, statut, distance, téléphone,
-   boutons Voir détails / Itinéraire.
-   ======================================================== */
-function DutyPharmacyCard({ pharma }: { pharma: Pharmacy }) {
+function Kpi({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="border-r border-border px-3 py-2 last:border-r-0">
+      <p className="text-sm font-extrabold text-foreground">{value}</p>
+      <p className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function QuickAction({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: typeof Pill;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex h-20 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-background text-sm font-bold text-foreground transition-colors hover:border-brand/40 hover:bg-brand-light hover:text-brand-dark"
+    >
+      <Icon className="size-5 text-brand" />
+      {label}
+    </button>
+  );
+}
+
+function DutyPharmacyRow({ pharma }: { pharma: Pharmacy }) {
   const { navigate } = useNav();
   const dist = distanceKm(
     ABIDJAN_CENTER.lat,
@@ -744,82 +338,90 @@ function DutyPharmacyCard({ pharma }: { pharma: Pharmacy }) {
     pharma.latitude,
     pharma.longitude
   );
-  // Extract quartier from address (part after commune)
   const quartier = pharma.address.split(",")[0]?.trim() ?? pharma.commune;
-  const mapsUrl = `https://www.google.com/maps?q=${pharma.latitude},${pharma.longitude}`;
 
   return (
-    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-premium-lg">
-      {/* Header banner */}
-      <div className="relative flex items-center justify-between bg-brand px-4 py-3">
-        {pharma.imageUrl && (
-          <img
-            src={pharma.imageUrl}
-            alt={pharma.name}
-            className="absolute inset-0 size-full object-cover"
-          />
-        )}
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="relative flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
-            <Plus className="size-5 text-white" strokeWidth={3} />
-          </span>
-          <Badge className="border-0 bg-amber-400 text-[10px] font-bold text-amber-950">
-            <Timer className="size-3" /> De garde
-          </Badge>
-        </div>
-        <span className="relative inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
-          <span className="size-1.5 rounded-full bg-emerald-300 animate-pulse" />
-          Ouvert
+    <button
+      onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
+      className="flex w-full items-center gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-brand/40 hover:bg-accent"
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-brand text-white">
+        <Plus className="size-5" strokeWidth={3} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-sm font-bold text-foreground">{pharma.name}</span>
+          {pharma.isOnDuty && (
+            <Badge className="border-0 bg-warning text-[10px] text-warning-foreground">
+              Garde
+            </Badge>
+          )}
         </span>
-      </div>
-
-      {/* Body */}
-      <div className="space-y-3 p-4">
-        <div>
-          <h3 className="text-sm font-bold leading-tight text-foreground">
-            {pharma.name}
-          </h3>
-          <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
-            <MapPin className="mt-0.5 size-3.5 shrink-0 text-brand/70" />
-            <span>
-              {quartier}, <span className="font-medium text-foreground/70">{pharma.commune}</span>
-            </span>
-          </p>
-        </div>
-
-        <div className="flex items-center justify-between text-xs">
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand-light px-2 py-1 font-semibold text-brand-dark">
-            <Navigation className="size-3.5" /> {dist} km
+        <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+          <MapPin className="size-3" />
+          <span className="truncate">
+            {quartier}, {pharma.commune}
           </span>
-          <span
-            className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2 py-1 font-semibold text-muted-foreground"
-          >
-            <Lock className="size-3.5" /> Contact verrouillé
-          </span>
-        </div>
+        </span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block text-xs font-bold text-brand-dark">{dist} km</span>
+        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+          <Clock className="size-3" /> Ouvert
+        </span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+    </button>
+  );
+}
 
-        {/* Actions */}
-        <div className="flex gap-2 pt-1">
-          <Button
-            size="sm"
-            className="flex-1 bg-brand-gradient text-white hover:opacity-90"
-            onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
-          >
-            Voir détails <ChevronRight className="size-3.5" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1"
-            asChild
-          >
-            <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-              <Navigation className="size-3.5" /> Itinéraire
-            </a>
-          </Button>
-        </div>
-      </div>
-    </Card>
+function MedicationAppRow({ med }: { med: Medication }) {
+  const { navigate } = useNav();
+  const status = medStatus(med);
+
+  return (
+    <button
+      onClick={() => navigate("medication-detail", { slug: med.slug })}
+      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent"
+    >
+      <span
+        className="flex size-10 shrink-0 items-center justify-center rounded-md text-white"
+        style={{ backgroundColor: med.category?.color ?? "var(--brand)" }}
+      >
+        {med.category ? (
+          <CategoryIcon name={med.category.iconName} size={20} color="#fff" />
+        ) : (
+          <Pill className="size-5" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="truncate text-sm font-bold text-foreground">{med.name}</span>
+          {med.requiresRx && <ShieldAlert className="size-3.5 shrink-0 text-warning" />}
+        </span>
+        <span className="block truncate text-xs text-muted-foreground">
+          {med.genericName} · {med.dosage}
+        </span>
+      </span>
+      <span className="hidden shrink-0 sm:block">
+        <MedicationStatusBadge status={status} />
+      </span>
+      <span className="shrink-0 text-right">
+        <Price amount={med.avgPrice} size="sm" variant="brand" />
+        <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
+          <MapPin className="size-3" />
+          {med.pharmacyCount ?? 0}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function ServiceLine({ label, cost }: { label: string; cost: number }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2.5">
+      <span className="text-sm font-semibold text-foreground">{label}</span>
+      <CreditCost cost={cost} />
+    </div>
   );
 }

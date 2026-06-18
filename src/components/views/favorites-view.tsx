@@ -167,10 +167,10 @@ export function FavoritesView() {
               return (
                 <Card
                   key={item.id}
-                  className="group flex flex-col gap-3 border-border/70 p-5 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg"
+                  className="group flex flex-col gap-3 border-border/70 p-5 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance-lg"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-premium">
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand text-white shadow-avance">
                       <Icon className="size-5" />
                     </span>
                     <div className="min-w-0 flex-1">

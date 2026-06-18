@@ -73,9 +73,18 @@ interface MedDetail {
   form: string;
   dosage: string;
   packSize: string;
+  packaging?: string | null;
+  manufacturer?: string | null;
   description: string;
+  longDescription?: string | null;
   requiresRx: boolean;
   avgPrice: number;
+  imageUrl?: string | null;
+  imageBadge?: string | null;
+  informationBadge?: string | null;
+  sourceName?: string | null;
+  verifiedAt?: string | null;
+  safetyNotice?: string | null;
   createdAt: string;
   pharmacies: PharmacyWithMed[];
 }
@@ -211,7 +220,7 @@ export function MedicationDetailView() {
         <p className="mt-2 text-sm text-muted-foreground">
           Ce médicament n&apos;existe pas ou le lien est incorrect.
         </p>
-        <Button className="mt-4 bg-brand-gradient text-white" onClick={() => navigate("medications")}>
+        <Button className="mt-4 bg-brand text-white" onClick={() => navigate("medications")}>
           <ChevronLeft className="size-4" /> Retour aux médicaments
         </Button>
       </div>
@@ -263,7 +272,7 @@ export function MedicationDetailView() {
             </button>
           )}
           {quickOpen && quickResults.length > 0 && (
-            <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-premium-lg">
+            <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-border bg-popover shadow-avance-lg">
               <ul className="max-h-72 overflow-y-auto scroll-thin py-1">
                 {quickResults.map((m) => (
                   <li key={m.id}>
@@ -295,7 +304,7 @@ export function MedicationDetailView() {
       </div>
 
       {/* ============ MEDICATION FICHE ============ */}
-      <Card className="overflow-hidden border-border/70 py-0 shadow-premium">
+      <Card className="overflow-hidden border-border/70 py-0 shadow-avance">
         <div className="grid gap-0 md:grid-cols-[220px_1fr]">
           {/* Visual */}
           <div className="relative flex items-center justify-center overflow-hidden bg-brand-light">
@@ -314,7 +323,7 @@ export function MedicationDetailView() {
                     : { backgroundColor: "var(--brand-light)" }
                 }
               >
-                <div className="relative flex size-24 items-center justify-center rounded-3xl bg-background shadow-premium">
+                <div className="relative flex size-24 items-center justify-center rounded-3xl bg-background shadow-avance">
                   {med.category ? (
                     <CategoryIcon name={med.category.iconName} size={44} color={med.category.color} />
                   ) : (
@@ -346,6 +355,12 @@ export function MedicationDetailView() {
                   <CheckCircle2 className="size-3" /> Libre accès
                 </Badge>
               )}
+              <Badge className="border-0 bg-white text-brand-dark">
+                {med.imageBadge ?? "Image illustrative"}
+              </Badge>
+              <Badge className="border-0 bg-brand-dark text-white">
+                {med.informationBadge ?? "Informations à confirmer"}
+              </Badge>
               <CreditCost cost={0} />
             </div>
 
@@ -358,7 +373,10 @@ export function MedicationDetailView() {
               <InfoItem label="DCI" value={med.genericName} />
               <InfoItem label="Dosage" value={med.dosage} />
               <InfoItem label="Forme" value={med.form} />
-              <InfoItem label="Conditionnement" value={med.packSize} />
+              <InfoItem label="Conditionnement" value={med.packaging ?? med.packSize} />
+              {med.manufacturer && <InfoItem label="Fabricant" value={med.manufacturer} />}
+              <InfoItem label="Source" value={med.sourceName ?? "Référentiel SABLIN"} />
+              <InfoItem label="Vérification" value={med.verifiedAt ? formatDate(med.verifiedAt) : "À confirmer"} />
             </div>
 
             {/* Price + stats */}
@@ -412,7 +430,7 @@ export function MedicationDetailView() {
                 className="bg-brand text-white hover:bg-brand-dark"
                 onClick={() => navigate("prescription")}
               >
-                <ClipboardList className="size-4" /> Estimer mon ordonnance
+                <ClipboardList className="size-4" /> Comparer les prix des pharmacies
               </Button>
               <Button
                 variant="outline"
@@ -451,8 +469,13 @@ export function MedicationDetailView() {
       {/* Prudence block */}
       <div className="mt-4">
         <AlertMessage variant="warning">
-          Les informations affichées sont indicatives. Demandez toujours conseil à un
-          pharmacien ou à un professionnel de santé avant toute utilisation.
+          {med.safetyNotice ??
+            "L’apparence de l’emballage peut varier selon le fabricant, le conditionnement ou la date de production. Vérifiez toujours le nom, la DCI, le dosage et la forme avec votre pharmacien."}
+        </AlertMessage>
+      </div>
+      <div className="mt-3">
+        <AlertMessage variant="info">
+          Les informations présentées sont indicatives et ne remplacent pas le conseil d’un pharmacien ou d’un professionnel de santé. Une image ne doit jamais être utilisée comme seul moyen d’identifier un médicament.
         </AlertMessage>
       </div>
 
@@ -516,8 +539,8 @@ export function MedicationDetailView() {
           </Card>
         ) : (
           <>
-            {/* Voir les prix détaillés par pharmacie — 1 crédit (gratuit avec Pass Ordonnance) */}
-            {!hasPass && !pricesUnlocked && (
+            {/* Voir les prix détaillés par pharmacie — 1 crédit */}
+            {!pricesUnlocked && (
               <Card className="mt-5 border-brand/20 p-5 shadow-card">
                 <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3">
@@ -551,7 +574,7 @@ export function MedicationDetailView() {
                   pharma={p}
                   medicationName={med.name}
                   medicationSlug={med.slug}
-                  pricesUnlocked={hasPass || pricesUnlocked}
+                  pricesUnlocked={pricesUnlocked}
                 />
               ))}
             </div>
@@ -641,7 +664,7 @@ export function MedicationDetailView() {
                 <Card
                   key={alt.id}
                   onClick={() => navigate("medication-detail", { slug: alt.slug })}
-                  className="group cursor-pointer gap-0 border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-premium-lg"
+                  className="group cursor-pointer gap-0 border-border/70 py-0 transition-all hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-avance-lg"
                 >
                   <div className="flex items-center gap-3 p-3.5">
                     <span
@@ -722,12 +745,11 @@ function PharmacyMedCard({
   );
   const quartier = pharma.address.split(",")[0]?.trim() ?? pharma.commune;
   const mapsUrl = `https://www.google.com/maps?q=${pharma.latitude},${pharma.longitude}`;
-  const phoneHref = `tel:${pharma.phone.replace(/\s/g, "")}`;
 
   return (
     <Card
       className={cn(
-        "gap-0 border-border/70 py-0 transition-all hover:shadow-premium",
+        "gap-0 border-border/70 py-0 transition-all hover:shadow-avance",
         !pharma.inStock && "opacity-70"
       )}
     >
@@ -842,7 +864,7 @@ function PharmacyMedCard({
       <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4">
         <Button
           size="sm"
-          className="bg-brand-gradient text-white hover:opacity-90"
+          className="bg-brand text-white hover:opacity-90"
           onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
         >
           Voir la pharmacie
@@ -866,7 +888,7 @@ function PharmacyMedCard({
           className="border-brand/30 text-brand-dark hover:bg-brand-light"
           onClick={() => {
             toast.success(`${medicationName} ajouté à votre ordonnance`, {
-              description: "Retrouvez-le dans la page Estimer mon ordonnance.",
+              description: "Retrouvez-le dans la page Comparer les prix des pharmacies.",
             });
             navigate("prescription");
           }}

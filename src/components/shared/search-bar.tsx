@@ -71,9 +71,9 @@ export function SearchBar({ variant = "compact", initialQuery = "", placeholder 
     <div ref={wrapRef} className="relative w-full">
       <div
         className={cn(
-          "flex items-center gap-2 rounded-2xl border bg-background shadow-premium transition-all",
+          "flex items-center gap-2 rounded-2xl border bg-background shadow-avance transition-all",
           variant === "hero"
-            ? "h-14 px-4 border-border/80 focus-within:border-brand/50 focus-within:shadow-premium-lg"
+            ? "h-14 px-4 border-border/80 focus-within:border-brand/50 focus-within:shadow-avance-lg"
             : "h-12 px-3.5 border-border"
         )}
       >
@@ -119,7 +119,7 @@ export function SearchBar({ variant = "compact", initialQuery = "", placeholder 
       </div>
 
       {open && (query.trim().length >= 2 || suggestions.length > 0) && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-border bg-popover shadow-premium-lg">
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-border bg-popover shadow-avance-lg">
           {loading && (
             <div className="px-4 py-3 text-sm text-muted-foreground">Recherche...</div>
           )}

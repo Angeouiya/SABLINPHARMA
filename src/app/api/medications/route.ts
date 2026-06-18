@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { buildMedicationPlaceholderUrl } from "@/lib/medication-enrichment";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -22,13 +23,33 @@ export async function GET(req: NextRequest) {
     where,
     include: {
       category: true,
-      pharmacies: true,
+      images: {
+        where: { validationStatus: { in: ["Validée", "Publiée"] } },
+        orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+      },
+      descriptions: {
+        where: { validationStatus: { in: ["Validée", "Publiée"] } },
+        orderBy: [{ validatedAt: "desc" }, { createdAt: "desc" }],
+        take: 1,
+      },
+      pharmacies: {
+        include: { pharmacy: true },
+      },
     },
     orderBy: { name: "asc" },
     take: limit,
   });
 
-  const result = meds.map((m) => ({
+  const result = meds.map((m) => {
+    const image = m.images.find((item) => item.validationStatus === "Publiée") ?? m.images[0];
+    const description = m.descriptions[0];
+    const imageUrl = image?.url ?? buildMedicationPlaceholderUrl({
+      name: m.name,
+      genericName: m.genericName,
+      dosage: m.dosage,
+      form: m.form,
+    });
+    return ({
     id: m.id,
     name: m.name,
     slug: m.slug,
@@ -38,13 +59,30 @@ export async function GET(req: NextRequest) {
     form: m.form,
     dosage: m.dosage,
     packSize: m.packSize,
-    description: m.description,
-    imageUrl: m.imageUrl,
+    description: description?.shortText ?? m.shortDescription ?? m.description,
+    imageUrl,
+    imageBadge: image
+      ? image.isPlaceholder
+        ? "Image illustrative"
+        : image.imageType === "pharmacy_photo"
+          ? "Photo fournie par une pharmacie"
+          : "Photo officielle"
+      : "Image illustrative",
+    imageAttribution: image?.attributionText ?? null,
+    informationBadge: description ? "Informations vérifiées" : "Informations à confirmer",
+    verificationStatus: m.verificationStatus,
     requiresRx: m.requiresRx,
     avgPrice: m.avgPrice,
     createdAt: m.createdAt,
-    pharmacyCount: m.pharmacies.length,
-  }));
+    pharmacyCount: m.pharmacies.filter(
+      (pm) =>
+        pm.inStock &&
+        pm.publicationStatus === "Publiée" &&
+        pm.pharmacy.accountStatus === "Validée" &&
+        pm.pharmacy.publicationStatus === "Publiée"
+    ).length,
+  });
+  });
 
   return NextResponse.json(result);
 }

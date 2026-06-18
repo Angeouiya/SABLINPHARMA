@@ -25,7 +25,7 @@ export function PaymentSummary({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border/70 bg-background p-5 shadow-premium",
+        "rounded-2xl border border-border/70 bg-background p-5 shadow-avance",
         className
       )}
     >

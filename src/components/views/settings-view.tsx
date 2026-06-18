@@ -79,7 +79,7 @@ interface SwitchRow {
   key: SettingKey;
   label: string;
   description?: string;
-  premiumLocked?: boolean;
+  avanceLocked?: boolean;
 }
 
 const NOTIF_ROWS: SwitchRow[] = [
@@ -98,7 +98,7 @@ const NOTIF_ROWS: SwitchRow[] = [
     label: "Alertes de prix sur mes favoris",
     description:
       "Soyez prévenu quand le prix d'un médicament favori baisse.",
-    premiumLocked: true,
+    avanceLocked: true,
   },
   {
     key: "promoAlerts",
@@ -114,7 +114,7 @@ const NOTIF_ROWS: SwitchRow[] = [
 
 export function SettingsView() {
   const { navigate } = useNav();
-  const { user, premium, logout } = useAuth();
+  const { user, avance, logout } = useAuth();
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
@@ -189,7 +189,7 @@ export function SettingsView() {
   if (!user) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 lg:px-8">
-        <Card className="border-border/70 p-0 shadow-premium">
+        <Card className="border-border/70 p-0 shadow-avance">
           <EmptyState
             icon={Settings}
             title="Connectez-vous pour gérer vos paramètres"
@@ -225,7 +225,7 @@ export function SettingsView() {
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <span className="flex size-11 items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-premium">
+        <span className="flex size-11 items-center justify-center rounded-2xl bg-brand text-white shadow-avance">
           <Settings className="size-6" />
         </span>
         <div>
@@ -246,7 +246,7 @@ export function SettingsView() {
       ) : (
         <div className="mt-8 flex flex-col gap-6">
           {/* 1. Notifications */}
-          <Card className="border-border/70 shadow-premium">
+          <Card className="border-border/70 shadow-avance">
             <CardHeader className="flex flex-row items-center gap-3 px-6 pt-6">
               <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
                 <Bell className="size-4" />
@@ -258,7 +258,7 @@ export function SettingsView() {
             <CardContent className="px-6 pb-4 pt-2">
               <div className="divide-y divide-border/60">
                 {NOTIF_ROWS.map((row) => {
-                  const locked = row.premiumLocked && !premium;
+                  const locked = row.avanceLocked && !avance;
                   const checked = Boolean(settings[row.key]);
                   const isSaving = saving === row.key;
                   return (
@@ -271,7 +271,7 @@ export function SettingsView() {
                           <p className="text-sm font-semibold text-foreground">
                             {row.label}
                           </p>
-                          {row.premiumLocked && (
+                          {row.avanceLocked && (
                             <Badge className="border-0 bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
                               <Crown className="mr-1 size-3" />
                               Crédits
@@ -299,7 +299,7 @@ export function SettingsView() {
                   );
                 })}
               </div>
-              {premium && (
+              {avance && (
                 <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   <Crown className="size-3.5" />
                   Les alertes de prix sur vos favoris sont activées avec
@@ -310,7 +310,7 @@ export function SettingsView() {
           </Card>
 
           {/* 2. Préférences */}
-          <Card className="border-border/70 shadow-premium">
+          <Card className="border-border/70 shadow-avance">
             <CardHeader className="flex flex-row items-center gap-3 px-6 pt-6">
               <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
                 <Globe className="size-4" />
@@ -405,7 +405,7 @@ export function SettingsView() {
           </Card>
 
           {/* 3. Confidentialité & sécurité */}
-          <Card className="border-border/70 shadow-premium">
+          <Card className="border-border/70 shadow-avance">
             <CardHeader className="flex flex-row items-center gap-3 px-6 pt-6">
               <span className="flex size-9 items-center justify-center rounded-xl bg-brand-light text-brand">
                 <Lock className="size-4" />
@@ -464,7 +464,7 @@ export function SettingsView() {
           </Card>
 
           {/* 4. Portefeuille */}
-          <Card className="border-border/70 shadow-premium">
+          <Card className="border-border/70 shadow-avance">
             <CardHeader className="flex flex-row items-center gap-3 px-6 pt-6">
               <span className="flex size-9 items-center justify-center rounded-xl bg-amber-500 text-white">
                 <Crown className="size-4" />
@@ -474,7 +474,7 @@ export function SettingsView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-2">
-              {premium ? (
+              {avance ? (
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-50 p-4">
                     <span className="flex size-11 items-center justify-center rounded-xl bg-amber-500 text-white">
@@ -492,7 +492,7 @@ export function SettingsView() {
                     <CheckCircle2 className="size-5 text-amber-600" />
                   </div>
                   <Button
-                    className="w-full bg-brand-gradient text-white hover:opacity-90"
+                    className="w-full bg-brand text-white hover:opacity-90"
                     onClick={() => navigate("subscription")}
                   >
                     Mon portefeuille
@@ -509,9 +509,9 @@ export function SettingsView() {
                       </p>
                     </div>
                     <p className="mt-1 text-xs leading-relaxed text-amber-800/80">
-                      Estimations illimitées, alertes de prix sur vos favoris,
+                      Estimations par crédits, alertes de prix sur vos favoris,
                       assistance prioritaire et bien plus — pour seulement
-                      500&nbsp;FCFA/mois.
+                      500 FCFA.
                     </p>
                   </div>
                   <Button

@@ -14,6 +14,7 @@ export type View =
   | "payment"
   | "success"
   | "notifications"
+  | "requests"
   | "history"
   | "favorites"
   | "settings"
@@ -31,7 +32,7 @@ export interface NavParams {
   estimateItems?: { slug: string; quantity: number }[];
   // Wallet → Payment : montant du pack de crédits sélectionné (FCFA)
   packAmount?: number;
-  // Wallet → Payment : achat du Pass Ordonnance
+  // Wallet → Payment : achat du Pass Ordonnance Unique
   passOrdonnance?: boolean;
 }
 
@@ -56,6 +57,12 @@ export interface Medication {
   packSize: string;
   description: string;
   imageUrl: string | null;
+  imageBadge?: string | null;
+  imageAttribution?: string | null;
+  informationBadge?: string | null;
+  verificationStatus?: string | null;
+  manufacturer?: string | null;
+  packaging?: string | null;
   requiresRx: boolean;
   avgPrice: number;
   createdAt: string;
@@ -68,7 +75,14 @@ export interface Pharmacy {
   slug: string;
   address: string;
   commune: string;
+  district?: string | null;
   phone: string;
+  whatsapp?: string | null;
+  professionalEmail?: string | null;
+  accountStatus?: string;
+  creationSource?: string;
+  dataQuality?: string;
+  lastDataUpdate?: string | null;
   hoursWeekday: string;
   hoursSaturday: string;
   hoursSunday: string;
@@ -78,8 +92,23 @@ export interface Pharmacy {
   longitude: number;
   rating: number;
   imageUrl: string | null;
+  logoUrl?: string | null;
+  facadeUrl?: string | null;
+  coverImageUrl?: string | null;
+  publicMedia?: PharmacyMedia[];
   medicationCount?: number;
   openNow?: boolean;
+}
+
+export interface PharmacyMedia {
+  id: string;
+  type: string;
+  title: string;
+  url: string;
+  visibility: "public" | "admin_only" | "internal" | string;
+  usage: string | null;
+  isPublic: boolean;
+  isValidated: boolean;
 }
 
 export interface PharmacyMedication {
@@ -88,6 +117,10 @@ export interface PharmacyMedication {
   medicationId: string;
   price: number;
   inStock: boolean;
+  availabilityStatus?: string;
+  dataSource?: string;
+  reliabilityLevel?: string;
+  lastUpdatedAt?: string;
   pharmacy?: Pharmacy;
   medication?: Medication;
 }

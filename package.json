@@ -15,6 +15,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:supabase:push": "supabase db push --include-all",
     "db:supabase:push:url": "supabase db push --include-all --db-url",
+    "db:supabase:apply": "powershell -ExecutionPolicy Bypass -File scripts/apply-supabase.ps1",
+    "db:supabase:apply:seed": "powershell -ExecutionPolicy Bypass -File scripts/apply-supabase.ps1 -Seed",
     "db:supabase:check": "prisma validate && prisma generate"
   },
   "dependencies": {

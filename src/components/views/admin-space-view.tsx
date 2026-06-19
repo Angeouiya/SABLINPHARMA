@@ -1379,6 +1379,10 @@ type EnrichmentData = {
     externalEnrichmentEnabled: boolean;
     googleApiConfigured: boolean;
     googleSearchEngineConfigured: boolean;
+    braveApiConfigured?: boolean;
+    openverseEnabled?: boolean;
+    imageSearchProvider?: "auto" | "google" | "brave" | "openverse" | "internal";
+    activeProviders?: string[];
     providerStatus: "active" | "disabled" | "misconfigured";
     mode: "google_web" | "internal_fallback";
     modeLabel: string;
@@ -1533,6 +1537,7 @@ function ExternalEnrichmentStatusCard({
 }) {
   const enabled = status?.providerStatus === "active";
   const modeLabel = status?.modeLabel ?? "Fallback interne";
+  const activeProviders = status?.activeProviders?.length ? status.activeProviders.join(", ") : "Aucun fournisseur externe";
   return (
     <Card className="border-border/70 bg-white p-5 shadow-card">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1540,10 +1545,10 @@ function ExternalEnrichmentStatusCard({
           <Badge className={cn("border-0 text-white", enabled ? "bg-brand" : "bg-amber-600")}>
             État de l’enrichissement externe
           </Badge>
-          <Heading level="h3" className="mt-3">Google/Web côté serveur</Heading>
+          <Heading level="h3" className="mt-3">Recherche images côté serveur</Heading>
           <Muted>
             {status?.adminMessage ??
-              "L’enrichissement Google/Web est prêt côté serveur, mais il fonctionne actuellement en mode fallback interne/placeholder. Configurez GOOGLE_SEARCH_API_KEY, GOOGLE_SEARCH_ENGINE_ID et ENABLE_EXTERNAL_ENRICHMENT=true pour activer les recherches externes."}
+              "L’enrichissement externe est prêt côté serveur. La chaîne peut utiliser Google si autorisé, Brave si une clé est configurée, puis Openverse/Wikimedia avec validation admin."}
           </Muted>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1569,6 +1574,22 @@ function ExternalEnrichmentStatusCard({
         <div className="rounded-lg border border-border bg-muted/20 p-3">
           <p className="text-xs font-bold uppercase text-muted-foreground">Mode actuel</p>
           <p className="mt-1 font-extrabold text-foreground">{modeLabel}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Fournisseur demandé</p>
+          <p className="mt-1 font-extrabold text-foreground">{status?.imageSearchProvider ?? "auto"}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Brave Search</p>
+          <p className="mt-1 font-extrabold text-foreground">{status?.braveApiConfigured ? "Configuré" : "Non configuré"}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Openverse/Wikimedia</p>
+          <p className="mt-1 font-extrabold text-foreground">{status?.openverseEnabled ? "Activé" : "Désactivé"}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Chaîne active</p>
+          <p className="mt-1 font-extrabold text-foreground">{activeProviders}</p>
         </div>
       </div>
 

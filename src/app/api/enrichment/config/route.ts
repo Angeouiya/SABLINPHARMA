@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEnrichmentConfig } from "@/lib/enrichment/config";
+import { searchExternalImageCandidates } from "@/lib/enrichment/external-image-search-service";
 import { getExternalEnrichmentAdminStatus, recordExternalEnrichmentTest } from "@/lib/enrichment/enrichment-service";
-import { googleImageSearchProvider } from "@/lib/enrichment/google-image-search-provider";
 import { requirePharmacyPermission } from "@/lib/pharmacy-access";
 
 export async function GET(req: NextRequest) {
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const test = await googleImageSearchProvider.searchImages(
+  const test = await searchExternalImageCandidates(
     {
       name: "Paracétamol",
       genericName: "Paracétamol",
@@ -40,17 +40,17 @@ export async function POST(req: NextRequest) {
     },
     { maxResults: 1 }
   );
-  const ok = test.provider === "Google Custom Search API";
+  const ok = test.provider !== "Fallback interne SABLIN PHARMA" && test.candidates.length > 0;
   await recordExternalEnrichmentTest({
     ok,
-    message: ok ? "Test Google/Web réussi." : test.message,
+    message: ok ? `Test ${test.provider} réussi.` : test.message,
   });
 
   return NextResponse.json({
     ok,
     status: await getExternalEnrichmentAdminStatus(),
     candidatesFound: test.candidates.length,
-    message: ok ? "Configuration Google/Web testée côté serveur." : test.message,
+    provider: test.provider,
+    message: ok ? `Configuration ${test.provider} testée côté serveur.` : test.message,
   });
 }
-

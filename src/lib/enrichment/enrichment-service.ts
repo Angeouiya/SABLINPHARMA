@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { getEnrichmentConfig, type EnrichmentConfigStatus } from "@/lib/enrichment/config";
-import { googleImageSearchProvider, type EnrichmentImageCandidate, type GoogleImageSearchMedicationInput } from "@/lib/enrichment/google-image-search-provider";
+import { searchExternalImageCandidates } from "@/lib/enrichment/external-image-search-service";
+import type { EnrichmentImageCandidate, GoogleImageSearchMedicationInput } from "@/lib/enrichment/google-image-search-provider";
 import { logEnrichment } from "@/lib/enrichment/logger";
 import { buildMedicationPlaceholderUrl, ensurePlaceholderImage } from "@/lib/medication-enrichment";
 
@@ -62,7 +63,7 @@ async function findFallbackImage(medication: GoogleImageSearchMedicationInput) {
 export async function searchImageCandidatesWithFallback(
   medication: GoogleImageSearchMedicationInput
 ): Promise<EnrichmentSearchWithFallback> {
-  const externalSearch = await googleImageSearchProvider.searchImages(medication);
+  const externalSearch = await searchExternalImageCandidates(medication);
   const fallback = await findFallbackImage(medication);
   const fallbackImageUrl = fallback?.url ?? buildMedicationPlaceholderUrl(medication);
   const fallbackSource = fallback?.source ?? placeholderSource();
@@ -112,8 +113,8 @@ export async function getExternalEnrichmentAdminStatus() {
     lastErrorAt: provider?.lastErrorAt?.toISOString() ?? null,
     adminMessage:
       config.providerStatus === "active"
-        ? "L’enrichissement Google/Web est actif côté serveur. Les images web restent en validation Admin avant publication."
-        : "L’enrichissement Google/Web est prêt côté serveur, mais il fonctionne actuellement en mode fallback interne/placeholder. Configurez GOOGLE_SEARCH_API_KEY, GOOGLE_SEARCH_ENGINE_ID et ENABLE_EXTERNAL_ENRICHMENT=true pour activer les recherches externes.",
+        ? `L’enrichissement externe est actif côté serveur via ${config.activeProviders.join(", ")}. Les images web restent en validation Admin avant publication.`
+        : "L’enrichissement externe est prêt côté serveur, mais il fonctionne actuellement en mode fallback interne/placeholder. Activez Openverse, Brave Search ou Google côté serveur pour lancer les recherches externes.",
   };
 }
 
@@ -139,4 +140,3 @@ export async function recordExternalEnrichmentTest(input: {
     },
   });
 }
-

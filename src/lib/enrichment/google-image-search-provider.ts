@@ -13,6 +13,15 @@ export type GoogleImageSearchMedicationInput = {
   manufacturer?: string | null;
 };
 
+export type ExternalImageProviderName =
+  | "Google Custom Search API"
+  | "Openverse API"
+  | "Brave Search API";
+
+export type ImageSearchResultProvider =
+  | ExternalImageProviderName
+  | "Fallback interne SABLIN PHARMA";
+
 export type EnrichmentImageCandidate = {
   title: string;
   imageUrl: string;
@@ -28,18 +37,18 @@ export type EnrichmentImageCandidate = {
   score: number;
   status: "À vérifier" | "Refusé";
   validationStatus: "À vérifier";
-  provider: "Google Custom Search API";
+  provider: ExternalImageProviderName;
 };
 
 export type GoogleImageSearchResult = {
-  provider: "Google Custom Search API" | "Fallback interne SABLIN PHARMA";
+  provider: ImageSearchResultProvider;
   query: string;
   candidates: EnrichmentImageCandidate[];
   configStatus: EnrichmentConfigStatus;
   message: string;
 };
 
-function compactText(parts: Array<string | null | undefined>) {
+export function compactText(parts: Array<string | null | undefined>) {
   return parts
     .map((part) => String(part ?? "").trim())
     .filter(Boolean)
@@ -60,7 +69,7 @@ export function buildGoogleImageQuery(input: GoogleImageSearchMedicationInput) {
   ]);
 }
 
-function safeHostname(value: string) {
+export function safeHostname(value: string) {
   try {
     return new URL(value).hostname.replace(/^www\./, "") || "Source web";
   } catch {
@@ -68,7 +77,7 @@ function safeHostname(value: string) {
   }
 }
 
-function candidateScore(
+export function candidateScore(
   medication: GoogleImageSearchMedicationInput,
   text: string
 ) {
@@ -114,13 +123,15 @@ export class GoogleImageSearchProvider {
     try {
       const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(9000) });
       if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: { message?: string; status?: string } } | null;
+        const googleMessage = body?.error?.message ?? "provider unavailable";
         logEnrichment("warn", "Google enrichment request failed: provider unavailable", { status: res.status });
         return {
           provider: "Fallback interne SABLIN PHARMA",
           query,
           candidates: [],
           configStatus,
-          message: "Google enrichment request failed: provider unavailable",
+          message: `Google enrichment request failed: ${googleMessage}`,
         };
       }
 
@@ -176,4 +187,3 @@ export class GoogleImageSearchProvider {
 }
 
 export const googleImageSearchProvider = new GoogleImageSearchProvider();
-

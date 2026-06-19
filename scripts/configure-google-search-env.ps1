@@ -35,8 +35,10 @@ Write-Host "Les valeurs ne seront pas écrites dans Git." -ForegroundColor Yello
 $googleApiKey = Read-RequiredSecret "Coller GOOGLE_SEARCH_API_KEY"
 $googleSearchEngineId = Read-RequiredSecret "Coller GOOGLE_SEARCH_ENGINE_ID"
 
+Set-VercelSecret "IMAGE_SEARCH_PROVIDER" "auto"
 Set-VercelSecret "GOOGLE_SEARCH_API_KEY" $googleApiKey
 Set-VercelSecret "GOOGLE_SEARCH_ENGINE_ID" $googleSearchEngineId
+Set-VercelSecret "OPENVERSE_ENRICHMENT_ENABLED" "true"
 Set-VercelSecret "ENABLE_EXTERNAL_ENRICHMENT" "true"
 Set-VercelSecret "ENRICHMENT_DAILY_LIMIT" "100"
 Set-VercelSecret "ENRICHMENT_CONFIDENCE_THRESHOLD" "85"
@@ -44,8 +46,10 @@ Set-VercelSecret "ENRICHMENT_CONFIDENCE_THRESHOLD" "85"
 $tempEnv = Join-Path $env:TEMP ("sablin-google-search-" + [Guid]::NewGuid().ToString("N") + ".env")
 try {
   @(
+    "IMAGE_SEARCH_PROVIDER=auto"
     "GOOGLE_SEARCH_API_KEY=$googleApiKey"
     "GOOGLE_SEARCH_ENGINE_ID=$googleSearchEngineId"
+    "OPENVERSE_ENRICHMENT_ENABLED=true"
     "ENABLE_EXTERNAL_ENRICHMENT=true"
     "ENRICHMENT_DAILY_LIMIT=100"
     "ENRICHMENT_CONFIDENCE_THRESHOLD=85"
@@ -62,4 +66,3 @@ if ($Deploy) {
 }
 
 Write-Host "Google/Web est configure. Testez ensuite /admin/enrichissement-medicaments > Tester la configuration." -ForegroundColor Green
-

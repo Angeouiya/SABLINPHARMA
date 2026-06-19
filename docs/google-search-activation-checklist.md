@@ -21,7 +21,7 @@ Puis activer :
 
 - `ENABLE_EXTERNAL_ENRICHMENT=true`
 
-Note : selon la documentation Google actuelle, le moteur a besoin d'un Programmable Search Engine et d'une API key. Google indique aussi que Custom Search JSON API peut ne plus être disponible pour certains nouveaux clients. Si ton compte Google Cloud ne permet pas d'activer cette API, SABLIN PHARMA restera en fallback interne ou devra utiliser un fournisseur compatible.
+Note : selon la documentation Google actuelle, le moteur a besoin d'un Programmable Search Engine et d'une API key. Google indique aussi que Custom Search JSON API peut ne plus être disponible pour certains nouveaux clients. Si ton compte Google Cloud retourne `403 PERMISSION_DENIED`, SABLIN PHARMA bascule vers Openverse/Wikimedia ou Brave Search si une clé Brave est configurée.
 
 ## Règles de sécurité
 
@@ -50,12 +50,30 @@ Si une variable existe déjà, utiliser `vercel env update` au lieu de `vercel e
 npx --yes supabase@latest secrets set GOOGLE_SEARCH_API_KEY="VRAIE_CLE_GOOGLE" GOOGLE_SEARCH_ENGINE_ID="VRAI_SEARCH_ENGINE_ID" ENABLE_EXTERNAL_ENRICHMENT="true" --project-ref pztpdigzgukntmvfsqmt
 ```
 
+## Alternative quand Google est bloque
+
+Openverse/Wikimedia est maintenant intégré comme fournisseur autorisé sans clé API. Pour l'utiliser en production :
+
+```powershell
+npx --yes vercel@latest env add IMAGE_SEARCH_PROVIDER production --value "auto" --yes --sensitive
+npx --yes vercel@latest env add OPENVERSE_ENRICHMENT_ENABLED production --value "true" --yes --sensitive
+npx --yes vercel@latest env update ENABLE_EXTERNAL_ENRICHMENT production --value "true" --yes --sensitive
+npx --yes supabase@latest secrets set IMAGE_SEARCH_PROVIDER="auto" OPENVERSE_ENRICHMENT_ENABLED="true" ENABLE_EXTERNAL_ENRICHMENT="true" --project-ref pztpdigzgukntmvfsqmt
+```
+
+Brave Search peut être ajouté plus tard avec :
+
+```powershell
+npx --yes vercel@latest env add BRAVE_SEARCH_API_KEY production --value "VRAIE_CLE_BRAVE" --yes --sensitive
+npx --yes supabase@latest secrets set BRAVE_SEARCH_API_KEY="VRAIE_CLE_BRAVE" --project-ref pztpdigzgukntmvfsqmt
+```
+
 ## Test après activation
 
 1. Redéployer Vercel en production.
 2. Ouvrir `/admin/enrichissement-medicaments`.
 3. Cliquer sur `Tester la configuration`.
-4. Vérifier que l'etat indique Google/Web actif.
+4. Vérifier que l'etat indique la chaîne active : Google, Brave ou Openverse.
 5. Lancer un enrichissement sur un médicament sans image.
 6. Vérifier que les images candidates restent en statut `À vérifier` avant validation admin.
 

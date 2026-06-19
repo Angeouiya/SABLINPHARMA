@@ -16,6 +16,11 @@ type ActionBody = {
   reliabilityLevel?: string;
   dataSource?: string;
   publicationStatus?: string;
+  schedule?: unknown;
+  dutyEnabled?: unknown;
+  dutyStart?: unknown;
+  dutyEnd?: unknown;
+  specialMessage?: unknown;
   details?: Record<string, unknown>;
 };
 
@@ -61,6 +66,31 @@ function jsonDetails(value: unknown) {
   } catch {
     return "{}";
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function formatScheduleDay(value: unknown, fallback: string) {
+  if (!isRecord(value)) return fallback;
+  const enabled = value.enabled !== false;
+  const status = typeof value.status === "string" ? value.status : enabled ? "Ouvert" : "Fermé";
+  if (!enabled || status === "Fermé") return "Fermé";
+  if (status === "Ouvert 24h/24") return "Ouvert 24h/24";
+
+  const open = typeof value.open === "string" && value.open.trim() ? value.open.trim() : "08:00";
+  const close = typeof value.close === "string" && value.close.trim() ? value.close.trim() : "22:00";
+  const breakStart = typeof value.breakStart === "string" ? value.breakStart.trim() : "";
+  const breakEnd = typeof value.breakEnd === "string" ? value.breakEnd.trim() : "";
+  const pause = breakStart && breakEnd ? ` · pause ${breakStart}-${breakEnd}` : "";
+  return `${status} · ${open}-${close}${pause}`;
+}
+
+function parseDateInput(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 async function getPharmacy(pharmacySlug?: string) {
@@ -178,7 +208,46 @@ export async function POST(req: NextRequest) {
       await db.pharmacy.update({ where: { id: pharmacy.id }, data: { isOnDuty: !pharmacy.isOnDuty, lastDataUpdate: new Date() } });
       message = "Statut de garde mis à jour.";
     } else if (action === "schedule-save") {
-      await db.pharmacy.update({ where: { id: pharmacy.id }, data: { specialHoursMessage: "Horaires vérifiés depuis l’espace professionnel.", lastDataUpdate: new Date(), dataQuality: "Données à jour" } });
+      const schedule = isRecord(body.schedule) ? body.schedule : {};
+      const hoursMonday = formatScheduleDay(schedule.monday, pharmacy.hoursMonday ?? pharmacy.hoursWeekday);
+      const hoursTuesday = formatScheduleDay(schedule.tuesday, pharmacy.hoursTuesday ?? pharmacy.hoursWeekday);
+      const hoursWednesday = formatScheduleDay(schedule.wednesday, pharmacy.hoursWednesday ?? pharmacy.hoursWeekday);
+      const hoursThursday = formatScheduleDay(schedule.thursday, pharmacy.hoursThursday ?? pharmacy.hoursWeekday);
+      const hoursFriday = formatScheduleDay(schedule.friday, pharmacy.hoursFriday ?? pharmacy.hoursWeekday);
+      const hoursSaturday = formatScheduleDay(schedule.saturday, pharmacy.hoursSaturdayDetailed ?? pharmacy.hoursSaturday);
+      const hoursSunday = formatScheduleDay(schedule.sunday, pharmacy.hoursSundayDetailed ?? pharmacy.hoursSunday);
+      const weekdayValues = [hoursMonday, hoursTuesday, hoursWednesday, hoursThursday, hoursFriday];
+      const hoursWeekday = weekdayValues.every((item) => item === weekdayValues[0]) ? weekdayValues[0] : "Horaires détaillés par jour";
+      const dutyStartAt = parseDateInput(body.dutyStart);
+      const dutyEndAt = parseDateInput(body.dutyEnd);
+      const isOnDuty = typeof body.dutyEnabled === "boolean" ? body.dutyEnabled : pharmacy.isOnDuty;
+      const specialHoursMessage = typeof body.specialMessage === "string" && body.specialMessage.trim()
+        ? body.specialMessage.trim()
+        : "Horaires vérifiés depuis l’espace professionnel.";
+
+      await db.pharmacy.update({
+        where: { id: pharmacy.id },
+        data: {
+          hoursMonday,
+          hoursTuesday,
+          hoursWednesday,
+          hoursThursday,
+          hoursFriday,
+          hoursSaturdayDetailed: hoursSaturday,
+          hoursSundayDetailed: hoursSunday,
+          hoursWeekday,
+          hoursSaturday,
+          hoursSunday,
+          specialHoursMessage,
+          isOnDuty,
+          dutyStartAt,
+          dutyEndAt,
+          dutyPeriod: isOnDuty ? `${body.dutyStart ?? "Début non précisé"} → ${body.dutyEnd ?? "Fin non précisée"}` : null,
+          isOpen247: Object.values(schedule).some((item) => isRecord(item) && item.status === "Ouvert 24h/24"),
+          lastDataUpdate: new Date(),
+          dataQuality: "Données à jour",
+        },
+      });
       message = "Horaires enregistrés et synchronisés côté utilisateur.";
     } else if (action === "quick-availability" || action === "mark-inventory-verified" || action === "publish-inventory") {
       const updated = await updateMedicationForPharmacy({

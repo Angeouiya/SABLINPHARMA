@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { hasPharmacyPermission, requirePharmacyPermission } from "@/lib/pharmacy-access";
 import { addRequestHistory, REQUEST_RESPONSE_STATUSES, serializeRequest } from "@/lib/user-requests";
@@ -27,13 +28,29 @@ export async function GET(req: NextRequest) {
   if (access.response) return access.response;
   const { searchParams } = new URL(req.url);
   const pharmacySlug = searchParams.get("pharmacySlug") || access.session?.pharmacySlug;
+  const status = searchParams.get("status") || "all";
+  const workflow = searchParams.get("workflow") || "all";
+  const query = (searchParams.get("q") || "").trim();
 
   if (!canManageAny(access.role) && access.session?.kind === "pharmacy" && pharmacySlug !== access.session.pharmacySlug) {
     return NextResponse.json({ error: "Une pharmacie ne peut consulter que ses propres demandes." }, { status: 403 });
   }
 
+  const where: Prisma.PharmacyRequestWhereInput = canManageAny(access.role) && !pharmacySlug ? {} : { pharmacy: { slug: pharmacySlug ?? "" } };
+  if (status !== "all") where.status = status;
+  if (workflow === "confirmations") where.requestType = { in: ["confirm_availability", "confirm_price", "confirm_full"] };
+  if (workflow === "advice") where.requestType = "advice_pharmacy";
+  if (query) {
+    where.OR = [
+      { reference: { contains: query } },
+      { serviceName: { contains: query } },
+      { medication: { name: { contains: query } } },
+      { userMessage: { contains: query } },
+    ];
+  }
+
   const requests = await db.pharmacyRequest.findMany({
-    where: canManageAny(access.role) && !pharmacySlug ? {} : { pharmacy: { slug: pharmacySlug ?? "" } },
+    where,
     include: {
       user: { select: { name: true, commune: true } },
       pharmacy: { select: { name: true, slug: true, commune: true, district: true } },
@@ -47,8 +64,24 @@ export async function GET(req: NextRequest) {
     take: 150,
   });
 
-  const pending = requests.filter((item) => !["Répondue", "Fermée", "Remboursée", "Annulée"].includes(item.status)).length;
-  return NextResponse.json({ requests: requests.map(serializeRequest), pending });
+  const statsWhere: Prisma.PharmacyRequestWhereInput = canManageAny(access.role) && !pharmacySlug ? {} : { pharmacy: { slug: pharmacySlug ?? "" } };
+  if (workflow === "confirmations") statsWhere.requestType = { in: ["confirm_availability", "confirm_price", "confirm_full"] };
+  if (workflow === "advice") statsWhere.requestType = "advice_pharmacy";
+  const [total, fresh, inProgress, answered, expired, highPriority] = await Promise.all([
+    db.pharmacyRequest.count({ where: statsWhere }),
+    db.pharmacyRequest.count({ where: { ...statsWhere, status: "Nouvelle" } }),
+    db.pharmacyRequest.count({ where: { ...statsWhere, status: { in: ["Reçue", "Acceptée", "En cours"] } } }),
+    db.pharmacyRequest.count({ where: { ...statsWhere, status: "Répondue" } }),
+    db.pharmacyRequest.count({ where: { ...statsWhere, status: { in: ["Expirée", "Refusée", "Annulée"] } } }),
+    db.pharmacyRequest.count({ where: { ...statsWhere, priority: "Haute" } }),
+  ]);
+
+  return NextResponse.json({
+    requests: requests.map(serializeRequest),
+    pending: fresh + inProgress,
+    stats: { total, new: fresh, inProgress, answered, expired, highPriority },
+    filters: { status, workflow, query },
+  });
 }
 
 export async function PATCH(req: NextRequest) {

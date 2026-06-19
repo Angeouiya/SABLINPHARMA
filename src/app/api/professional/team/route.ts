@@ -23,6 +23,11 @@ export async function GET(req: NextRequest) {
     include: { account: true },
     orderBy: [{ status: "asc" }, { createdAt: "asc" }],
   });
+  const invitations = await db.professionalInvitation.findMany({
+    where: { pharmacyId: pharmacy.id, status: { in: ["En attente", "Renvoyée"] } },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
   return NextResponse.json({
     members: members.map((member) => ({
       id: member.id,
@@ -30,9 +35,21 @@ export async function GET(req: NextRequest) {
       email: member.account.email,
       phone: member.account.phone,
       role: member.role,
+      permissions: JSON.parse(member.permissionsJson || "[]"),
       status: member.status,
       accountStatus: member.account.status,
       lastLoginAt: member.account.lastLoginAt,
+    })),
+    invitations: invitations.map((invitation) => ({
+      id: invitation.id,
+      name: invitation.name,
+      email: invitation.email,
+      phone: invitation.phone,
+      role: invitation.role,
+      permissions: JSON.parse(invitation.permissionsJson || "[]"),
+      status: invitation.status,
+      expiresAt: invitation.expiresAt,
+      createdAt: invitation.createdAt,
     })),
   });
 }

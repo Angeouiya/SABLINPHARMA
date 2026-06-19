@@ -723,7 +723,6 @@ function AdminLogin() {
           <div className="mt-3"><Field label="Mot de passe" placeholder="Mot de passe interne" /></div>
           <Button className="mt-4 h-11 w-full bg-brand text-white hover:bg-brand-dark" onClick={() => adminLogin()}>Se connecter</Button>
           <Button variant="outline" className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => adminLogin("Super administrateur")}>Démo super administrateur</Button>
-          <a href="/professionnel/reinitialiser-mot-de-passe" className="mt-3 block text-center text-sm font-bold text-brand-dark">Mot de passe oublié ?</a>
         </Card>
       </div>
     </div>
@@ -1060,7 +1059,6 @@ function PharmacyDetail({ pharmacyId }: { pharmacyId?: string }) {
     { label: "Documents justificatifs", action: "review-documents" },
     { label: "Notes internes", action: "update-internal-note" },
     { label: "Créer accès pharmacie", action: "create-pharmacy-account" },
-    { label: "Réinitialiser mot de passe", action: "reset-pharmacy-password" },
     { label: "Publier ou retirer côté utilisateur", action: "publish-pharmacy" },
     { label: "Motif de refus", action: "refuse-pharmacy" },
     { label: "Motif de suspension", action: "suspend-pharmacy" },
@@ -2181,7 +2179,6 @@ function Administrators() {
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <ProfessionalActionButton action="admin-permission-update" label="Permissions" entityType="admin-account" entityId={row.name} size="sm" variant="outline">Permissions</ProfessionalActionButton>
-              <ProfessionalActionButton action="admin-force-password-reset" label="Reset mot de passe" entityType="admin-account" entityId={row.name} size="sm" variant="outline">Reset mot de passe</ProfessionalActionButton>
               <ProfessionalActionButton action="admin-session-revoke" label="Révoquer session" entityType="admin-account" entityId={row.name} size="sm" variant="outline">Révoquer session</ProfessionalActionButton>
             </div>
           </Card>

@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Archive,
   Bell,
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
-  Clock,
+  Eye,
+  Filter,
   FileSpreadsheet,
   History,
   KeyRound,
@@ -17,11 +19,15 @@ import {
   Mail,
   MessageCircle,
   Pill,
+  Save,
   Search,
+  Send,
   Settings,
   ShieldCheck,
   Upload,
+  UserPlus,
   UserRound,
+  Users,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { InventorySyncPanel } from "@/components/views/inventory-sync-panels";
@@ -47,11 +53,13 @@ import {
   IMPORT_TEMPLATE_COLUMNS,
   INTERNAL_PHARMACY_DATA,
   PHARMACY_IMAGE_FIELDS,
+  PHARMACY_OPERATION_STATUSES,
   PHARMACY_PORTAL_MEDICATIONS,
   PHARMACY_PROFILE_STEPS,
   PHARMACY_SERVICES,
   PUBLIC_AVAILABILITY_STATUSES,
   PUBLIC_PHARMACY_DATA,
+  REQUEST_STATUSES,
   RELIABILITY_LEVELS,
   USER_VISIBLE_MAPPING,
 } from "@/lib/pharmacy-platform";
@@ -120,6 +128,167 @@ const pharmacyDashboardFallback: PharmacyDashboardSummary = {
   lastDataUpdateLabel: "Non renseignée",
   priceToCheck: 0,
 };
+
+const WEEK_DAYS = [
+  { key: "monday", label: "Lundi" },
+  { key: "tuesday", label: "Mardi" },
+  { key: "wednesday", label: "Mercredi" },
+  { key: "thursday", label: "Jeudi" },
+  { key: "friday", label: "Vendredi" },
+  { key: "saturday", label: "Samedi" },
+  { key: "sunday", label: "Dimanche" },
+] as const;
+
+type DaySchedule = {
+  enabled: boolean;
+  open: string;
+  close: string;
+  breakStart: string;
+  breakEnd: string;
+  status: string;
+};
+
+const defaultSchedule: Record<string, DaySchedule> = Object.fromEntries(
+  WEEK_DAYS.map((day, index) => [
+    day.key,
+    {
+      enabled: index < 6,
+      open: index < 5 ? "08:00" : "08:30",
+      close: index < 5 ? "22:00" : "20:00",
+      breakStart: "13:00",
+      breakEnd: "14:00",
+      status: index === 6 ? "Fermé" : "Ouvert",
+    },
+  ])
+) as Record<string, DaySchedule>;
+
+const teamPermissions = [
+  "Modifier les médicaments",
+  "Importer l’inventaire",
+  "Modifier les horaires",
+  "Répondre aux demandes",
+  "Modifier le profil",
+  "Voir l’historique",
+] as const;
+
+type ProfessionalRequestItem = {
+  id: string;
+  reference: string;
+  requestType: string;
+  serviceName: string;
+  status: string;
+  priority: string;
+  creditCost: number;
+  fcfaEquivalent: number;
+  userMessage?: string | null;
+  dosage?: string | null;
+  form?: string | null;
+  createdAt: string;
+  expiresAt: string;
+  medication?: { name: string; slug: string; dosage?: string | null; form?: string | null; packSize?: string | null } | null;
+  user?: { name: string; commune?: string | null } | null;
+  responses?: Array<{ id: string; availabilityStatus?: string | null; confirmedPrice?: number | null; responseMessage: string; createdAt: string }>;
+};
+
+type RequestStats = {
+  total?: number;
+  new?: number;
+  inProgress?: number;
+  answered?: number;
+  expired?: number;
+  highPriority?: number;
+};
+
+type HistoryRow = {
+  id: string;
+  date: string;
+  action: string;
+  author: string;
+  source: string;
+  oldValue?: unknown;
+  newValue?: unknown;
+  status: string;
+  message?: string | null;
+  kind: string;
+};
+
+type PharmacyNotification = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  status: string;
+  createdAt: string;
+};
+
+type TeamMember = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role: string;
+  permissions: string[];
+  status: string;
+  accountStatus: string;
+  lastLoginAt?: string | null;
+};
+
+type TeamInvitation = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role: string;
+  permissions: string[];
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+};
+
+type PharmacyProfileData = {
+  name: string;
+  managerName?: string | null;
+  managerRole?: string | null;
+  phone: string;
+  whatsapp?: string | null;
+  professionalEmail?: string | null;
+  authorizationNumber?: string | null;
+  commune: string;
+  district?: string | null;
+  address: string;
+  latitude: number;
+  longitude: number;
+  landmark?: string | null;
+  coverageZone?: string | null;
+  description?: string | null;
+  accountStatus: string;
+  dataQuality: string;
+  services: string[];
+  mediaCount: number;
+  medicationCount: number;
+  completenessScore: number;
+};
+
+function formatDateTime(value?: string | Date | null) {
+  if (!value) return "Non renseigné";
+  return new Intl.DateTimeFormat("fr-CI", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function stringifyCell(value: unknown) {
+  if (value === null || value === undefined || value === "") return "Non renseigné";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "Valeur complexe";
+  }
+}
 
 function downloadImportTemplate(fileName = "modele-import-ma-pharmacie.csv") {
   const header = IMPORT_TEMPLATE_COLUMNS.join(";");
@@ -998,98 +1167,1038 @@ function InventoryEnrichment() {
   );
 }
 
-function SimpleCards({ title, items }: { title: string; items: string[] }) {
+function ConfirmationCenter() {
+  const [filter, setFilter] = useState("Tous");
+  const [query, setQuery] = useState("");
+  const [requests, setRequests] = useState<ProfessionalRequestItem[]>([]);
+  const [stats, setStats] = useState<RequestStats>({});
+  const [responses, setResponses] = useState<Record<string, { availability: string; price: string; note: string }>>({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ pharmacySlug: PHARMACY_SESSION_SLUG, workflow: "confirmations" });
+    if (filter !== "Tous") params.set("status", filter);
+    if (query.trim()) params.set("q", query.trim());
+    try {
+      const res = await fetch(`/api/pharmacy-platform/user-requests?${params}`, { headers: { "X-Sablin-Session-Kind": "pharmacy" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des confirmations impossible.");
+      setRequests(data.requests ?? []);
+      setStats(data.stats ?? {});
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des confirmations impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, query]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const respond = async (request: ProfessionalRequestItem, kind: "availability" | "price" | "full" | "rupture") => {
+    const response = responses[request.reference] ?? { availability: "À confirmer", price: "", note: "" };
+    const responseMessage = response.note.trim() || "Réponse confirmée par la pharmacie. Prix indicatif à confirmer auprès de la pharmacie.";
+    const availabilityStatus = kind === "rupture" ? "Rupture" : response.availability;
+    try {
+      const res = await fetch("/api/pharmacy-platform/user-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({
+          reference: request.reference,
+          pharmacySlug: PHARMACY_SESSION_SLUG,
+          action: "respond",
+          responseMessage,
+          availabilityStatus,
+          confirmedPrice: response.price ? Number(response.price) : null,
+          updateInventory: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Réponse impossible.");
+      setMessage(`Demande ${request.reference} traitée et synchronisée.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Réponse impossible.");
+    }
+  };
+
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">{title}</Heading>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {items.map((item, index) => (
-          <Card key={item} className="border-border/70 p-4">
-            <StatusBadge label={index % 2 === 0 ? "Nouvelle" : "En cours"} />
-            <p className="mt-3 font-bold text-foreground">{item}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Médicament concerné, date, priorité, réponse, statut et historique restent liés uniquement à votre pharmacie.</p>
-            <ProfessionalActionButton action="handle-pharmacy-request" label="Traiter" pharmacySlug={PHARMACY_SESSION_SLUG} payload={{ details: { title, item } }} className="mt-3 w-full bg-brand text-white hover:bg-brand-dark">
-              Traiter
-            </ProfessionalActionButton>
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <Heading level="h2">Confirmations pharmacie</Heading>
+            <Muted className="mt-1">Confirmez disponibilité, prix indicatif et remarque avant déplacement. Chaque réponse améliore la donnée côté utilisateur.</Muted>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[180px_220px_auto]">
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher demande" className="bg-white" />
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="Tous">Tous les statuts</option>
+              {REQUEST_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load}>Actualiser</Button>
+          </div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Nouvelles confirmations" value={stats.new ?? 0} badge="Nouvelle" />
+        <Stat label="À traiter" value={(stats.new ?? 0) + (stats.inProgress ?? 0)} badge="En cours" />
+        <Stat label="Priorité haute" value={stats.highPriority ?? 0} badge="Priorité" />
+        <Stat label="Synchronisées" value={stats.answered ?? 0} badge="Répondue" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {loading && <Card className="border-border/70 p-5 text-sm font-bold text-muted-foreground">Chargement des confirmations...</Card>}
+        {!loading && requests.length === 0 && <Card className="border-dashed border-border p-8 text-center text-sm font-bold text-foreground">Aucune confirmation réelle dans ce filtre.</Card>}
+        {requests.map((item) => {
+          const latest = item.responses?.[0];
+          const response = responses[item.reference] ?? { availability: latest?.availabilityStatus ?? "À confirmer", price: latest?.confirmedPrice ? String(latest.confirmedPrice) : "", note: latest?.responseMessage ?? "" };
+          return (
+            <Card key={item.id} className="border-border/70 p-4 shadow-card">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap gap-2"><StatusBadge label={item.status} /><StatusBadge label={item.priority} /></div>
+                  <h3 className="mt-3 text-lg font-extrabold text-foreground">{item.medication?.name ?? item.serviceName}</h3>
+                  <p className="text-sm font-medium text-muted-foreground">{[item.medication?.dosage ?? item.dosage, item.medication?.form ?? item.form].filter(Boolean).join(" · ") || "Information libre"} · Échéance : {formatDateTime(item.expiresAt)}</p>
+                  <p className="mt-1 text-xs font-bold text-muted-foreground">{item.reference} · {item.creditCost} crédit{item.creditCost > 1 ? "s" : ""}</p>
+                </div>
+                <Price amount={item.fcfaEquivalent} size="sm" variant="brand" />
+              </div>
+              {item.userMessage && <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm font-semibold text-foreground">{item.userMessage}</p>}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <Field label="Prix indicatif confirmé" type="number" value={response.price} onChange={(value) => setResponses((current) => ({ ...current, [item.reference]: { ...response, price: value } }))} />
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-foreground">Disponibilité confirmée</Label>
+                  <select value={response.availability} onChange={(event) => setResponses((current) => ({ ...current, [item.reference]: { ...response, availability: event.target.value } }))} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+                    {PUBLIC_AVAILABILITY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                  </select>
+                </div>
+              </div>
+              <Textarea value={response.note} onChange={(event) => setResponses((current) => ({ ...current, [item.reference]: { ...response, note: event.target.value } }))} className="mt-3 min-h-20 bg-white" placeholder="Remarque professionnelle pour l’utilisateur. Exemple : prix indicatif confirmé à 10h30." />
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => respond(item, "availability")}>
+                  Confirmer disponible
+                </Button>
+                <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => respond(item, "price")}>
+                  Confirmer prix
+                </Button>
+                <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => respond(item, "rupture")}>
+                  Confirmer rupture
+                </Button>
+                <Button variant="outline" onClick={() => respond(item, "full")}>
+                  Répondre avec remarque
+                </Button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AdviceCenter() {
+  const [selectedTemplate, setSelectedTemplate] = useState("Les informations fournies sont indicatives et ne remplacent pas une consultation médicale.");
+  const [requests, setRequests] = useState<ProfessionalRequestItem[]>([]);
+  const [stats, setStats] = useState<RequestStats>({});
+  const [filter, setFilter] = useState("Tous");
+  const [responses, setResponses] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ pharmacySlug: PHARMACY_SESSION_SLUG, workflow: "advice" });
+    if (filter !== "Tous") params.set("status", filter);
+    try {
+      const res = await fetch(`/api/pharmacy-platform/user-requests?${params}`, { headers: { "X-Sablin-Session-Kind": "pharmacy" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des conseils impossible.");
+      setRequests(data.requests ?? []);
+      setStats(data.stats ?? {});
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des conseils impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const sendAdvice = async (request: ProfessionalRequestItem, text: string) => {
+    const responseMessage = text.trim();
+    if (responseMessage.length < 8) {
+      setMessage("Ajoutez une réponse claire avant l’envoi.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/pharmacy-platform/user-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({
+          reference: request.reference,
+          pharmacySlug: PHARMACY_SESSION_SLUG,
+          action: "respond",
+          responseMessage,
+          availabilityStatus: "À confirmer",
+          updateInventory: false,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Envoi impossible.");
+      setMessage(`Conseil transmis pour ${request.reference}.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Envoi impossible.");
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading level="h2">Conseils pharmacie</Heading>
+            <Muted className="mt-1">Répondez aux demandes de conseil sans prescription, sans diagnostic et avec prudence professionnelle.</Muted>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge label="Responsabilité pharmacien" />
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="Tous">Tous les statuts</option>
+              {REQUEST_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+          Les conseils fournis ne remplacent pas une consultation médicale. Le pharmacien reste responsable de ses réponses.
+        </p>
+      </Card>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Conseils reçus" value={stats.total ?? 0} badge="Conseil" />
+        <Stat label="Nouveaux" value={stats.new ?? 0} badge="Nouvelle" />
+        <Stat label="En cours" value={stats.inProgress ?? 0} badge="En cours" />
+        <Stat label="Répondus" value={stats.answered ?? 0} badge="Répondue" />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="space-y-3">
+          {loading && <Card className="border-border/70 p-5 text-sm font-bold text-muted-foreground">Chargement des conseils...</Card>}
+          {!loading && requests.length === 0 && <Card className="border-dashed border-border p-8 text-center text-sm font-bold text-foreground">Aucune demande de conseil réelle dans ce filtre.</Card>}
+          {requests.map((item) => {
+            const draft = responses[item.reference] ?? selectedTemplate;
+            return (
+            <Card key={item.id} className="border-border/70 p-4 shadow-card">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap gap-2"><StatusBadge label={item.status} /><StatusBadge label={item.priority} /><StatusBadge label={`${item.creditCost} crédits`} /></div>
+                  <h3 className="mt-3 font-extrabold text-foreground">{item.serviceName}</h3>
+                  <p className="text-sm font-medium text-muted-foreground">{item.user?.name ?? "Utilisateur"} · {item.medication?.name ?? "Question libre"} · {formatDateTime(item.createdAt)}</p>
+                </div>
+                <MessageCircle className="size-5 text-brand" />
+              </div>
+              {item.userMessage && <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm font-semibold text-foreground">{item.userMessage}</p>}
+              <Textarea className="mt-4 min-h-24 bg-white" value={draft} onChange={(event) => setResponses((current) => ({ ...current, [item.reference]: event.target.value }))} />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => sendAdvice(item, draft)}>
+                  <Send className="size-4" /> Envoyer conseil
+                </Button>
+                <Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => sendAdvice(item, "Orientation vers un professionnel de santé recommandée. Les informations fournies ne remplacent pas une consultation médicale.")}>
+                  Orienter médecin
+                </Button>
+              </div>
+            </Card>
+            );
+          })}
+        </div>
+        <SectionBlock title="Modèles de réponse sûrs" description="Utilisez des formulations neutres, courtes et prudentes.">
+          <div className="grid gap-2">
+            {[
+              "Veuillez confirmer avec le pharmacien sur place avant tout achat.",
+              "SABLIN PHARMA ne remplace pas un professionnel de santé.",
+              "Si les symptômes persistent, consultez un médecin.",
+              "Le prix indiqué reste indicatif et peut varier.",
+            ].map((template) => (
+              <button key={template} type="button" onClick={() => setSelectedTemplate(template)} className="rounded-lg border border-border bg-white p-3 text-left text-sm font-bold text-foreground hover:border-brand/40">
+                {template}
+              </button>
+            ))}
+          </div>
+        </SectionBlock>
+      </div>
+    </div>
+  );
+}
+
+function HistoryCenter() {
+  const [filter, setFilter] = useState("Tous");
+  const [query, setQuery] = useState("");
+  const [rows, setRows] = useState<HistoryRow[]>([]);
+  const [stats, setStats] = useState<{ total?: number; success?: number; review?: number; imports?: number }>({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ pharmacySlug: PHARMACY_SESSION_SLUG });
+    if (filter === "Réussi" || filter === "À vérifier") params.set("status", filter.toLowerCase() === "réussi" ? "réussi" : "à vérifier");
+    if (filter === "Import pharmacie" || filter === "Demande utilisateur") params.set("source", filter);
+    if (query.trim()) params.set("q", query.trim());
+    try {
+      const res = await fetch(`/api/pharmacy-platform/history?${params}`, { headers: { "X-Sablin-Session-Kind": "pharmacy" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement de l’historique impossible.");
+      setRows(data.rows ?? []);
+      setStats(data.stats ?? {});
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement de l’historique impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, query]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <Heading level="h2">Historique de ma pharmacie</Heading>
+            <Muted>Chaque modification sensible est historisée avec auteur, source, ancienne valeur, nouvelle valeur et statut.</Muted>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher dans l’historique" className="h-9 w-full bg-white sm:w-64" />
+            {["Tous", "Réussi", "À vérifier", "Import pharmacie", "Demande utilisateur"].map((item) => (
+              <Button key={item} size="sm" variant={filter === item ? "default" : "outline"} className={filter === item ? "bg-brand text-white hover:bg-brand-dark" : "border-brand/30 text-brand-dark hover:bg-brand-light"} onClick={() => setFilter(item)}>
+                <Filter className="size-4" /> {item}
+              </Button>
+            ))}
+            <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load}>Actualiser</Button>
+          </div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Actions tracées" value={stats.total ?? rows.length} badge="Historique" />
+        <Stat label="Réussies" value={stats.success ?? 0} badge="Réussi" />
+        <Stat label="À vérifier" value={stats.review ?? 0} badge="À vérifier" />
+        <Stat label="Imports" value={stats.imports ?? 0} badge="Import pharmacie" />
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border bg-white">
+        <div className="hidden grid-cols-[150px_1fr_150px_170px_1fr_1fr_110px] gap-0 bg-muted/40 px-4 py-3 text-xs font-extrabold uppercase text-muted-foreground lg:grid">
+          <span>Date</span><span>Action</span><span>Auteur</span><span>Source</span><span>Ancienne valeur</span><span>Nouvelle valeur</span><span>Statut</span>
+        </div>
+        <div className="divide-y divide-border">
+          {loading && <div className="p-4 text-sm font-bold text-muted-foreground">Chargement de l’historique réel...</div>}
+          {!loading && rows.length === 0 && <div className="p-8 text-center text-sm font-bold text-foreground">Aucune action journalisée dans ce filtre.</div>}
+          {rows.map((item) => (
+            <div key={item.id} className="grid gap-3 p-4 text-sm lg:grid-cols-[150px_1fr_150px_170px_1fr_1fr_110px] lg:items-center">
+              <p className="font-bold text-foreground">{formatDateTime(item.date)}</p>
+              <p className="font-extrabold text-foreground">{item.action}</p>
+              <p className="text-muted-foreground">{item.author}</p>
+              <StatusBadge label={item.source} />
+              <p className="break-words text-muted-foreground">{stringifyCell(item.oldValue)}</p>
+              <p className="break-words font-bold text-foreground">{stringifyCell(item.newValue)}</p>
+              <StatusBadge label={item.status} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NotificationsCenter() {
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [platformEnabled, setPlatformEnabled] = useState(true);
+  const [criticalOnly, setCriticalOnly] = useState(false);
+  const [filter, setFilter] = useState("all");
+  const [items, setItems] = useState<PharmacyNotification[]>([]);
+  const [stats, setStats] = useState<{ total?: number; unread?: number; critical?: number; archived?: number }>({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ pharmacySlug: PHARMACY_SESSION_SLUG });
+    if (filter !== "all") params.set("status", filter);
+    try {
+      const res = await fetch(`/api/pharmacy-platform/notifications?${params}`, { headers: { "X-Sablin-Session-Kind": "pharmacy" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des notifications impossible.");
+      setItems(data.notifications ?? []);
+      setStats(data.stats ?? {});
+      setPlatformEnabled(Boolean(data.preferences?.platformEnabled ?? true));
+      setEmailEnabled(Boolean(data.preferences?.emailEnabled ?? true));
+      setCriticalOnly(Boolean(data.preferences?.criticalOnly ?? false));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des notifications impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const savePreferences = async () => {
+    try {
+      const res = await fetch("/api/pharmacy-platform/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({ pharmacySlug: PHARMACY_SESSION_SLUG, emailEnabled, platformEnabled, criticalOnly }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Enregistrement impossible.");
+      setMessage("Préférences notifications enregistrées.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Enregistrement impossible.");
+    }
+  };
+
+  const updateNotification = async (notificationId: string, action: "read" | "archive") => {
+    try {
+      const res = await fetch("/api/pharmacy-platform/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({ notificationId, action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Action impossible.");
+      setMessage(action === "archive" ? "Notification archivée." : "Notification marquée comme lue.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Action impossible.");
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading level="h2">Notifications pharmacie</Heading>
+            <Muted className="mt-1">Suivez les demandes, confirmations, imports, données anciennes et alertes de sécurité de votre pharmacie.</Muted>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="all">Toutes</option>
+              <option value="non_lue">Non lues</option>
+              <option value="lue">Lues</option>
+              <option value="archivée">Archivées</option>
+            </select>
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load}>Actualiser</Button>
+          </div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat label="Notifications" value={stats.total ?? items.length} badge="Plateforme" />
+          <Stat label="Non lues" value={stats.unread ?? 0} badge="non_lue" />
+          <Stat label="Critiques" value={stats.critical ?? 0} badge="Alerte" />
+          <Stat label="Archivées" value={stats.archived ?? 0} badge="archivée" />
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <label className="rounded-xl border border-border bg-white p-4">
+            <input type="checkbox" checked={platformEnabled} onChange={(event) => setPlatformEnabled(event.target.checked)} className="mr-2" />
+            <span className="font-bold text-foreground">Notifications plateforme</span>
+            <p className="mt-1 text-sm text-muted-foreground">Visible dans l’espace pharmacie.</p>
+          </label>
+          <label className="rounded-xl border border-border bg-white p-4">
+            <input type="checkbox" checked={emailEnabled} onChange={(event) => setEmailEnabled(event.target.checked)} className="mr-2" />
+            <span className="font-bold text-foreground">Alertes e-mail</span>
+            <p className="mt-1 text-sm text-muted-foreground">Pour demandes et sécurité.</p>
+          </label>
+          <label className="rounded-xl border border-border bg-white p-4">
+            <input type="checkbox" checked={criticalOnly} onChange={(event) => setCriticalOnly(event.target.checked)} className="mr-2" />
+            <span className="font-bold text-foreground">Urgences uniquement</span>
+            <p className="mt-1 text-sm text-muted-foreground">Réduit les notifications secondaires.</p>
+          </label>
+        </div>
+        <Button onClick={savePreferences} className="mt-4 bg-brand text-white hover:bg-brand-dark">
+          <Save className="size-4" /> Enregistrer les préférences
+        </Button>
+      </Card>
+      <div className="grid gap-3 md:grid-cols-2">
+        {loading && <Card className="border-border/70 p-5 text-sm font-bold text-muted-foreground">Chargement des notifications...</Card>}
+        {!loading && items.length === 0 && <Card className="border-dashed border-border p-8 text-center text-sm font-bold text-foreground">Aucune notification réelle dans ce filtre.</Card>}
+        {items.map((item) => (
+          <Card key={item.id} className="border-border/70 p-4 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap gap-2"><StatusBadge label={item.type} /><StatusBadge label={item.status} /></div>
+                <h3 className="mt-3 font-extrabold text-foreground">{item.title}</h3>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">{item.message}</p>
+                <p className="mt-2 text-xs font-bold text-muted-foreground">{formatDateTime(item.createdAt)}</p>
+              </div>
+              <Bell className="size-5 text-brand" />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => updateNotification(item.id, "read")}>
+                <Eye className="size-4" /> Marquer lu
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => updateNotification(item.id, "archive")}>
+                <Archive className="size-4" /> Archiver
+              </Button>
+            </div>
           </Card>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }
 
 function Profile() {
+  const [profile, setProfile] = useState<PharmacyProfileData | null>(null);
+  const [profileForm, setProfileForm] = useState<Record<string, string>>({
+    name: "",
+    managerName: "",
+    managerRole: "",
+    phone: "",
+    whatsapp: "",
+    professionalEmail: "",
+    authorizationNumber: "",
+    commune: "",
+    district: "",
+    address: "",
+    latitude: "",
+    longitude: "",
+    landmark: "",
+    coverageZone: "",
+    description: "",
+  });
+  const [services, setServices] = useState<string[]>(["Pharmacie de garde", "Paiement mobile", "Conseil pharmaceutique"]);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const updateProfileField = (key: string, value: string) => {
+    setProfileForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const loadProfile = useCallback(async () => {
+    setLoadingProfile(true);
+    try {
+      const res = await fetch(`/api/pharmacy-platform/profile?pharmacySlug=${encodeURIComponent(PHARMACY_SESSION_SLUG)}`, {
+        headers: { "X-Sablin-Session-Kind": "pharmacy" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement du profil impossible.");
+      const loaded = data.profile as PharmacyProfileData;
+      setProfile(loaded);
+      setServices(loaded.services?.length ? loaded.services : []);
+      setProfileForm({
+        name: loaded.name ?? "",
+        managerName: loaded.managerName ?? "",
+        managerRole: loaded.managerRole ?? "",
+        phone: loaded.phone ?? "",
+        whatsapp: loaded.whatsapp ?? "",
+        professionalEmail: loaded.professionalEmail ?? "",
+        authorizationNumber: loaded.authorizationNumber ?? "",
+        commune: loaded.commune ?? "",
+        district: loaded.district ?? "",
+        address: loaded.address ?? "",
+        latitude: String(loaded.latitude ?? ""),
+        longitude: String(loaded.longitude ?? ""),
+        landmark: loaded.landmark ?? "",
+        coverageZone: loaded.coverageZone ?? "",
+        description: loaded.description ?? "",
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement du profil impossible.");
+    } finally {
+      setLoadingProfile(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  const toggleService = (service: string) => {
+    setServices((current) => (current.includes(service) ? current.filter((item) => item !== service) : [...current, service]));
+  };
+
+  const saveProfile = async () => {
+    try {
+      const res = await fetch("/api/pharmacy-platform/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({ pharmacySlug: PHARMACY_SESSION_SLUG, ...profileForm, services }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Enregistrement impossible.");
+      setProfile(data.profile);
+      setMessage("Profil pharmacie enregistré et journalisé.");
+      await loadProfile();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Enregistrement impossible.");
+    }
+  };
+
   return (
     <div className="space-y-5">
       <Card className="border-border/70 p-5 shadow-card">
-        <Heading level="h2">Profil pharmacie</Heading>
-        <Muted>Complétez les données publiques et internes qui alimentent SABLIN PHARMA Utilisateur après validation.</Muted>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {["Nom de la pharmacie", "Nom du pharmacien responsable", "Fonction du responsable", "Commune", "Quartier", "Adresse complète", "Téléphone professionnel", "WhatsApp professionnel", "Email professionnel", "Numéro d’autorisation / agrément", "Point GPS latitude", "Point GPS longitude", "Repère connu", "Zone de couverture"].map((field) => <Field key={field} label={field} />)}
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading level="h2">Profil pharmacie</Heading>
+            <Muted className="mt-1">Complétez les données publiques et internes qui alimentent SABLIN PHARMA Utilisateur après validation.</Muted>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge label={profile?.accountStatus ?? "Chargement"} />
+            <StatusBadge label={profile?.dataQuality ?? "Données à vérifier"} />
+            <StatusBadge label="Contact verrouillé côté utilisateur" />
+          </div>
         </div>
-        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">Même renseignés ici, les contacts restent verrouillés côté utilisateur par crédits. Les documents administratifs restent côté admin.</p>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat label="Score complétude profil" value={loadingProfile ? "..." : `${profile?.completenessScore ?? 0}%`} badge="Dossier pharmacie" />
+          <Stat label="Photos chargées" value={loadingProfile ? "..." : profile?.mediaCount ?? 0} badge="Validation requise" />
+          <Stat label="Services actifs" value={services.length} badge="Profil utilisateur" />
+          <Stat label="Médicaments rattachés" value={loadingProfile ? "..." : profile?.medicationCount ?? 0} badge="Inventaire" />
+        </div>
       </Card>
+
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="border-border/70 p-5 shadow-card">
+          <h3 className="text-base font-extrabold text-foreground">Identification officielle</h3>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">Ces données créent la fiche officielle. Les contacts restent protégés par crédits côté utilisateur.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <Field label="Nom de la pharmacie" placeholder="Pharmacie Sainte Marie Cocody" value={profileForm.name} onChange={(value) => updateProfileField("name", value)} />
+            <Field label="Nom du pharmacien responsable" placeholder="Dr Awa N’Guessan" value={profileForm.managerName} onChange={(value) => updateProfileField("managerName", value)} />
+            <Field label="Fonction du responsable" placeholder="Pharmacien responsable" value={profileForm.managerRole} onChange={(value) => updateProfileField("managerRole", value)} />
+            <Field label="Téléphone professionnel" placeholder="+225 07 00 00 00 00" value={profileForm.phone} onChange={(value) => updateProfileField("phone", value)} />
+            <Field label="WhatsApp professionnel" placeholder="+225 05 00 00 00 00" value={profileForm.whatsapp} onChange={(value) => updateProfileField("whatsapp", value)} />
+            <Field label="Email professionnel" placeholder="contact@pharmacie.ci" value={profileForm.professionalEmail} onChange={(value) => updateProfileField("professionalEmail", value)} />
+            <Field label="Numéro d’autorisation / agrément" placeholder="AGR-CI-..." value={profileForm.authorizationNumber} onChange={(value) => updateProfileField("authorizationNumber", value)} />
+            <Field label="Description courte" placeholder="Pharmacie de proximité à Cocody." value={profileForm.description} onChange={(value) => updateProfileField("description", value)} />
+          </div>
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+            Même renseignés ici, le téléphone, WhatsApp et l’email direct ne sont jamais affichés gratuitement côté utilisateur.
+          </p>
+        </Card>
+
+        <Card className="border-border/70 p-5 shadow-card">
+          <h3 className="text-base font-extrabold text-foreground">Localisation & repères</h3>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">Ces informations alimentent les pharmacies proches, par commune et les itinéraires.</p>
+          <div className="mt-4 grid gap-3">
+            <Field label="Commune" placeholder="Cocody" value={profileForm.commune} onChange={(value) => updateProfileField("commune", value)} />
+            <Field label="Quartier" placeholder="Riviera 2" value={profileForm.district} onChange={(value) => updateProfileField("district", value)} />
+            <Field label="Adresse complète" placeholder="Près de la station Total" value={profileForm.address} onChange={(value) => updateProfileField("address", value)} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Latitude GPS" placeholder="5.3599" value={profileForm.latitude} onChange={(value) => updateProfileField("latitude", value)} />
+              <Field label="Longitude GPS" placeholder="-3.9876" value={profileForm.longitude} onChange={(value) => updateProfileField("longitude", value)} />
+            </div>
+            <Field label="Repère connu" placeholder="En face du supermarché" value={profileForm.landmark} onChange={(value) => updateProfileField("landmark", value)} />
+            <Field label="Zone de couverture" placeholder="Riviera, M’Badon, Angré" value={profileForm.coverageZone} onChange={(value) => updateProfileField("coverageZone", value)} />
+          </div>
+        </Card>
+      </div>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-extrabold text-foreground">Services proposés</h3>
+            <p className="text-sm font-medium text-muted-foreground">Ces services aident au filtrage côté utilisateur sans créer de vente en ligne.</p>
+          </div>
+          <StatusBadge label="Information générale" />
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {PHARMACY_SERVICES.map((service) => (
+            <label key={service} className="flex min-h-12 items-start gap-2 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">
+              <input type="checkbox" checked={services.includes(service)} onChange={() => toggleService(service)} className="mt-0.5 size-4 accent-brand" />
+              <span>{service}</span>
+            </label>
+          ))}
+        </div>
+        <Button onClick={saveProfile} className="mt-4 w-full bg-brand text-white hover:bg-brand-dark sm:w-auto">
+          <Save className="size-4" /> Enregistrer le profil
+        </Button>
+      </Card>
+
       <ImageRules />
-      <SectionBlock title="Services proposés" description="Ces services aident au filtrage côté utilisateur sans créer de vente en ligne.">
-        <PillList items={PHARMACY_SERVICES} />
-      </SectionBlock>
       <DataVisibilityBlocks />
     </div>
   );
 }
 
 function Schedule() {
+  const [schedule, setSchedule] = useState<Record<string, DaySchedule>>(defaultSchedule);
+  const [dutyEnabled, setDutyEnabled] = useState(true);
+  const [dutyStart, setDutyStart] = useState("2026-06-19");
+  const [dutyEnd, setDutyEnd] = useState("2026-06-20");
+  const [specialMessage, setSpecialMessage] = useState("Pharmacie de garde cette nuit. Confirmez avant tout déplacement.");
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const loadSchedule = useCallback(async () => {
+    setLoadingSchedule(true);
+    try {
+      const res = await fetch(`/api/pharmacy-platform/schedule?pharmacySlug=${encodeURIComponent(PHARMACY_SESSION_SLUG)}`, {
+        headers: { "X-Sablin-Session-Kind": "pharmacy" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des horaires impossible.");
+      setSchedule({ ...defaultSchedule, ...(data.schedule ?? {}) });
+      setDutyEnabled(Boolean(data.duty?.enabled));
+      setDutyStart(data.duty?.start ? String(data.duty.start).slice(0, 10) : "2026-06-19");
+      setDutyEnd(data.duty?.end ? String(data.duty.end).slice(0, 10) : "2026-06-20");
+      setSpecialMessage(data.duty?.message || "");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des horaires impossible.");
+    } finally {
+      setLoadingSchedule(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSchedule();
+  }, [loadSchedule]);
+
+  const updateDay = (dayKey: string, patch: Partial<DaySchedule>) => {
+    setSchedule((current) => ({
+      ...current,
+      [dayKey]: {
+        ...current[dayKey],
+        ...patch,
+      },
+    }));
+  };
+
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Horaires & garde</Heading>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {["Horaires lundi", "Horaires mardi", "Horaires mercredi", "Horaires jeudi", "Horaires vendredi", "Horaires samedi", "Horaires dimanche", "Pause", "Ouverture exceptionnelle", "Fermeture exceptionnelle", "Statut de garde", "Période de garde", "Message spécial"].map((field) => <Field key={field} label={field} />)}
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading level="h2">Horaires & garde</Heading>
+            <Muted className="mt-1">Configurez les jours, heures, pauses, gardes et exceptions qui alimentent les pharmacies ouvertes ou de garde côté utilisateur.</Muted>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PHARMACY_OPERATION_STATUSES.map((status) => <StatusBadge key={status} label={status} />)}
+          </div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-extrabold text-foreground">Planning hebdomadaire</h3>
+            <p className="text-sm font-medium text-muted-foreground">Chaque ligne reste lisible sur mobile et se transforme en grille complète sur ordinateur.</p>
+          </div>
+          <StatusBadge label="Synchronisé utilisateur après validation" />
+        </div>
+        {loadingSchedule && <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm font-bold text-muted-foreground">Chargement du planning enregistré...</p>}
+        <div className="mt-4 space-y-3">
+          {WEEK_DAYS.map((day) => {
+            const item = schedule[day.key];
+            return (
+              <Card key={day.key} className="border-border/70 bg-white p-4">
+                <div className="grid gap-3 lg:grid-cols-[118px_160px_1fr_1fr_1fr_1fr_150px] lg:items-end">
+                  <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 text-sm font-extrabold text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={item.enabled}
+                      onChange={(event) => updateDay(day.key, { enabled: event.target.checked, status: event.target.checked ? "Ouvert" : "Fermé" })}
+                      className="size-4 accent-brand"
+                    />
+                    {day.label}
+                  </label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-foreground">Statut public</Label>
+                    <select
+                      value={item.status}
+                      onChange={(event) => updateDay(day.key, { status: event.target.value, enabled: event.target.value !== "Fermé" })}
+                      className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground"
+                    >
+                      {PHARMACY_OPERATION_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                    </select>
+                  </div>
+                  <Field label="Ouverture" type="time" value={item.open} onChange={(value) => updateDay(day.key, { open: value })} />
+                  <Field label="Fermeture" type="time" value={item.close} onChange={(value) => updateDay(day.key, { close: value })} />
+                  <Field label="Début pause" type="time" value={item.breakStart} onChange={(value) => updateDay(day.key, { breakStart: value })} />
+                  <Field label="Fin pause" type="time" value={item.breakEnd} onChange={(value) => updateDay(day.key, { breakEnd: value })} />
+                  <div className="flex lg:justify-end">
+                    <StatusBadge label={item.enabled ? item.status : "Fermé"} />
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </Card>
+
+      <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
+        <Card className="border-border/70 p-5 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-base font-extrabold text-foreground">Garde, exceptions et message spécial</h3>
+              <p className="text-sm font-medium text-muted-foreground">Les gardes alimentent directement les pharmacies de garde. Les exceptions évitent les mauvaises orientations.</p>
+            </div>
+            <StatusBadge label={dutyEnabled ? "De garde" : "Fermé"} />
+          </div>
+          <label className="mt-4 flex items-center gap-3 rounded-xl border border-brand/20 bg-brand-light/50 p-3 text-sm font-extrabold text-brand-dark">
+            <input type="checkbox" checked={dutyEnabled} onChange={(event) => setDutyEnabled(event.target.checked)} className="size-4 accent-brand" />
+            Activer le statut pharmacie de garde
+          </label>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Field label="Début de garde" type="datetime-local" value={`${dutyStart}T20:00`} onChange={(value) => setDutyStart(value.slice(0, 10))} />
+            <Field label="Fin de garde" type="datetime-local" value={`${dutyEnd}T08:00`} onChange={(value) => setDutyEnd(value.slice(0, 10))} />
+            <Field label="Ouverture exceptionnelle" placeholder="Exemple : dimanche 08:00 - 14:00" />
+            <Field label="Fermeture exceptionnelle" placeholder="Exemple : inventaire annuel" />
+          </div>
+          <Label className="mt-4 block text-xs font-bold text-foreground">Message spécial visible si validé</Label>
+          <Textarea value={specialMessage} onChange={(event) => setSpecialMessage(event.target.value)} className="mt-2 min-h-24 bg-white" />
+          <ProfessionalActionButton
+            action="schedule-save"
+            label="Enregistrer horaires et garde"
+            pharmacySlug={PHARMACY_SESSION_SLUG}
+            payload={{ schedule, dutyEnabled, dutyStart, dutyEnd, specialMessage }}
+            onSuccess={() => {
+              setMessage("Horaires enregistrés et synchronisés.");
+              void loadSchedule();
+            }}
+            className="mt-4 w-full bg-brand text-white hover:bg-brand-dark sm:w-auto"
+          >
+            <Save className="size-4" /> Enregistrer horaires et garde
+          </ProfessionalActionButton>
+        </Card>
+
+        <SectionBlock title="Règles de publication" description="Ce qui est publié côté utilisateur reste contrôlé.">
+          <div className="grid gap-3">
+            {[
+              ["Ouvert / fermé", "Calculé depuis les horaires et exceptions validées."],
+              ["De garde", "Affiché si la période de garde est active et vérifiée."],
+              ["Horaires à confirmer", "Utilisé si les données sont anciennes ou incohérentes."],
+              ["Message spécial", "Visible uniquement s’il est utile, clair et non confidentiel."],
+            ].map(([title, text]) => (
+              <div key={title} className="rounded-lg border border-border bg-white p-3">
+                <p className="font-extrabold text-foreground">{title}</p>
+                <p className="text-sm font-medium text-muted-foreground">{text}</p>
+              </div>
+            ))}
+          </div>
+        </SectionBlock>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">{["Ouvert", "Fermé", "De garde", "Fermeture exceptionnelle", "Horaires à confirmer"].map((s) => <StatusBadge key={s} label={s} />)}</div>
-      <ProfessionalActionButton action="schedule-save" label="Enregistrer" pharmacySlug={PHARMACY_SESSION_SLUG} className="mt-4 bg-brand text-white hover:bg-brand-dark">
-        Enregistrer
-      </ProfessionalActionButton>
-    </Card>
+    </div>
   );
 }
 
 function TeamManagement() {
-  const members = [
-    { name: "Dr Awa N’Guessan", role: "PHARMACY_OWNER", status: "Actif", lastLogin: "Aujourd’hui" },
-    { name: "Koffi Yao", role: "PHARMACY_STOCK_MANAGER", status: "Actif", lastLogin: "Hier" },
-    { name: "Mariam Coulibaly", role: "PHARMACY_SUPPORT_AGENT", status: "Invité", lastLogin: "Invitation en attente" },
-  ];
+  const [name, setName] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [role, setRole] = useState("PHARMACY_EMPLOYEE");
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(["Modifier les médicaments", "Répondre aux demandes", "Voir l’historique"]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const loadTeam = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/professional/team?pharmacySlug=${encodeURIComponent(PHARMACY_SESSION_SLUG)}`, {
+        headers: { "X-Sablin-Session-Kind": "pharmacy" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement de l’équipe impossible.");
+      setMembers(data.members ?? []);
+      setInvitations(data.invitations ?? []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement de l’équipe impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTeam();
+  }, [loadTeam]);
+
+  const togglePermission = (permission: string) => {
+    setSelectedPermissions((current) =>
+      current.includes(permission) ? current.filter((item) => item !== permission) : [...current, permission]
+    );
+  };
+
+  const inviteMember = async () => {
+    setMessage("");
+    const isEmail = identifier.includes("@");
+    try {
+      const res = await fetch("/api/professional/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({
+          pharmacySlug: PHARMACY_SESSION_SLUG,
+          name,
+          email: isEmail ? identifier : "",
+          phone: isEmail ? "" : identifier,
+          role,
+          permissions: selectedPermissions,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Invitation impossible.");
+      setMessage(`Invitation créée. Jeton temporaire : ${data.activationTokenPreview ?? "envoyé par canal sécurisé"}`);
+      setName("");
+      setIdentifier("");
+      await loadTeam();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Invitation impossible.");
+    }
+  };
+
+  const updateMember = async (member: TeamMember, nextStatus?: string) => {
+    try {
+      const res = await fetch("/api/professional/team", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({
+          membershipId: member.id,
+          role: member.role,
+          permissions: member.permissions,
+          status: nextStatus ?? member.status,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Modification impossible.");
+      setMessage(nextStatus === "Révoqué" ? "Accès révoqué et journalisé." : "Rôle équipe mis à jour.");
+      await loadTeam();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Modification impossible.");
+    }
+  };
+
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Équipe de la pharmacie</Heading>
-      <Muted>Invitez des employés, attribuez des rôles et gardez une trace des accès. Le dernier propriétaire actif ne peut pas être supprimé.</Muted>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="Nom de l’employé" />
-        <Field label="Email ou téléphone" />
-        <Field label="Rôle" placeholder="PHARMACY_EMPLOYEE" />
-        <Field label="Permissions" placeholder="inventory.update, requests.respond" />
-      </div>
-      <ProfessionalActionButton action="team-invite" label="Inviter un employé" pharmacySlug={PHARMACY_SESSION_SLUG} className="mt-4 bg-brand text-white hover:bg-brand-dark">
-        Inviter un employé
-      </ProfessionalActionButton>
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        {members.map((member) => (
-          <Card key={member.name} className="border-border/70 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-extrabold text-foreground">{member.name}</p>
-                <p className="text-sm font-medium text-muted-foreground">{member.role} · Dernière connexion : {member.lastLogin}</p>
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading level="h2">Équipe de la pharmacie</Heading>
+            <Muted className="mt-1">Invitez les employés, attribuez des permissions précises et gardez une trace des accès sans exposer les données d’autres pharmacies.</Muted>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge label="Accès limité à ma pharmacie" />
+            <StatusBadge label="Session pharmacie séparée" />
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
+        <Card className="border-border/70 p-5 shadow-card">
+          <h3 className="text-base font-extrabold text-foreground">Inviter un membre</h3>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">L’employé recevra un accès limité. Il choisira son mot de passe via un lien temporaire.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Field label="Nom de l’employé" placeholder="Exemple : Aminata Koné" value={name} onChange={setName} />
+            <Field label="Email ou téléphone" placeholder="email@pharmacie.ci ou +225..." value={identifier} onChange={setIdentifier} />
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs font-bold text-foreground">Rôle</Label>
+              <select value={role} onChange={(event) => setRole(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+                <option value="PHARMACY_OWNER">Pharmacien responsable</option>
+                <option value="PHARMACY_EMPLOYEE">Employé pharmacie</option>
+                <option value="PHARMACY_STOCK_MANAGER">Assistant stock</option>
+                <option value="PHARMACY_SUPPORT_AGENT">Agent demandes et conseils</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-4">
+            <Label className="text-xs font-bold text-foreground">Permissions</Label>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {teamPermissions.map((permission) => (
+                <label key={permission} className="flex items-start gap-2 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">
+                  <input type="checkbox" checked={selectedPermissions.includes(permission)} onChange={() => togglePermission(permission)} className="mt-0.5 size-4 accent-brand" />
+                  <span>{permission}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          {message && <p className="mt-4 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+          <Button onClick={inviteMember} className="mt-4 w-full bg-brand text-white hover:bg-brand-dark sm:w-auto">
+            <UserPlus className="size-4" /> Envoyer l’invitation
+          </Button>
+        </Card>
+
+        <SectionBlock title="Matrice d’accès" description="Les permissions restent internes à cette pharmacie.">
+          <div className="grid gap-3">
+            {[
+              ["Pharmacien responsable", "Peut gérer le profil, les horaires, l’équipe, l’inventaire et les demandes."],
+              ["Employé pharmacie", "Peut mettre à jour les disponibilités et répondre aux demandes si autorisé."],
+              ["Assistant stock", "Peut importer ou corriger l’inventaire, sans modifier les identifiants."],
+              ["Gestionnaire horaires", "Peut ajuster horaires, gardes et exceptions sans accès aux contacts globaux."],
+            ].map(([title, text]) => (
+              <div key={title} className="rounded-lg border border-border bg-white p-3">
+                <p className="font-extrabold text-foreground">{title}</p>
+                <p className="text-sm font-medium text-muted-foreground">{text}</p>
               </div>
-              <StatusBadge label={member.status} />
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <ProfessionalActionButton action="team-update-role" label="Modifier rôle" pharmacySlug={PHARMACY_SESSION_SLUG} size="sm" variant="outline">Modifier rôle</ProfessionalActionButton>
-              <ProfessionalActionButton action="team-revoke" label="Révoquer accès" pharmacySlug={PHARMACY_SESSION_SLUG} size="sm" variant="outline" className="border-red-300 text-red-700">Révoquer</ProfessionalActionButton>
-            </div>
-          </Card>
-        ))}
+            ))}
+          </div>
+        </SectionBlock>
       </div>
-    </Card>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-extrabold text-foreground">Membres, invitations et accès</h3>
+            <p className="text-sm font-medium text-muted-foreground">Chaque action est journalisée. Le dernier responsable actif reste protégé.</p>
+          </div>
+          <Users className="size-5 text-brand" />
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          {loading && <Card className="border-border/70 p-4 text-sm font-bold text-muted-foreground">Chargement des membres...</Card>}
+          {!loading && members.length === 0 && <Card className="border-dashed border-border p-4 text-sm font-bold text-foreground">Aucun membre actif trouvé.</Card>}
+          {members.map((member) => (
+            <Card key={member.id} className="border-border/70 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-extrabold text-foreground">{member.name}</p>
+                  <p className="text-sm font-medium text-muted-foreground">{member.role} · Dernière connexion : {formatDateTime(member.lastLoginAt)}</p>
+                  <p className="text-xs font-bold text-muted-foreground">{member.email ?? member.phone ?? "Contact non renseigné"}</p>
+                </div>
+                <StatusBadge label={member.status} />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(member.permissions.length ? member.permissions : ["Permissions héritées du rôle"]).map((permission) => <StatusBadge key={permission} label={permission} />)}
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => updateMember(member)}>Modifier rôle</Button>
+                <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => updateMember(member, "Révoqué")}>Révoquer</Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+        {invitations.length > 0 && (
+          <div className="mt-5 border-t border-border pt-4">
+            <h4 className="font-extrabold text-foreground">Invitations en attente</h4>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {invitations.map((invitation) => (
+                <Card key={invitation.id} className="border-border/70 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-extrabold text-foreground">{invitation.name}</p>
+                      <p className="text-sm font-medium text-muted-foreground">{invitation.role} · Expire : {formatDateTime(invitation.expiresAt)}</p>
+                      <p className="text-xs font-bold text-muted-foreground">{invitation.email ?? invitation.phone ?? "Contact non renseigné"}</p>
+                    </div>
+                    <StatusBadge label={invitation.status} />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+          Les accès équipe ne donnent jamais accès à l’espace Admin, aux autres pharmacies ou aux transactions globales.
+        </p>
+      </Card>
+    </div>
   );
 }
 
@@ -1242,14 +2351,14 @@ export function PharmacySpaceView({ page }: { page: PharmacyPage }) {
       {page === "enrichissement-inventaire" && <InventoryEnrichment />}
       {page === "synchronisation-inventaire" && <InventorySyncPanel kind="pharmacy" pharmacySlug={PHARMACY_SESSION_SLUG} />}
       {page === "demandes" && <ProfessionalRequestsPanel kind="pharmacy" pharmacySlug={PHARMACY_SESSION_SLUG} />}
-      {page === "confirmations" && <SimpleCards title="Confirmations à traiter" items={["Paracétamol 500 mg", "Augmentin", "Ventoline", "Smecta"]} />}
-      {page === "conseils" && <SimpleCards title="Conseils pharmacie" items={["Conseil dosage", "Interaction possible", "Orientation vers médecin", "Question ordonnance"]} />}
+      {page === "confirmations" && <ConfirmationCenter />}
+      {page === "conseils" && <AdviceCenter />}
       {page === "horaires-garde" && <Schedule />}
       {page === "profil" && <Profile />}
       {page === "photos" && <ImageRules />}
       {page === "equipe" && <TeamManagement />}
-      {page === "historique" && <SimpleCards title="Historique de ma pharmacie" items={["Modification disponibilité", "Import inventaire", "Changement horaires", "Confirmation traitée"]} />}
-      {page === "notifications" && <SimpleCards title="Notifications pharmacie" items={["Nouvelle demande", "Données anciennes", "Import avec erreurs", "Compte validé"]} />}
+      {page === "historique" && <HistoryCenter />}
+      {page === "notifications" && <NotificationsCenter />}
       {page === "parametres" && <ProfessionalAccountSettings />}
     </PharmacyShell>
   );

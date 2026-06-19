@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
     }),
     db.pharmacyRequest.count({ where: { pharmacyId: pharmacy.id } }),
     db.pharmacyRequest.count({ where: { pharmacyId: pharmacy.id, status: { in: ["Nouvelle", "Reçue", "Acceptée", "En cours"] } } }),
-    db.pharmacyRequest.count({ where: { pharmacyId: pharmacy.id, requestType: { contains: "confirmation" }, status: { in: ["Nouvelle", "Reçue", "Acceptée", "En cours"] } } }),
+    db.pharmacyRequest.count({ where: { pharmacyId: pharmacy.id, requestType: { in: ["confirm_availability", "confirm_price", "confirm_full"] }, status: { in: ["Nouvelle", "Reçue", "Acceptée", "En cours"] } } }),
     db.pharmacyMedication.count({
       where: {
         pharmacyId: pharmacy.id,

@@ -5,6 +5,10 @@ import {
   normalizeImportedRow,
   type ImportedMedicationRow,
 } from "@/lib/medication-enrichment";
+import {
+  findProhibitedMedicationMatch,
+  getActiveProhibitedMedicationRules,
+} from "@/lib/prohibited-medications";
 
 export const SYNC_METHODS = [
   "Saisie manuelle",
@@ -80,8 +84,12 @@ export type SyncInventoryResult = {
 };
 
 function encryptionKey() {
+  const secret = process.env.SABLIN_SYNC_SECRET_KEY || process.env.NEXTAUTH_SECRET || process.env.SABLIN_SESSION_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("SABLIN_SYNC_SECRET_KEY is required in production.");
+  }
   return createHash("sha256")
-    .update(process.env.SABLIN_SYNC_SECRET_KEY || process.env.NEXTAUTH_SECRET || "sablin-local-sync-key")
+    .update(secret || "sablin-local-sync-key")
     .digest();
 }
 
@@ -269,6 +277,7 @@ export async function syncInventory(input: SyncInventoryInput): Promise<SyncInve
   let updatedProducts = 0;
   let outOfStockProducts = 0;
   let priceChanges = 0;
+  const prohibitedRules = await getActiveProhibitedMedicationRules();
 
   for (const row of input.rows) {
     const normalized = normalizeImportedRow(row);
@@ -309,6 +318,20 @@ export async function syncInventory(input: SyncInventoryInput): Promise<SyncInve
     const medicationId = "medicationId" in match.best ? match.best.medicationId : null;
     if (medicationId) recognizedMedications += 1;
     else unknownMedications += 1;
+
+    const prohibitedMatch = findProhibitedMedicationMatch(
+      {
+        name: row.name,
+        genericName: row.genericName,
+        dosage: normalized.dosage,
+        form: normalized.form,
+        barcode: row.barcode,
+      },
+      prohibitedRules
+    );
+    if (prohibitedMatch) {
+      errors.push(`Médicament interdit : ${prohibitedMatch.name}`);
+    }
 
     const rowHasConflict = match.best.level === "Conflit de données" || errors.length > 0 || !medicationId;
     if (rowHasConflict) {

@@ -1124,9 +1124,12 @@ function ImportInventory() {
       const res = await fetch("/api/imports/preview", { method: "POST", headers: { "X-Sablin-Session-Kind": "pharmacy" }, body: form });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Aperçu impossible.");
+      const safeLines = safePublishLineNumbers(data);
       setPreview(data);
-      setSelectedLineNumbers(safePublishLineNumbers(data));
-      setMessage(`Aperçu prêt : ${data.totalRows} ligne(s), ${data.recognizedMedications} reconnue(s), ${data.unknownMedications} à valider.`);
+      setSelectedLineNumbers(safeLines);
+      setMessage(
+        `Analyse terminée : ${safeLines.size} produit(s) prêt(s) à publier, ${data.unknownMedications} non reconnu(s), ${data.prohibitedRows ?? 0} interdit(s) retiré(s).`
+      );
     } catch (error) {
       setPreview(null);
       setSelectedLineNumbers(new Set());
@@ -1135,7 +1138,7 @@ function ImportInventory() {
       setUploading(false);
     }
   };
-  const submitImport = async (mode: "publish_selected" | "draft") => {
+  const submitImport = async (mode: "auto_publish_safe" | "draft") => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, Excel, Word ou PowerPoint avant l’import.");
       return;
@@ -1147,10 +1150,6 @@ function ImportInventory() {
     const rowsToConfirm = preview.confirmableRows ?? [];
     if (!rowsToConfirm.length) {
       setMessage("Aucune ligne analysée à enregistrer.");
-      return;
-    }
-    if (mode === "publish_selected" && !selectedLineNumbers.size) {
-      setMessage("Aucune ligne dans la liste à publier. Sélectionnez les lignes sûres ou enregistrez l’import en brouillon contrôlé.");
       return;
     }
     setUploading(true);
@@ -1172,8 +1171,8 @@ function ImportInventory() {
       if (!res.ok) throw new Error(data?.error ?? "Import impossible.");
       setMessage(
         mode === "draft"
-          ? `Brouillon contrôlé enregistré : ${data.report.totalRows ?? 0} ligne(s), ${data.report.draftRows ?? 0} hors marketplace.`
-          : `Liste publiée avec contrôle : ${data.report.safePublishedRows ?? 0} ligne(s) sûre(s), ${data.report.selectedButNeedsValidation ?? 0} à valider, ${data.report.draftRows ?? 0} en brouillon contrôlé.`
+          ? `Liste enregistrée sans publication : ${data.report.totalRows ?? 0} ligne(s).`
+          : `Publication terminée : ${data.report.safePublishedRows ?? 0} produit(s) publié(s), ${data.report.notPublishedRows ?? 0} non publié(s), ${data.report.prohibitedRows ?? 0} interdit(s) retiré(s).`
       );
       setFile(null);
       setSelectedLineNumbers(new Set());
@@ -1184,16 +1183,31 @@ function ImportInventory() {
       setUploading(false);
     }
   };
-  const uploadImport = async () => submitImport("publish_selected");
-  const saveDraftImport = async () => submitImport("draft");
+  const uploadImport = async () => submitImport("auto_publish_safe");
   return (
     <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Import inventaire pharmacie</Heading>
-      <Muted>Vous importez uniquement l’inventaire de votre propre pharmacie. Formats acceptés : CSV, XLSX, XLS lisible, Word DOCX et PowerPoint PPTX.</Muted>
+      <Heading level="h2">Importer mes médicaments</Heading>
+      <Muted>
+        Ajoutez vos médicaments depuis un fichier Excel, CSV, Word ou PowerPoint. Les produits reconnus et autorisés
+        seront publiés automatiquement. Les médicaments interdits sont retirés automatiquement.
+      </Muted>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {[
+          ["1", "Choisir le fichier", "Importez votre liste avec nom, dosage, forme, prix et statut."],
+          ["2", "Vérifier l’analyse", "Le moteur reconnaît les produits, prépare les images et signale les lignes à corriger."],
+          ["3", "Publier", "Seuls les produits sûrs et autorisés alimentent la marketplace utilisateur."],
+        ].map(([step, title, text]) => (
+          <div key={step} className="rounded-xl border border-border bg-white p-4">
+            <Badge className="border-0 bg-brand text-white">Étape {step}</Badge>
+            <p className="mt-3 text-sm font-extrabold text-foreground">{title}</p>
+            <p className="mt-1 text-xs font-semibold leading-relaxed text-muted-foreground">{text}</p>
+          </div>
+        ))}
+      </div>
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
         <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); }} />
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Aperçu avant validation"}</Button>
-        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier la liste sélectionnée"}</Button>
+        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Analyser le fichier"}</Button>
+        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier les produits autorisés"}</Button>
       </div>
       {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
       {preview && (
@@ -1206,6 +1220,8 @@ function ImportInventory() {
           <Stat label="Prix manquants" value={preview.missingPrices} badge="À compléter" />
           <Stat label="Statuts invalides" value={preview.invalidStatuses} badge="Normalisé" />
           <Stat label="Médicaments reconnus" value={preview.recognizedMedications} badge="Référentiel" />
+          <Stat label="À publier" value={safePublishLineNumbers(preview).size} badge="Publication" />
+          <Stat label="Interdits retirés" value={preview.prohibitedRows ?? 0} badge="Bloqué" />
         </div>
       )}
       {preview?.confirmableRows?.length ? (
@@ -1215,15 +1231,14 @@ function ImportInventory() {
           onSelectionChange={setSelectedLineNumbers}
         />
       ) : null}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate()}>
           Télécharger modèle Excel
         </Button>
         <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport}>Analyser maintenant</Button>
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={saveDraftImport} disabled={uploading || !preview}>Enregistrer en brouillon contrôlé</Button>
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={uploadImport}>Publier la liste</Button>
+        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={uploadImport} disabled={uploading || !preview}>Publier les produits autorisés</Button>
       </div>
-      <SectionBlock title="Colonnes du modèle d’import" description="La pharmacie peut corriger les lignes avant publication.">
+      <SectionBlock title="Colonnes recommandées" description="Plus votre fichier est complet, plus la publication automatique est fiable.">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {IMPORT_TEMPLATE_COLUMNS.map((column) => <div key={column} className="rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{column}</div>)}
         </div>

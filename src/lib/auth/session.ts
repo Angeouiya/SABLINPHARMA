@@ -1,12 +1,16 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { USER_SESSION_COOKIE } from "@/lib/professional-sessions";
+import { decodeSignedSession, encodeSignedSession } from "@/lib/security/session-signing";
 
-const SESSION_COOKIE = "sablin_session";
+const LEGACY_SESSION_COOKIE = "sablin_session";
+const SESSION_COOKIE = USER_SESSION_COOKIE;
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
   path: "/",
   maxAge: SESSION_MAX_AGE,
 };
@@ -16,7 +20,7 @@ export async function getSessionUser() {
   const raw = cookieStore.get(SESSION_COOKIE)?.value;
   if (!raw) return null;
   try {
-    const decoded = JSON.parse(Buffer.from(raw, "base64").toString("utf-8"));
+    const decoded = decodeSignedSession<{ userId?: string; ts?: number }>(raw);
     if (!decoded?.userId) return null;
     const user = await db.user.findUnique({
       where: { id: decoded.userId },
@@ -41,11 +45,7 @@ export async function setSession(userId: string) {
 }
 
 export function createSessionValue(userId: string) {
-  const payload = Buffer.from(
-    JSON.stringify({ userId, ts: Date.now() }),
-    "utf-8"
-  ).toString("base64");
-  return payload;
+  return encodeSignedSession({ userId, ts: Date.now(), kind: "user" });
 }
 
 export function attachSession(response: NextResponse, userId: string) {
@@ -55,12 +55,14 @@ export function attachSession(response: NextResponse, userId: string) {
 
 export function detachSession(response: NextResponse) {
   response.cookies.delete(SESSION_COOKIE);
+  response.cookies.delete(LEGACY_SESSION_COOKIE);
   return response;
 }
 
 export async function clearSession() {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
+  cookieStore.delete(LEGACY_SESSION_COOKIE);
 }
 
 // Simple password hashing using Node crypto scrypt

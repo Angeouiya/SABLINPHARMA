@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { attachSession, hashPassword } from "@/lib/auth/session";
+import { optionalTextField, rejectLargeBody, textField, validationErrorResponse } from "@/lib/security/input";
 import { emailIsValid, normalizeEmail, normalizePhone, phoneIsValid } from "@/lib/user-contact";
+import { z } from "zod";
+
+const registerSchema = z.object({
+  name: textField(120),
+  email: optionalTextField(160),
+  phone: optionalTextField(40),
+  password: z.preprocess((value) => String(value ?? ""), z.string().min(1).max(256)),
+  commune: optionalTextField(120),
+});
 
 export async function POST(req: NextRequest) {
+  const largeBody = rejectLargeBody(req);
+  if (largeBody) return largeBody;
   try {
-    const body = await req.json();
-    const name = (body.name ?? "").toString().trim();
-    const email = normalizeEmail(body.email);
-    const password = (body.password ?? "").toString();
-    const phone = normalizePhone(body.phone);
-    const commune = (body.commune ?? "").toString().trim() || null;
+    const body = registerSchema.safeParse(await req.json().catch(() => ({})));
+    if (!body.success) return validationErrorResponse();
+    const name = body.data.name;
+    const email = normalizeEmail(body.data.email);
+    const password = body.data.password;
+    const phone = normalizePhone(body.data.phone);
+    const commune = body.data.commune;
 
     if (!name || !password || (!email && !phone)) {
       return NextResponse.json(
@@ -30,9 +43,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (password.length < 6) {
+    if (password.length < 8) {
       return NextResponse.json(
-        { error: "Le mot de passe doit contenir au moins 6 caractères." },
+        { error: "Le mot de passe doit contenir au moins 8 caractères." },
         { status: 400 }
       );
     }

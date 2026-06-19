@@ -71,6 +71,7 @@ export type AdminPage =
   | "validations-pharmacies"
   | "comptes-professionnels"
   | "referentiel-medicaments"
+  | "medicaments-interdits"
   | "enrichissement-medicaments"
   | "moteur-marketplace"
   | "sources-licences-images"
@@ -104,6 +105,7 @@ const adminNavItems: { page: AdminPage; label: string; icon: typeof LayoutDashbo
   { page: "comptes-professionnels", label: "Comptes pro", icon: ShieldCheck, href: "/admin/comptes-professionnels" },
   { page: "utilisateurs", label: "Utilisateurs", icon: Users, href: "/admin/utilisateurs" },
   { page: "referentiel-medicaments", label: "Référentiel médicaments", icon: Pill, href: "/admin/referentiel-medicaments" },
+  { page: "medicaments-interdits", label: "Médicaments interdits", icon: ShieldCheck, href: "/admin/medicaments-interdits" },
   { page: "enrichissement-medicaments", label: "Enrichissement", icon: Database, href: "/admin/enrichissement-medicaments" },
   { page: "moteur-marketplace", label: "Moteur Marketplace", icon: Database, href: "/admin/moteur-marketplace" },
   { page: "sources-licences-images", label: "Sources images", icon: ShieldCheck, href: "/admin/sources-licences-images" },
@@ -142,6 +144,19 @@ function slugify(value: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function formatDateTime(value?: string | Date | null) {
+  if (!value) return "Non renseigné";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "Non renseigné";
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function downloadImportTemplate(fileName = "modele-import-sablin-pharma.csv") {
@@ -497,9 +512,12 @@ function GlobalAdminImports() {
       const res = await fetch("/api/imports/preview", { method: "POST", headers: { "X-Sablin-Session-Kind": "admin" }, body: form });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Aperçu impossible.");
+      const safeLines = safePublishLineNumbers(data);
       setPreview(data);
-      setSelectedLineNumbers(safePublishLineNumbers(data));
-      setMessage(`Aperçu prêt : ${data.totalRows} ligne(s), ${data.recognizedMedications} reconnue(s), ${data.unknownMedications} à valider.`);
+      setSelectedLineNumbers(safeLines);
+      setMessage(
+        `Analyse terminée : ${safeLines.size} produit(s) prêt(s) à publier, ${data.unknownMedications} non reconnu(s), ${data.prohibitedRows ?? 0} interdit(s) retiré(s).`
+      );
     } catch (error) {
       setPreview(null);
       setSelectedLineNumbers(new Set());
@@ -508,7 +526,7 @@ function GlobalAdminImports() {
       setUploading(false);
     }
   };
-  const submitImport = async (mode: "publish_selected" | "draft") => {
+  const submitImport = async (mode: "auto_publish_safe" | "draft") => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
       return;
@@ -520,10 +538,6 @@ function GlobalAdminImports() {
     const rowsToConfirm = preview.confirmableRows ?? [];
     if (!rowsToConfirm.length) {
       setMessage("Aucune ligne analysée à enregistrer.");
-      return;
-    }
-    if (mode === "publish_selected" && !selectedLineNumbers.size) {
-      setMessage("Aucune ligne dans la liste à publier. Sélectionnez les lignes sûres ou enregistrez l’import en brouillon contrôlé.");
       return;
     }
     setUploading(true);
@@ -545,8 +559,8 @@ function GlobalAdminImports() {
       if (!res.ok) throw new Error(data?.error ?? "Import impossible.");
       setMessage(
         mode === "draft"
-          ? `Brouillon contrôlé enregistré : ${data.report.totalRows ?? 0} ligne(s), ${data.report.draftRows ?? 0} hors marketplace.`
-          : `Liste publiée avec contrôle : ${data.report.safePublishedRows ?? 0} ligne(s) sûre(s), ${data.report.selectedButNeedsValidation ?? 0} à valider, ${data.report.draftRows ?? 0} en brouillon contrôlé.`
+          ? `Liste enregistrée sans publication : ${data.report.totalRows ?? 0} ligne(s).`
+          : `Publication terminée : ${data.report.safePublishedRows ?? 0} produit(s) publié(s), ${data.report.notPublishedRows ?? 0} non publié(s), ${data.report.prohibitedRows ?? 0} interdit(s) retiré(s).`
       );
       setFile(null);
       setSelectedLineNumbers(new Set());
@@ -557,25 +571,26 @@ function GlobalAdminImports() {
       setUploading(false);
     }
   };
-  const uploadImport = async () => submitImport("publish_selected");
-  const saveDraftImport = async () => submitImport("draft");
+  const uploadImport = async () => submitImport("auto_publish_safe");
   return (
     <div className="space-y-5">
       <Card className="border-border/70 p-5 shadow-card">
         <Heading level="h2">Imports globaux</Heading>
-        <Muted>Imports inventaire multi-format : CSV, Excel, Word et PowerPoint. Les données non reconnues restent bloquées avant validation Admin.</Muted>
+        <Muted>
+          Imports inventaire multi-format : CSV, Excel, Word et PowerPoint. Les lignes sûres et autorisées sont publiées,
+          les médicaments interdits sont retirés, et les lignes ambiguës restent non publiées.
+        </Muted>
         <div className="mt-4 max-w-xl">
           <Label className="text-xs font-extrabold text-foreground">Pharmacie cible</Label>
           <select value={pharmacySlug} onChange={(e) => setPharmacySlug(e.target.value)} className="mt-2 h-11 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
             {adminPharmacies.map((pharmacy) => <option key={pharmacy.slug} value={pharmacy.slug}>{pharmacy.name}</option>)}
           </select>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
+        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
           <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); }} />
           <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate(`modele-import-${pharmacySlug}.csv`)}>Télécharger modèle Excel</Button>
-          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Aperçu avant validation"}</Button>
-          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={saveDraftImport} disabled={uploading || !preview}>Brouillon contrôlé</Button>
-          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier la liste"}</Button>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Analyser le fichier"}</Button>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier les produits autorisés"}</Button>
         </div>
         {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
         {preview && (
@@ -588,6 +603,8 @@ function GlobalAdminImports() {
             <Stat label="Prix manquants" value={preview.missingPrices} badge="À compléter" />
             <Stat label="Statuts invalides" value={preview.invalidStatuses} badge="Normalisation" />
             <Stat label="Médicaments reconnus" value={preview.recognizedMedications} badge="Référentiel" />
+            <Stat label="À publier" value={safePublishLineNumbers(preview).size} badge="Publication" />
+            <Stat label="Interdits retirés" value={preview.prohibitedRows ?? 0} badge="Bloqué" />
           </div>
         )}
         {preview?.confirmableRows?.length ? (
@@ -1337,6 +1354,166 @@ function Reference() {
         ))}
       </div>
     </Card>
+  );
+}
+
+type ProhibitedMedicationTermView = {
+  id: string;
+  name: string;
+  normalizedName: string;
+  reason?: string | null;
+  active: boolean;
+  createdAt: string;
+  disabledAt?: string | null;
+};
+
+function ProhibitedMedicationsAdmin() {
+  const [terms, setTerms] = useState<ProhibitedMedicationTermView[]>([]);
+  const [name, setName] = useState("");
+  const [reason, setReason] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/admin/prohibited-medications?includeInactive=true", {
+      headers: { "X-Sablin-Session-Kind": "admin" },
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) setTerms(json.terms ?? []);
+    else setMessage(json.error ?? "Chargement impossible.");
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const addTerm = async () => {
+    if (!name.trim()) {
+      setMessage("Renseignez le nom du médicament à bloquer.");
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    const res = await fetch("/api/admin/prohibited-medications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+      body: JSON.stringify({ name, reason }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setLoading(false);
+    if (!res.ok) {
+      setMessage(json.error ?? "Ajout impossible.");
+      return;
+    }
+    setName("");
+    setReason("");
+    setMessage("Règle ajoutée. Ce médicament sera retiré automatiquement des publications pharmacie.");
+    await load();
+  };
+
+  const disableTerm = async (id: string) => {
+    setLoading(true);
+    setMessage("");
+    const res = await fetch("/api/admin/prohibited-medications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+      body: JSON.stringify({ id }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setLoading(false);
+    if (!res.ok) {
+      setMessage(json.error ?? "Désactivation impossible.");
+      return;
+    }
+    setMessage("Règle désactivée.");
+    await load();
+  };
+
+  const activeTerms = terms.filter((term) => term.active);
+  const inactiveTerms = terms.filter((term) => !term.active);
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading level="h2">Médicaments interdits</Heading>
+            <Muted>
+              Cette liste bloque automatiquement les produits sensibles ou interdits lors des imports pharmacie.
+              Les pharmacies publient librement les produits autorisés, mais ces noms sont retirés sans intervention manuelle.
+            </Muted>
+          </div>
+          <Badge className="w-fit border-0 bg-brand text-white">{activeTerms.length} règle(s) active(s)</Badge>
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
+          <Input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Nom du médicament à bloquer"
+            className="bg-white"
+          />
+          <Input
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Motif interne, optionnel"
+            className="bg-white"
+          />
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={addTerm} disabled={loading}>
+            Ajouter
+          </Button>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+        <SectionBlock
+          title="Règles actives"
+          description="Ces médicaments sont retirés automatiquement des imports et ne peuvent pas alimenter la marketplace utilisateur."
+        >
+          <div className="grid gap-3 md:grid-cols-2">
+            {activeTerms.map((term) => (
+              <Card key={term.id} className="border-border/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <StatusBadge label="Blocage actif" />
+                    <p className="mt-3 font-extrabold text-foreground">{term.name}</p>
+                    <p className="text-xs font-semibold text-muted-foreground">Nom normalisé : {term.normalizedName}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="border-red-200 text-red-700 hover:bg-red-50"
+                    onClick={() => disableTerm(term.id)}
+                    disabled={loading}
+                  >
+                    Désactiver
+                  </Button>
+                </div>
+                {term.reason && <p className="mt-3 rounded-lg border border-border bg-muted/30 p-3 text-sm font-semibold text-foreground">{term.reason}</p>}
+              </Card>
+            ))}
+            {!activeTerms.length && (
+              <Card className="border-dashed border-border p-6 text-sm font-bold text-foreground">
+                Aucun médicament interdit actif.
+              </Card>
+            )}
+          </div>
+        </SectionBlock>
+
+        <SectionBlock title="Règles désactivées" description="Elles ne bloquent plus les imports, mais restent historisées.">
+          <div className="grid gap-3">
+            {inactiveTerms.slice(0, 8).map((term) => (
+              <Card key={term.id} className="border-border/70 p-3">
+                <StatusBadge label="Désactivée" />
+                <p className="mt-2 text-sm font-extrabold text-foreground">{term.name}</p>
+                <p className="text-xs font-semibold text-muted-foreground">{term.disabledAt ? formatDateTime(term.disabledAt) : "Date non renseignée"}</p>
+              </Card>
+            ))}
+            {!inactiveTerms.length && <p className="text-sm font-semibold text-muted-foreground">Aucune règle désactivée.</p>}
+          </div>
+        </SectionBlock>
+      </div>
+    </div>
   );
 }
 
@@ -2285,6 +2462,7 @@ export function AdminSpaceView({ page, pharmacyId, userId }: { page: AdminPage; 
       {page === "validations-pharmacies" && <SimpleAdmin title="Validations pharmacies" items={["Pharmacie Les Palmiers Yopougon", "Pharmacie Marcory Résidentiel", "Pharmacie Koumassi Nouveau Marché"]} />}
       {page === "comptes-professionnels" && <ProfessionalAccounts />}
       {page === "referentiel-medicaments" && <Reference />}
+      {page === "medicaments-interdits" && <ProhibitedMedicationsAdmin />}
       {page === "enrichissement-medicaments" && <EnrichmentAdmin />}
       {page === "moteur-marketplace" && <MarketplaceEngineAdmin />}
       {page === "sources-licences-images" && <EnrichmentAdmin licenseOnly />}

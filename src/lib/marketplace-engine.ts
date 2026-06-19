@@ -13,6 +13,10 @@ import {
 import { searchImageCandidatesWithFallback } from "@/lib/enrichment/enrichment-service";
 import { PUBLIC_AVAILABILITY_STATUSES } from "@/lib/pharmacy-platform";
 import { syncInventory } from "@/lib/inventory-sync";
+import {
+  findProhibitedMedicationMatch,
+  getActiveProhibitedMedicationRules,
+} from "@/lib/prohibited-medications";
 
 export const MARKETPLACE_IMPORT_MAX_BYTES = Number(process.env.MARKETPLACE_IMPORT_MAX_BYTES ?? 12 * 1024 * 1024);
 
@@ -83,6 +87,8 @@ export type MarketplacePreviewRow = {
   confidenceLabel: string;
   publicationDecision: "Prêt à publier" | "Validation admin requise" | "Référentiel requis" | "Bloqué";
   publicationReason: string;
+  prohibitedTerm?: string;
+  blockedReason?: string;
   correctionProposals: string[];
 };
 
@@ -101,6 +107,7 @@ export type MarketplacePreview = {
   missingDosages: number;
   missingForms: number;
   invalidStatuses: number;
+  prohibitedRows: number;
   rows: MarketplacePreviewRow[];
   detectedColumns: Record<string, string>;
   acceptedStatuses: readonly string[];
@@ -112,9 +119,12 @@ export type MarketplacePreview = {
   };
 };
 
-function isPreviewRowSafeForPublication(row: Pick<MarketplacePreviewRow, "errors" | "normalizedPrice" | "matchScore" | "matchLevel">) {
+function isPreviewRowSafeForPublication(
+  row: Pick<MarketplacePreviewRow, "errors" | "normalizedPrice" | "matchScore" | "matchLevel" | "prohibitedTerm">
+) {
   return (
     row.errors.length === 0 &&
+    !row.prohibitedTerm &&
     row.normalizedPrice !== null &&
     row.matchScore >= 95 &&
     row.matchLevel === "Correspondance certaine"
@@ -448,6 +458,7 @@ export async function buildMarketplacePreview(input: {
   rows: MarketplaceParsedRow[];
 }) {
   await seedDefaultEnrichmentProviders();
+  const prohibitedRules = await getActiveProhibitedMedicationRules();
   let validRows = 0;
   let invalidRows = 0;
   let incompleteRows = 0;
@@ -458,6 +469,9 @@ export async function buildMarketplacePreview(input: {
   let missingDosages = 0;
   let missingForms = 0;
   let invalidStatuses = 0;
+  let prohibitedRows = 0;
+  let imageCandidateLookups = 0;
+  const maxPreviewImageLookups = Math.max(0, Number(process.env.MARKETPLACE_PREVIEW_IMAGE_LOOKUPS ?? 12));
   const seen = new Set<string>();
 
   const previewRows: MarketplacePreviewRow[] = [];
@@ -510,26 +524,61 @@ export async function buildMarketplacePreview(input: {
             form: true,
             images: {
               where: { validationStatus: "Publiée" },
-              orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+              orderBy: [{ isPlaceholder: "asc" }, { isPrimary: "desc" }, { createdAt: "desc" }],
               take: 1,
             },
           },
         })
       : null;
+    const prohibitedMatch = findProhibitedMedicationMatch(
+      {
+        name: row.name,
+        genericName: row.genericName,
+        medicationName: medication?.name,
+        dosage: normalized.dosage,
+        form: normalized.form,
+        barcode: normalized.barcode,
+      },
+      prohibitedRules
+    );
+    if (prohibitedMatch) {
+      prohibitedRows += 1;
+      errors.push(`Médicament interdit : ${prohibitedMatch.name}`);
+    }
     const image = medication?.images[0];
-    const imageUrl = image?.url ?? buildMedicationPlaceholderUrl({
+    let imageUrl = image?.url ?? buildMedicationPlaceholderUrl({
       name: medication?.name ?? normalized.commercialName ?? row.name ?? "Médicament",
       genericName: medication?.genericName ?? normalized.genericName,
       dosage: medication?.dosage ?? normalized.dosage,
       form: medication?.form ?? normalized.form,
     });
-    const imageBadge = image
+    let imageBadge = image
       ? image.isPlaceholder
         ? "Image illustrative"
         : image.imageType === "pharmacy_photo"
           ? "Photo pharmacie validée"
           : "Image validée"
       : "Image illustrative";
+    if (medication && !image && imageCandidateLookups < maxPreviewImageLookups) {
+      imageCandidateLookups += 1;
+      const imageSearch = await searchImageCandidatesWithFallback({
+        id: best.medicationId,
+        name: medication.name,
+        genericName: medication.genericName,
+        dosage: medication.dosage,
+        form: medication.form,
+      });
+      const candidate = imageSearch.candidates[0];
+      if (candidate?.imageUrl) {
+        imageUrl = candidate.imageUrl;
+        imageBadge = "Image candidate à vérifier";
+      } else {
+        imageUrl = imageSearch.fallbackImageUrl;
+        imageBadge = imageSearch.fallbackSource.includes("Placeholder")
+          ? "Image illustrative"
+          : imageSearch.fallbackSource;
+      }
+    }
     if (errors.length) invalidRows += 1;
     else if (warnings.length) incompleteRows += 1;
     else validRows += 1;
@@ -540,13 +589,16 @@ export async function buildMarketplacePreview(input: {
           normalizedPrice: price,
           matchScore: best.score,
           matchLevel: best.level,
+          prohibitedTerm: prohibitedMatch?.name,
         })
         ? "Prêt à publier"
         : isRecognized
           ? "Validation admin requise"
           : "Référentiel requis";
     const publicationReason =
-      publicationDecision === "Prêt à publier"
+      prohibitedMatch
+        ? `Retiré automatiquement : ${prohibitedMatch.name} est dans la liste des médicaments interdits.`
+        : publicationDecision === "Prêt à publier"
         ? "Correspondance certaine, prix valide et aucune erreur bloquante."
         : publicationDecision === "Référentiel requis"
           ? "Médicament non reconnu : validation ou fusion dans le référentiel nécessaire."
@@ -581,6 +633,8 @@ export async function buildMarketplacePreview(input: {
       confidenceLabel: confidenceLabel(best.score),
       publicationDecision,
       publicationReason,
+      prohibitedTerm: prohibitedMatch?.name,
+      blockedReason: prohibitedMatch ? prohibitedMatch.reason ?? "Médicament interdit par l’administration SABLIN." : undefined,
       correctionProposals: normalized.correctionProposals,
     });
   }
@@ -600,6 +654,7 @@ export async function buildMarketplacePreview(input: {
     missingDosages,
     missingForms,
     invalidStatuses,
+    prohibitedRows,
     rows: previewRows,
     detectedColumns: input.rows[0]?.detectedColumns ?? {},
     acceptedStatuses: PUBLIC_AVAILABILITY_STATUSES,
@@ -618,7 +673,7 @@ export async function confirmMarketplaceImport(input: {
   fileType: string;
   rows: MarketplaceParsedRow[];
   publishLineNumbers?: number[];
-  mode?: "publish_selected" | "draft";
+  mode?: "publish_selected" | "auto_publish_safe" | "draft";
   role: MarketplaceImportRole;
   actorName?: string | null;
   actorRole?: string | null;
@@ -626,9 +681,11 @@ export async function confirmMarketplaceImport(input: {
   const pharmacy = await db.pharmacy.findUnique({ where: { slug: input.pharmacySlug } });
   if (!pharmacy) throw new Error("Pharmacie introuvable.");
   const preview = await buildMarketplacePreview({ fileName: input.fileName, fileType: input.fileType, rows: input.rows });
-  const requestedPublishLines = input.publishLineNumbers
-    ? new Set(input.publishLineNumbers.map(Number).filter(Number.isFinite))
-    : new Set(preview.rows.map((row) => row.lineNumber));
+  const requestedPublishLines = input.mode === "draft"
+    ? new Set<number>()
+    : input.publishLineNumbers
+      ? new Set(input.publishLineNumbers.map(Number).filter(Number.isFinite))
+      : new Set(preview.rows.map((row) => row.lineNumber));
   const safePublishLines = new Set(
     preview.rows
       .filter((row) => requestedPublishLines.has(row.lineNumber) && isPreviewRowSafeForPublication(row))
@@ -640,7 +697,7 @@ export async function confirmMarketplaceImport(input: {
   const draftRows = preview.rows.filter((row) => !requestedPublishLines.has(row.lineNumber)).length;
   const source = input.role === "admin" ? "Import administrateur" : "Import pharmacie";
   const status = input.mode === "draft"
-    ? "Brouillon contrôlé"
+    ? "Enregistré sans publication"
     : preview.invalidRows > 0 || preview.incompleteRows > 0 || selectedButNeedsValidation > 0 || draftRows > 0
       ? "Terminé avec contrôles"
       : "Terminé";
@@ -693,8 +750,10 @@ export async function confirmMarketplaceImport(input: {
     const nextStatus = safePublishLines.has(row.lineNumber)
       ? "Publié"
       : requestedPublishLines.has(row.lineNumber)
-        ? "Validation requise"
-        : "Brouillon contrôlé";
+        ? row.prohibitedTerm
+          ? "Bloqué"
+          : "Non publié"
+        : "Retiré";
     return db.inventoryImportRow.updateMany({
       where: {
         importId: importLog.id,
@@ -721,7 +780,7 @@ export async function confirmMarketplaceImport(input: {
       })
     : {
         jobId: null,
-        status: "Brouillon contrôlé",
+        status: "Aucune publication",
         totalRows: 0,
         validRows: 0,
         invalidRows: 0,
@@ -747,6 +806,8 @@ export async function confirmMarketplaceImport(input: {
     selectedRows: requestedPublishLines.size,
     safePublishedRows: safePublishLines.size,
     draftRows,
+    notPublishedRows: selectedButNeedsValidation + draftRows,
+    prohibitedRows: preview.prohibitedRows,
     selectedButNeedsValidation,
     syncPublishedProducts: syncReport.updatedProducts,
     syncOutOfStockProducts: syncReport.outOfStockProducts,
@@ -758,7 +819,7 @@ export async function confirmMarketplaceImport(input: {
     syncConflicts: syncReport.conflicts,
     syncWarnings: syncReport.warnings,
     syncPublicationRule:
-      "Publication contrôlée : seules les lignes reconnues avec une correspondance certaine, un prix valide et aucune erreur sont visibles côté utilisateur après déblocage par crédits. Les lignes retirées restent en brouillon contrôlé et les lignes ambiguës restent en validation admin.",
+      "Publication autonome contrôlée : les lignes sûres et autorisées sont publiées automatiquement. Les médicaments interdits sont retirés automatiquement. Les lignes ambiguës restent non publiées jusqu’à correction ou validation admin.",
   };
   await db.pharmacyImport.update({
     where: { id: importLog.id },

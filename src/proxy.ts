@@ -6,6 +6,7 @@ import {
   isAdminRole,
   isPharmacyRole,
 } from "@/lib/professional-sessions";
+import { rateLimit, rateLimitForPath } from "@/lib/security/rate-limit";
 
 const publicPharmacyRoutes = [
   "/pharmacie/login",
@@ -18,6 +19,11 @@ const publicAdminRoutes = ["/admin/login", "/admin/connexion"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  if (pathname.startsWith("/api/")) {
+    const limited = rateLimit(req, rateLimitForPath(pathname));
+    if (limited) return limited;
+  }
 
   if (pathname === "/pharmacie") {
     return NextResponse.redirect(new URL("/pharmacie/connexion", req.url));
@@ -62,5 +68,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/pharmacie/:path*", "/admin/:path*"],
+  matcher: ["/api/:path*", "/pharmacie/:path*", "/admin/:path*"],
 };

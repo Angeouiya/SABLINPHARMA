@@ -3,13 +3,25 @@ import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/session";
 import { buildResetUrl, sendPasswordResetEmail } from "@/lib/email";
 import { generateToken, hashToken } from "@/lib/security/passwords";
+import { rejectLargeBody, textField, validationErrorResponse } from "@/lib/security/input";
 import { emailIsValid, normalizeEmail } from "@/lib/user-contact";
+import { z } from "zod";
 
 const RESET_TTL_MINUTES = 30;
+const resetRequestSchema = z.object({ email: textField(160) });
+const resetConfirmSchema = z.object({
+  token: textField(256),
+  password: z.preprocess((value) => String(value ?? ""), z.string().min(1).max(256)),
+  confirmation: z.preprocess((value) => String(value ?? ""), z.string().min(1).max(256)).optional(),
+  confirmPassword: z.preprocess((value) => String(value ?? ""), z.string().min(1).max(256)).optional(),
+});
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const email = normalizeEmail(body.email);
+  const largeBody = rejectLargeBody(req);
+  if (largeBody) return largeBody;
+  const body = resetRequestSchema.safeParse(await req.json().catch(() => ({})));
+  if (!body.success) return validationErrorResponse();
+  const email = normalizeEmail(body.data.email);
 
   if (!email || !emailIsValid(email)) {
     return NextResponse.json({ error: "Veuillez saisir un e-mail valide." }, { status: 400 });
@@ -44,10 +56,13 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const token = String(body.token ?? "");
-  const password = String(body.password ?? "");
-  const confirmation = String(body.confirmation ?? body.confirmPassword ?? "");
+  const largeBody = rejectLargeBody(req);
+  if (largeBody) return largeBody;
+  const body = resetConfirmSchema.safeParse(await req.json().catch(() => ({})));
+  if (!body.success) return validationErrorResponse();
+  const token = body.data.token;
+  const password = body.data.password;
+  const confirmation = body.data.confirmation ?? body.data.confirmPassword ?? "";
 
   if (!token || !password || password !== confirmation) {
     return NextResponse.json({ error: "Lien et confirmation du mot de passe obligatoires." }, { status: 400 });

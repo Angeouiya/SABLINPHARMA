@@ -112,7 +112,12 @@ export async function confirmImportFromRequest(req: NextRequest) {
   const publishLineNumbers = Array.isArray(body.publishLineNumbers)
     ? body.publishLineNumbers.map(Number).filter(Number.isFinite)
     : undefined;
-  const mode = body.mode === "draft" ? "draft" : "publish_selected";
+  const mode =
+    body.mode === "draft"
+      ? "draft"
+      : body.mode === "publish_selected"
+        ? "publish_selected"
+        : "auto_publish_safe";
   const result = await confirmMarketplaceImport({
     pharmacySlug: effectiveSlug ?? pharmacySlug,
     fileName: String(body.fileName ?? "inventaire-sablin.csv"),

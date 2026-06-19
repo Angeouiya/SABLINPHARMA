@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { attachSession, verifyPassword } from "@/lib/auth/session";
+import { rejectLargeBody, textField, validationErrorResponse } from "@/lib/security/input";
 import { emailIsValid, normalizeEmail, normalizePhone, phoneIsValid } from "@/lib/user-contact";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  identifier: textField(120).optional(),
+  email: textField(120).optional(),
+  phone: textField(40).optional(),
+  password: z.preprocess((value) => String(value ?? ""), z.string().min(1).max(256)),
+});
 
 export async function POST(req: NextRequest) {
+  const largeBody = rejectLargeBody(req);
+  if (largeBody) return largeBody;
   try {
-    const body = await req.json();
-    const identifier = (body.identifier ?? body.email ?? body.phone ?? "").toString().trim();
-    const password = (body.password ?? "").toString();
+    const body = loginSchema.safeParse(await req.json().catch(() => ({})));
+    if (!body.success) return validationErrorResponse();
+    const identifier = (body.data.identifier ?? body.data.email ?? body.data.phone ?? "").trim();
+    const password = body.data.password;
 
     if (!identifier || !password) {
       return NextResponse.json(

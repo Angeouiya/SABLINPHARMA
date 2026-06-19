@@ -96,6 +96,22 @@ model Medication {
   @@index([barcode])
 }
 
+model ProhibitedMedicationTerm {
+  id             String    @id @default(cuid())
+  name           String
+  normalizedName String    @unique
+  reason         String?
+  active         Boolean   @default(true)
+  createdBy      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  disabledAt     DateTime?
+  disabledBy     String?
+
+  @@index([active])
+  @@index([normalizedName])
+}
+
 model Pharmacy {
   id                        String                           @id @default(cuid())
   name                      String

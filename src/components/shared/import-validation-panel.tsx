@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, FileCheck2, ImageIcon, RotateCcw, ShieldCheck, XCircle } from "lucide-react";
+import { FileCheck2, ImageIcon, RotateCcw, ShieldCheck, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -50,6 +50,8 @@ export type ImportPreviewLine = {
   confidenceLabel: string;
   publicationDecision?: "Prêt à publier" | "Validation admin requise" | "Référentiel requis" | "Bloqué";
   publicationReason?: string;
+  prohibitedTerm?: string;
+  blockedReason?: string;
 };
 
 export type ImportPreviewData = {
@@ -62,6 +64,7 @@ export type ImportPreviewData = {
   duplicateRows: number;
   missingPrices: number;
   invalidStatuses: number;
+  prohibitedRows?: number;
   rows?: ImportPreviewLine[];
   confirmableRows?: ConfirmableImportRow[];
   safePublishedRows?: number;
@@ -72,6 +75,7 @@ export type ImportPreviewData = {
 function isSafePublishRow(row: ImportPreviewLine) {
   return (
     row.errors.length === 0 &&
+    !row.prohibitedTerm &&
     row.normalizedPrice !== null &&
     row.matchScore >= 95 &&
     row.matchLevel === "Correspondance certaine"
@@ -93,15 +97,16 @@ export function ImportValidationPanel({
 }) {
   const rows = preview.rows ?? [];
   const safeRows = rows.filter(isSafePublishRow);
-  const selectedCount = selectedLineNumbers.size;
-  const draftCount = Math.max(0, rows.length - selectedCount);
+  const selectedCount = rows.filter((row) => selectedLineNumbers.has(row.lineNumber) && isSafePublishRow(row)).length;
   const selectedSafeCount = rows.filter((row) => selectedLineNumbers.has(row.lineNumber) && isSafePublishRow(row)).length;
-  const selectedNeedsReview = rows.filter((row) => selectedLineNumbers.has(row.lineNumber) && !isSafePublishRow(row)).length;
+  const selectedNeedsReview = rows.filter((row) => !isSafePublishRow(row)).length;
+  const prohibitedCount = rows.filter((row) => row.prohibitedTerm).length;
 
-  const selectAll = () => onSelectionChange(new Set(rows.map((row) => row.lineNumber)));
   const selectSafe = () => onSelectionChange(new Set(safeRows.map((row) => row.lineNumber)));
   const clearAll = () => onSelectionChange(new Set());
   const toggleLine = (lineNumber: number) => {
+    const row = rows.find((item) => item.lineNumber === lineNumber);
+    if (!row || !isSafePublishRow(row)) return;
     const next = new Set(selectedLineNumbers);
     if (next.has(lineNumber)) next.delete(lineNumber);
     else next.add(lineNumber);
@@ -112,31 +117,28 @@ export function ImportValidationPanel({
     <Card className="mt-4 border-border/70 p-4 shadow-card">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h3 className="text-base font-extrabold text-foreground">Validation avant publication marketplace</h3>
+          <h3 className="text-base font-extrabold text-foreground">Analyse de la liste à publier</h3>
           <p className="mt-1 max-w-3xl text-sm font-medium leading-relaxed text-muted-foreground">
-            Sélectionnez uniquement les produits à publier. Chaque ligne affiche son image produit ou un placeholder
-            SABLIN PHARMA. Les lignes retirées restent en brouillon contrôlé et ne sont pas visibles côté utilisateur.
+            Les produits reconnus, autorisés et complets seront publiés automatiquement. Vous pouvez retirer une ligne
+            sûre si vous ne voulez pas l’afficher. Les produits interdits et les lignes incomplètes restent non publiés.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge className="border-0 bg-brand text-white">{selectedSafeCount} prête(s)</Badge>
-          <Badge variant="outline" className="border-amber-300 bg-white text-amber-700">{selectedNeedsReview} à valider</Badge>
-          <Badge variant="outline" className="border-border bg-white text-foreground">{draftCount} brouillon(s)</Badge>
+          <Badge className="border-0 bg-brand text-white">{selectedSafeCount} à publier</Badge>
+          <Badge variant="outline" className="border-amber-300 bg-white text-amber-700">{selectedNeedsReview} non publié(s)</Badge>
+          <Badge variant="outline" className="border-red-200 bg-white text-red-700">{prohibitedCount} interdit(s)</Badge>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid gap-2 sm:grid-cols-3">
         <Button type="button" className="bg-brand text-white hover:bg-brand-dark" onClick={selectSafe}>
-          <ShieldCheck className="size-4" /> Préparer lignes sûres
-        </Button>
-        <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={selectAll}>
-          <CheckCircle2 className="size-4" /> Tout sélectionner
+          <ShieldCheck className="size-4" /> Publier les produits sûrs
         </Button>
         <Button type="button" variant="outline" className="border-border text-foreground hover:bg-muted" onClick={clearAll}>
           <XCircle className="size-4" /> Tout retirer
         </Button>
         <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={selectSafe}>
-          <RotateCcw className="size-4" /> Réinitialiser sûr
+          <RotateCcw className="size-4" /> Réinitialiser
         </Button>
       </div>
 
@@ -146,16 +148,16 @@ export function ImportValidationPanel({
           <p className="mt-1 text-xl font-extrabold text-foreground">{selectedCount}</p>
         </div>
         <div className="rounded-xl border border-border bg-white p-3">
-          <p className="text-xs font-bold text-muted-foreground">Publication automatique sûre</p>
+          <p className="text-xs font-bold text-muted-foreground">Publication automatique</p>
           <p className="mt-1 text-xl font-extrabold text-brand-dark">{selectedSafeCount}</p>
         </div>
         <div className="rounded-xl border border-border bg-white p-3">
-          <p className="text-xs font-bold text-muted-foreground">Validation admin nécessaire</p>
+          <p className="text-xs font-bold text-muted-foreground">Non publiés</p>
           <p className="mt-1 text-xl font-extrabold text-amber-700">{selectedNeedsReview}</p>
         </div>
         <div className="rounded-xl border border-border bg-white p-3">
-          <p className="text-xs font-bold text-muted-foreground">Retirées de la publication</p>
-          <p className="mt-1 text-xl font-extrabold text-foreground">{draftCount}</p>
+          <p className="text-xs font-bold text-muted-foreground">Interdits retirés</p>
+          <p className="mt-1 text-xl font-extrabold text-red-700">{prohibitedCount}</p>
         </div>
       </div>
 
@@ -192,9 +194,12 @@ export function ImportValidationPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="border-border bg-white text-foreground">Ligne {row.lineNumber}</Badge>
                   <Badge className={cn("border-0", decisionClass)}>{decision}</Badge>
-                  <Badge variant="outline" className="border-border bg-white text-foreground">{selected ? "Dans la liste à publier" : "Brouillon contrôlé"}</Badge>
+                  <Badge variant="outline" className="border-border bg-white text-foreground">
+                    {safe ? (selected ? "Sera publié" : "Retiré de la publication") : "Non publié"}
+                  </Badge>
                   <Badge variant="outline" className="border-brand/30 bg-white text-brand-dark">{row.confidenceLabel}</Badge>
                   {row.imageBadge && <Badge variant="outline" className="border-border bg-white text-foreground">{row.imageBadge}</Badge>}
+                  {row.prohibitedTerm && <Badge variant="outline" className="border-red-200 bg-white text-red-700">Interdit : {row.prohibitedTerm}</Badge>}
                 </div>
                 <p className="mt-2 break-words text-sm font-extrabold text-foreground">
                   {row.medicationName || row.name || "Médicament sans nom"}
@@ -212,6 +217,9 @@ export function ImportValidationPanel({
                   <FileCheck2 className="mr-1 inline size-3.5" />
                   {row.publicationReason ?? (safe ? "Cette ligne peut alimenter la marketplace après validation." : "Cette ligne reste à contrôler avant publication.")}
                 </p>
+                {row.blockedReason && (
+                  <p className="mt-2 break-words text-xs font-semibold text-red-700">{row.blockedReason}</p>
+                )}
                 {(row.errors.length > 0 || row.warnings.length > 0) && (
                   <p className="mt-2 break-words text-xs font-semibold text-amber-800">
                     {[...row.errors, ...row.warnings].join(" · ")}
@@ -224,13 +232,16 @@ export function ImportValidationPanel({
                   variant={selected ? "outline" : "default"}
                   className={cn(
                     "w-full sm:w-auto",
-                    selected
+                    !safe
+                      ? "bg-muted text-muted-foreground"
+                      : selected
                       ? "border-red-200 text-red-700 hover:bg-red-50"
                       : "bg-brand text-white hover:bg-brand-dark"
                   )}
+                  disabled={!safe}
                   onClick={() => toggleLine(row.lineNumber)}
                 >
-                  {selected ? "Retirer de la liste" : "Ajouter à la liste"}
+                  {!safe ? "Non publiable" : selected ? "Retirer" : "Publier"}
                 </Button>
               </div>
             </div>

@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateProfessionalAccount } from "@/lib/professional-auth";
 import { PHARMACY_SESSION_COOKIE, professionalCookieOptions } from "@/lib/professional-sessions";
+import { rejectLargeBody, textField, validationErrorResponse } from "@/lib/security/input";
+import { z } from "zod";
+
+const professionalLoginSchema = z.object({
+  identifier: textField(160).optional(),
+  email: textField(160).optional(),
+  phone: textField(40).optional(),
+  password: z.preprocess((value) => String(value ?? ""), z.string().min(1).max(256)),
+  role: textField(80).optional(),
+});
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
+  const largeBody = rejectLargeBody(req);
+  if (largeBody) return largeBody;
+  const body = professionalLoginSchema.safeParse(await req.json().catch(() => ({})));
+  if (!body.success) return validationErrorResponse();
   const auth = await authenticateProfessionalAccount({
     req,
     kind: "pharmacy",
-    identifier: body.identifier ?? body.email ?? body.phone,
-    password: body.password,
-    fallbackRole: body.role,
+    identifier: body.data.identifier ?? body.data.email ?? body.data.phone,
+    password: body.data.password,
+    fallbackRole: body.data.role,
   });
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });

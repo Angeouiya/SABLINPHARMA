@@ -1,28 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { createPaymentIntent, type PurchaseType } from "@/lib/payment-security";
+import { optionalTextField, rejectLargeBody, textField, validationErrorResponse } from "@/lib/security/input";
+import { z } from "zod";
+
+const paymentIntentSchema = z.object({
+  purchaseType: textField(80).optional(),
+  type: textField(80).optional(),
+  amount: z.coerce.number().int().positive().max(2_000),
+  provider: optionalTextField(80),
+  idempotencyKey: optionalTextField(160),
+  phone: optionalTextField(40),
+  holderName: optionalTextField(160),
+});
 
 export async function POST(req: NextRequest) {
+  const largeBody = rejectLargeBody(req);
+  if (largeBody) return largeBody;
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json({ error: "Vous devez être connecté pour payer." }, { status: 401 });
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const purchaseType = String(body.purchaseType ?? body.type ?? "") as PurchaseType;
-    const amount = Number(body.amount);
-    const idempotencyKey = req.headers.get("x-idempotency-key") ?? body.idempotencyKey ?? null;
+    const body = paymentIntentSchema.safeParse(await req.json().catch(() => ({})));
+    if (!body.success) return validationErrorResponse();
+    const purchaseType = String(body.data.purchaseType ?? body.data.type ?? "") as PurchaseType;
+    const amount = body.data.amount;
+    const idempotencyKey = req.headers.get("x-idempotency-key") ?? body.data.idempotencyKey ?? null;
     const result = await createPaymentIntent({
       userId: user.id,
       purchaseType,
       amount,
-      provider: body.provider,
+      provider: body.data.provider,
       idempotencyKey,
       req,
       metadata: {
-        phone: body.phone,
-        holderName: body.holderName,
+        phone: body.data.phone,
+        holderName: body.data.holderName,
       },
     });
 

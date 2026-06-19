@@ -8,6 +8,7 @@ interface NotifState {
   unread: number;
   loading: boolean;
   setNotifications: (items: AppNotification[], unread: number) => void;
+  reset: () => void;
   fetch: () => Promise<void>;
   markAllRead: () => Promise<void>;
   markRead: (id: string) => void;
@@ -20,13 +21,16 @@ export const useNotifications = create<NotifState>((set, get) => ({
   unread: 0,
   loading: false,
   setNotifications: (items, unread) => set({ notifications: items, unread }),
+  reset: () => set({ notifications: [], unread: 0, loading: false }),
   fetch: async () => {
     set({ loading: true });
     try {
-      const res = await fetch("/api/notifications");
+      const res = await fetch("/api/notifications", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         set({ notifications: data.notifications ?? [], unread: data.unread ?? 0 });
+      } else {
+        get().reset();
       }
     } catch {
       /* noop */

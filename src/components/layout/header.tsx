@@ -67,11 +67,12 @@ export function Header() {
   const visibleNavItems = user ? NAV_ITEMS : NAV_ITEMS.filter((item) => !AUTH_ONLY_VIEWS.includes(item.view));
 
   useEffect(() => {
+    if (!user) return;
     fetchNotifs();
     // Refresh notifications every 60s
     const t = setInterval(fetchNotifs, 60000);
     return () => clearInterval(t);
-  }, [fetchNotifs]);
+  }, [user, fetchNotifs]);
 
   const go = (v: View) => {
     navigate(v);
@@ -125,7 +126,7 @@ export function Header() {
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           {/* Notifications dropdown */}
-          <NotificationDropdown />
+          {user && <NotificationDropdown />}
 
           {/* Credit balance badge + Recharger (desktop) */}
           {user && (
@@ -286,68 +287,68 @@ export function Header() {
                 <ChevronRight className="size-4 opacity-50" />
               </button>
             ))}
-            <div className="my-2 h-px bg-border" />
-            <button
-              onClick={() => go("favorites")}
-              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
-            >
-              <span className="flex items-center gap-2">
-                <Heart className="size-4" /> Mes favoris
-              </span>
-              <ChevronRight className="size-4 opacity-50" />
-            </button>
-            <button
-              onClick={() => go("history")}
-              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
-            >
-              <span className="flex items-center gap-2">
-                <Clock className="size-4" /> Historique
-              </span>
-              <ChevronRight className="size-4 opacity-50" />
-            </button>
-            <button
-              onClick={() => go("notifications")}
-              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
-            >
-              <span className="flex items-center gap-2">
-                <Bell className="size-4" /> Notifications
-                {unread > 0 && (
-                  <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
-                    {unread}
-                  </span>
-                )}
-              </span>
-              <ChevronRight className="size-4 opacity-50" />
-            </button>
-            <button
-              onClick={() => go("requests")}
-              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
-            >
-              <span className="flex items-center gap-2">
-                <MessageSquareText className="size-4" /> Mes demandes
-              </span>
-              <ChevronRight className="size-4 opacity-50" />
-            </button>
-            <button
-              onClick={() => go("wallet")}
-              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
-            >
-              <span className="flex items-center gap-2">
-                <Wallet className="size-4" /> Portefeuille
-              </span>
-              <ChevronRight className="size-4 opacity-50" />
-            </button>
-            <button
-              onClick={() => go("settings")}
-              className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
-            >
-              <span className="flex items-center gap-2">
-                <Settings className="size-4" /> Paramètres
-              </span>
-              <ChevronRight className="size-4 opacity-50" />
-            </button>
             {user && (
               <>
+                <div className="my-2 h-px bg-border" />
+                <button
+                  onClick={() => go("favorites")}
+                  className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
+                >
+                  <span className="flex items-center gap-2">
+                    <Heart className="size-4" /> Mes favoris
+                  </span>
+                  <ChevronRight className="size-4 opacity-50" />
+                </button>
+                <button
+                  onClick={() => go("history")}
+                  className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
+                >
+                  <span className="flex items-center gap-2">
+                    <Clock className="size-4" /> Historique
+                  </span>
+                  <ChevronRight className="size-4 opacity-50" />
+                </button>
+                <button
+                  onClick={() => go("notifications")}
+                  className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
+                >
+                  <span className="flex items-center gap-2">
+                    <Bell className="size-4" /> Notifications
+                    {unread > 0 && (
+                      <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                        {unread}
+                      </span>
+                    )}
+                  </span>
+                  <ChevronRight className="size-4 opacity-50" />
+                </button>
+                <button
+                  onClick={() => go("requests")}
+                  className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
+                >
+                  <span className="flex items-center gap-2">
+                    <MessageSquareText className="size-4" /> Mes demandes
+                  </span>
+                  <ChevronRight className="size-4 opacity-50" />
+                </button>
+                <button
+                  onClick={() => go("wallet")}
+                  className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
+                >
+                  <span className="flex items-center gap-2">
+                    <Wallet className="size-4" /> Portefeuille
+                  </span>
+                  <ChevronRight className="size-4 opacity-50" />
+                </button>
+                <button
+                  onClick={() => go("settings")}
+                  className="flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium text-foreground/80 hover:bg-accent"
+                >
+                  <span className="flex items-center gap-2">
+                    <Settings className="size-4" /> Paramètres
+                  </span>
+                  <ChevronRight className="size-4 opacity-50" />
+                </button>
                 <div className="my-2 h-px bg-border" />
                 <button
                   onClick={() => go("wallet")}

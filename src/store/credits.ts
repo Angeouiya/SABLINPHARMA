@@ -29,6 +29,7 @@ interface CreditState {
   transactions: CreditTransaction[];
   loading: boolean;
   fetch: () => Promise<void>;
+  reset: () => void;
   debit: (amount: number, description: string) => Promise<{ success: boolean; balance?: number; error?: string }>;
   recharge: (amount: number, provider: string) => Promise<{ success: boolean; balance?: number; error?: string }>;
   expirePass: () => Promise<{ success: boolean; error?: string }>;
@@ -43,13 +44,21 @@ export const useCredits = create<CreditState>()(
       passStatus: "none",
       transactions: [],
       loading: false,
+      reset: () =>
+        set({
+          credits: 0,
+          hasPass: false,
+          passStatus: "none",
+          transactions: [],
+          loading: false,
+        }),
       setCredits: () => {
         // Le solde est autoritaire côté serveur. Cette méthode reste no-op pour compatibilité.
       },
       fetch: async () => {
         set({ loading: true });
         try {
-          const res = await fetch("/api/credits");
+          const res = await fetch("/api/credits", { cache: "no-store" });
           if (res.ok) {
             const data = await res.json();
             set({
@@ -58,6 +67,8 @@ export const useCredits = create<CreditState>()(
               hasPass: data.hasPass ?? false,
               passStatus: data.passStatus ?? "none",
             });
+          } else {
+            get().reset();
           }
         } catch {
           /* noop */

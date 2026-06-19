@@ -146,14 +146,13 @@ export function MedicationRow({ med }: { med: Medication }) {
         "group flex w-full min-w-0 items-start gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 text-left transition-all hover:border-brand/30 hover:bg-accent/40 sm:items-center"
       )}
     >
-      <span
-        className="flex size-11 shrink-0 items-center justify-center rounded-lg text-white"
-        style={{ backgroundColor: med.category?.color ?? "var(--brand)" }}
-      >
-        {med.category ? (
-          <CategoryIcon name={med.category.iconName} size={22} color="#fff" />
+      <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-brand-light text-brand sm:size-14">
+        {med.imageUrl ? (
+          <img src={med.imageUrl} alt={med.name} className="size-full object-cover" />
+        ) : med.category ? (
+          <CategoryIcon name={med.category.iconName} size={22} color={med.category.color} />
         ) : (
-          <Pill className="size-5 text-white" />
+          <Pill className="size-5 text-brand" />
         )}
       </span>
       <span className="min-w-0 flex-1">

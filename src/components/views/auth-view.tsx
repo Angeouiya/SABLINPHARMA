@@ -120,8 +120,6 @@ export function AuthView() {
     }
     if (!loginPassword) {
       errors.password = "Le mot de passe est obligatoire.";
-    } else if (loginPassword.length < 6) {
-      errors.password = "Le mot de passe doit contenir au moins 6 caractères.";
     }
     setLoginErrors(errors);
     return Object.keys(errors).length === 0;
@@ -187,8 +185,8 @@ export function AuthView() {
     if (!regCommune) errors.commune = "Veuillez sélectionner votre commune.";
     if (!regPassword) {
       errors.password = "Le mot de passe est obligatoire.";
-    } else if (regPassword.length < 6) {
-      errors.password = "Le mot de passe doit contenir au moins 6 caractères.";
+    } else if (regPassword.length < 8) {
+      errors.password = "Le mot de passe doit contenir au moins 8 caractères.";
     }
     if (!regConfirm) {
       errors.confirm = "Veuillez confirmer votre mot de passe.";
@@ -561,7 +559,7 @@ export function AuthView() {
                       </Label>
                       <PasswordInput
                         id="reg-password"
-                        placeholder="6 caractères minimum"
+                        placeholder="8 caractères minimum"
                         value={regPassword}
                         onChange={(v) => {
                           setRegPassword(v);
@@ -574,9 +572,9 @@ export function AuthView() {
                         disabled={regLoading}
                         autoComplete="new-password"
                       />
-                      {regPassword && regPassword.length < 6 && !regErrors.password && (
+                      {regPassword && regPassword.length < 8 && !regErrors.password && (
                         <p className="text-xs text-muted-foreground">
-                          Le mot de passe doit contenir au moins 6 caractères.
+                          Le mot de passe doit contenir au moins 8 caractères.
                         </p>
                       )}
                     </div>

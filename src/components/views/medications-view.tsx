@@ -34,6 +34,7 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { Heading, Eyebrow } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
+import { useAuth } from "@/store/auth";
 import { cn } from "@/lib/utils";
 import type { Category, Medication } from "@/lib/types";
 
@@ -81,6 +82,7 @@ const HOME_CATEGORIES = [
 
 export function MedicationsView() {
   const { params, navigate } = useNav();
+  const sessionKey = useAuth((s) => s.user?.id ?? "public");
   const [categories, setCategories] = useState<Category[]>([]);
   const [allMeds, setAllMeds] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,11 +105,11 @@ export function MedicationsView() {
 
   // Fetch categories
   useEffect(() => {
-    fetch("/api/categories")
+    fetch("/api/categories", { cache: "no-store" })
       .then((r) => r.json())
       .then(setCategories)
       .catch(() => {});
-  }, []);
+  }, [sessionKey]);
 
   // Fetch all medications once
   useEffect(() => {
@@ -117,7 +119,7 @@ export function MedicationsView() {
     url.searchParams.set("limit", "100");
     (async () => {
       try {
-        const r = await fetch(url.toString());
+        const r = await fetch(url.toString(), { cache: "no-store" });
         const data = await r.json();
         if (active) setAllMeds(data);
       } catch {
@@ -129,7 +131,7 @@ export function MedicationsView() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [sessionKey]);
 
   // Unique forms for the form filter
   const forms = useMemo(() => {
@@ -216,7 +218,7 @@ export function MedicationsView() {
                   (e.target as HTMLInputElement).blur();
                 }
               }}
-              placeholder="Rechercher un médicament, une DCI ou un dosage"
+              placeholder="Médicament, DCI ou dosage"
               className="h-12 border-border bg-background pl-11 pr-4 text-[15px]"
               aria-label="Rechercher un médicament"
             />

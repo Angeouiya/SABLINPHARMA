@@ -7,6 +7,7 @@ interface FavState {
   favorites: FavoriteItem[];
   loading: boolean;
   setFavorites: (items: FavoriteItem[]) => void;
+  reset: () => void;
   fetch: () => Promise<void>;
   toggle: (
     kind: FavoriteKind,
@@ -22,13 +23,16 @@ export const useFavorites = create<FavState>((set, get) => ({
   favorites: [],
   loading: false,
   setFavorites: (items) => set({ favorites: items }),
+  reset: () => set({ favorites: [], loading: false }),
   fetch: async () => {
     set({ loading: true });
     try {
-      const res = await fetch("/api/favorites");
+      const res = await fetch("/api/favorites", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         set({ favorites: data.favorites ?? [] });
+      } else {
+        get().reset();
       }
     } catch {
       /* noop */

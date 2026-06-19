@@ -35,12 +35,22 @@ export function UserRouteShell({ initialView = "home" }: { initialView?: View })
   const { view, navigate } = useNav();
   const fetchMe = useAuth((s) => s.fetchMe);
   const user = useAuth((s) => s.user);
+  const sessionChecked = useAuth((s) => s.sessionChecked);
   const fetchNotifs = useNotifications((s) => s.fetch);
+  const resetNotifs = useNotifications((s) => s.reset);
   const fetchFavs = useFavorites((s) => s.fetch);
+  const resetFavs = useFavorites((s) => s.reset);
   const fetchHistory = useHistory((s) => s.fetch);
+  const resetHistory = useHistory((s) => s.reset);
   const fetchCredits = useCredits((s) => s.fetch);
+  const resetCredits = useCredits((s) => s.reset);
 
   useEffect(() => {
+    try {
+      window.localStorage.removeItem("sablin-auth");
+    } catch {
+      /* noop */
+    }
     fetchMe();
   }, [fetchMe]);
 
@@ -54,8 +64,24 @@ export function UserRouteShell({ initialView = "home" }: { initialView?: View })
       fetchFavs();
       fetchHistory();
       fetchCredits();
+    } else if (sessionChecked) {
+      resetNotifs();
+      resetFavs();
+      resetHistory();
+      resetCredits();
     }
-  }, [user, fetchNotifs, fetchFavs, fetchHistory, fetchCredits]);
+  }, [
+    user,
+    sessionChecked,
+    fetchNotifs,
+    fetchFavs,
+    fetchHistory,
+    fetchCredits,
+    resetNotifs,
+    resetFavs,
+    resetHistory,
+    resetCredits,
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">

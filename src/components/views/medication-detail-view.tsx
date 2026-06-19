@@ -151,7 +151,7 @@ export function MedicationDetailView() {
     setPricesUnlocked(false);
     (async () => {
       try {
-        const r = await fetch(`/api/medications/${params.slug}`);
+        const r = await fetch(`/api/medications/${params.slug}`, { cache: "no-store" });
         if (!r.ok) throw new Error("not found");
         const data = await r.json();
         if (!active) return;
@@ -161,7 +161,8 @@ export function MedicationDetailView() {
         // Fetch alternatives (same genericName, different slug)
         if (data.genericName) {
           const altRes = await fetch(
-            `/api/medications?q=${encodeURIComponent(data.genericName)}&limit=10`
+            `/api/medications?q=${encodeURIComponent(data.genericName)}&limit=10`,
+            { cache: "no-store" }
           );
           if (altRes.ok) {
             const altData = await altRes.json();

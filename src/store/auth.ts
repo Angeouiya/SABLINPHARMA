@@ -1,12 +1,13 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { User } from "@/lib/types";
 
 interface AuthState {
   user: User | null;
   avance: boolean;
+  loading: boolean;
+  sessionChecked: boolean;
   setUser: (user: User | null) => void;
   setPassActive: (active: boolean) => void;
   setavance: (avance: boolean) => void;
@@ -14,39 +15,42 @@ interface AuthState {
   fetchMe: () => Promise<void>;
 }
 
-export const useAuth = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      avance: false,
-      setUser: (user) => set({ user }),
-      setPassActive: (active) => set({ avance: active }),
-      setavance: (avance) => set({ avance }),
-      logout: async () => {
-        try {
-          await fetch("/api/auth/logout", { method: "POST" });
-        } catch {
-          /* noop */
-        }
-        set({ user: null, avance: false });
-      },
-      fetchMe: async () => {
-        try {
-          const res = await fetch("/api/me");
-          if (res.ok) {
-            const data = await res.json();
-            set({ user: data.user, avance: !!data.pass });
-          } else {
-            set({ user: null, avance: false });
-          }
-        } catch {
-          /* noop */
-        }
-      },
-    }),
-    {
-      name: "sablin-auth",
-      partialize: (s) => ({ user: s.user, avance: s.avance }),
+export const useAuth = create<AuthState>((set) => ({
+  user: null,
+  avance: false,
+  loading: false,
+  sessionChecked: false,
+  setUser: (user) =>
+    set((state) => ({
+      user,
+      avance: user ? state.avance : false,
+      loading: false,
+      sessionChecked: true,
+    })),
+  setPassActive: (active) => set({ avance: active }),
+  setavance: (avance) => set({ avance }),
+  logout: async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* noop */
     }
-  )
-);
+    set({ user: null, avance: false, loading: false, sessionChecked: true });
+  },
+  fetchMe: async () => {
+    set({ loading: true });
+    try {
+      const res = await fetch("/api/me", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        set({ user: data.user ?? null, avance: !!data.pass, sessionChecked: true });
+      } else {
+        set({ user: null, avance: false, sessionChecked: true });
+      }
+    } catch {
+      set({ user: null, avance: false, sessionChecked: true });
+    } finally {
+      set({ loading: false });
+    }
+  },
+}));

@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNav } from "@/store/nav";
+import { useAuth } from "@/store/auth";
 import { distanceKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Category, Medication, Pharmacy } from "@/lib/types";
@@ -48,6 +49,7 @@ const HOME_CATEGORIES: { slug: string; fallbackName: string }[] = [
 
 export function HomeView() {
   const { navigate } = useNav();
+  const sessionKey = useAuth((s) => s.user?.id ?? "public");
   const [categories, setCategories] = useState<Category[]>([]);
   const [popularMeds, setPopularMeds] = useState<Medication[]>([]);
   const [onDuty, setOnDuty] = useState<Pharmacy[]>([]);
@@ -64,10 +66,10 @@ export function HomeView() {
     (async () => {
       try {
         const [cats, meds, pharma, publicStats] = await Promise.all([
-          fetch("/api/categories").then((r) => r.json()),
-          fetch("/api/medications?limit=6").then((r) => r.json()),
-          fetch("/api/pharmacies?filter=on-duty").then((r) => r.json()),
-          fetch("/api/public-stats").then((r) => r.json()),
+          fetch("/api/categories", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/medications?limit=6", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/pharmacies?filter=on-duty", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/public-stats", { cache: "no-store" }).then((r) => r.json()),
         ]);
         if (!active) return;
         setCategories(cats);
@@ -83,7 +85,7 @@ export function HomeView() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [sessionKey]);
 
   const homeCategories = useMemo(
     () =>

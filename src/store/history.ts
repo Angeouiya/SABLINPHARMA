@@ -7,6 +7,7 @@ interface HistoryState {
   history: HistoryItem[];
   loading: boolean;
   setHistory: (items: HistoryItem[]) => void;
+  reset: () => void;
   fetch: () => Promise<void>;
   add: (
     kind: HistoryKind,
@@ -22,13 +23,16 @@ export const useHistory = create<HistoryState>((set, get) => ({
   history: [],
   loading: false,
   setHistory: (items) => set({ history: items }),
+  reset: () => set({ history: [], loading: false }),
   fetch: async () => {
     set({ loading: true });
     try {
-      const res = await fetch("/api/history");
+      const res = await fetch("/api/history", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         set({ history: data.history ?? [] });
+      } else {
+        get().reset();
       }
     } catch {
       /* noop */

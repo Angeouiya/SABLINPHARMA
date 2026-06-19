@@ -39,6 +39,7 @@ import { GoogleMap } from "@/components/shared/google-map";
 import { CreditCost } from "@/components/shared/credit-cost";
 import { Heading, Eyebrow, Muted } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
+import { useAuth } from "@/store/auth";
 import { distanceKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Pharmacy } from "@/lib/types";
@@ -126,6 +127,7 @@ const DEFAULT_FILTERS: Filters = {
 
 export function PharmaciesView() {
   const { params, navigate } = useNav();
+  const sessionKey = useAuth((s) => s.user?.id ?? "public");
   const [allPharmacies, setAllPharmacies] = useState<Pharmacy[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState(params.query ?? "");
@@ -153,7 +155,7 @@ export function PharmaciesView() {
     setLoading(true);
     (async () => {
       try {
-        const r = await fetch("/api/pharmacies");
+        const r = await fetch("/api/pharmacies", { cache: "no-store" });
         const data = await r.json();
         if (active) setAllPharmacies(data);
       } catch {
@@ -165,7 +167,7 @@ export function PharmaciesView() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [sessionKey]);
 
   // Enrich pharmacies with distance
   const enriched = useMemo(
@@ -285,7 +287,7 @@ export function PharmaciesView() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Rechercher une pharmacie, une commune ou un quartier"
+              placeholder="Pharmacie, commune ou quartier"
               className="h-12 border-border bg-background pl-11 pr-10 text-[15px]"
               aria-label="Rechercher une pharmacie"
             />

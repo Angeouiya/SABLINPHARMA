@@ -173,7 +173,7 @@ export function PharmacyDetailView() {
     setUnlockedPhone("");
     (async () => {
       try {
-        const r = await fetch(`/api/pharmacies/${params.slug}`);
+        const r = await fetch(`/api/pharmacies/${params.slug}`, { cache: "no-store" });
         if (!r.ok) throw new Error("not found");
         const data = await r.json();
         if (active) {

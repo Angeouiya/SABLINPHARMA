@@ -1843,6 +1843,7 @@ function MarketplaceEngineAdmin() {
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" className="bg-brand text-white" onClick={() => patchEnrichmentAction({ action: "promote-image-candidate", candidateId: candidate.id }, "Image candidate préparée pour validation.")}>Préparer validation</Button>
                     <Button size="sm" variant="outline" className="border-red-300 text-red-700" onClick={() => postAction("/api/enrichment/reject-image", { candidateId: candidate.id }, "Image candidate refusée.")}>Refuser</Button>
                     <Button size="sm" variant="outline" onClick={() => patchEnrichmentAction({ action: "use-placeholder", candidateId: candidate.id }, "Placeholder SABLIN PHARMA utilisé.")}>Utiliser placeholder</Button>
                   </div>

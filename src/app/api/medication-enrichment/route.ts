@@ -6,6 +6,13 @@ import { hasPharmacyPermission, requirePharmacyPermission } from "@/lib/pharmacy
 import { ensurePlaceholderImage, matchMedicationInReferential, normalizeImportedRow, seedDefaultEnrichmentProviders } from "@/lib/medication-enrichment";
 import { writeAudit } from "@/lib/professional-auth";
 
+type CandidateImageDetails = {
+  width?: number | null;
+  height?: number | null;
+  licenseUrl?: string | null;
+  text?: string | null;
+};
+
 function getKind(req: NextRequest) {
   return req.headers.get("x-sablin-session-kind") === "admin" ? "admin" : "pharmacy";
 }
@@ -207,6 +214,78 @@ export async function PATCH(req: NextRequest) {
       });
     }
     return NextResponse.json({ image });
+  }
+
+  if (action === "promote-image-candidate") {
+    const candidate = await db.enrichmentCandidate.findUnique({
+      where: { id: String(body.candidateId ?? "") },
+      include: { job: true },
+    });
+    if (!candidate?.imageUrl || candidate.candidateType !== "image") {
+      return NextResponse.json({ error: "Image candidate introuvable." }, { status: 404 });
+    }
+    const medicationId = candidate.job.medicationId;
+    if (!medicationId) {
+      return NextResponse.json({ error: "Aucun médicament associé à cette image candidate." }, { status: 400 });
+    }
+    let details: CandidateImageDetails = {};
+    if (candidate.matchDetails) {
+      try {
+        details = JSON.parse(candidate.matchDetails) as CandidateImageDetails;
+      } catch {
+        details = {};
+      }
+    }
+    const existing = await db.medicationImage.findFirst({
+      where: {
+        medicationId,
+        OR: [
+          { url: candidate.imageUrl },
+          { originalUrl: candidate.imageUrl },
+        ],
+      },
+    });
+    const image = existing ?? (await db.medicationImage.create({
+      data: {
+        medicationId,
+        url: candidate.imageUrl,
+        originalUrl: candidate.imageUrl,
+        sourceName: candidate.sourceName ?? "Source web",
+        sourceUrl: candidate.sourceUrl,
+        imageType: "web_candidate",
+        licenseType: candidate.licenseType ?? "Licence à confirmer",
+        licenseUrl: details.licenseUrl ?? null,
+        attributionText: details.text ?? null,
+        commercialUseAllowed: false,
+        modificationAllowed: false,
+        isPrimary: false,
+        isPlaceholder: false,
+        width: Number(details.width ?? 0) || null,
+        height: Number(details.height ?? 0) || null,
+        confidenceScore: candidate.score,
+        validationStatus: "À vérifier",
+      },
+    }));
+    await db.enrichmentCandidate.update({
+      where: { id: candidate.id },
+      data: {
+        status: "Validé",
+        reviewedBy: access.session?.name ?? access.role ?? null,
+        reviewedAt: new Date(),
+      },
+    });
+    await writeAudit({
+      req,
+      platform: "admin",
+      action: "enrichment-image-candidate-promoted",
+      entityType: "medication-image",
+      entityId: image.id,
+      actorAccountId: access.session?.accountId,
+      actorName: access.session?.name,
+      actorRole: access.role ?? undefined,
+      newValue: { candidateId: candidate.id, sourceName: candidate.sourceName, score: candidate.score },
+    });
+    return NextResponse.json({ image, message: "Image candidate préparée pour validation." });
   }
 
   if (action === "use-placeholder") {

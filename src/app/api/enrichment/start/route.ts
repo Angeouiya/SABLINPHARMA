@@ -25,9 +25,22 @@ export async function POST(req: NextRequest) {
         select: { medicationId: true },
       })
     : [];
-  const medicationIds = [...directIds, ...rows.map((row) => row.medicationId).filter(Boolean) as string[]];
+  let medicationIds = [...directIds, ...rows.map((row) => row.medicationId).filter(Boolean) as string[]];
+  if (!medicationIds.length && (body.missingImagesOnly === true || kind === "admin")) {
+    const limit = Math.min(Math.max(Number(body.limit ?? 40), 1), 80);
+    const medications = await db.medication.findMany({
+      where: {
+        status: "Actif",
+        images: { none: { validationStatus: "Publiée", isPlaceholder: false } },
+      },
+      select: { id: true },
+      orderBy: { name: "asc" },
+      take: limit,
+    });
+    medicationIds = medications.map((medication) => medication.id);
+  }
   if (!medicationIds.length) {
-    return NextResponse.json({ error: "Aucun médicament reconnu à enrichir." }, { status: 400 });
+    return NextResponse.json({ error: "Aucun médicament à enrichir. Les produits disposent déjà d’images publiées ou aucun médicament n’est reconnu." }, { status: 400 });
   }
 
   try {

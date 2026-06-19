@@ -736,6 +736,8 @@ export async function startMarketplaceEnrichment(input: {
     });
     jobs.push(job);
 
+    await ensurePlaceholderImage(medicationId);
+
     const search = await searchImageCandidatesForMedication(medicationId).catch((error: Error) => ({
       provider: "Erreur fournisseur image",
       query,
@@ -761,25 +763,38 @@ export async function startMarketplaceEnrichment(input: {
           },
         });
         if (candidate.status !== "Refusé") {
-          await db.medicationImage.create({
-            data: {
+          const existingImage = await db.medicationImage.findFirst({
+            where: {
               medicationId,
-              url: candidate.imageUrl,
-              originalUrl: candidate.imageUrl,
-              sourceName: candidate.sourceName,
-              sourceUrl: candidate.sourceUrl,
-              imageType: "web_candidate",
-              licenseType: candidate.licenseType,
-              commercialUseAllowed: false,
-              modificationAllowed: false,
-              isPrimary: false,
-              isPlaceholder: false,
-              width: candidate.width,
-              height: candidate.height,
-              confidenceScore: candidate.score,
-              validationStatus: "À vérifier",
+              OR: [
+                { url: candidate.imageUrl },
+                { originalUrl: candidate.imageUrl },
+              ],
             },
           });
+          if (!existingImage) {
+            await db.medicationImage.create({
+              data: {
+                medicationId,
+                url: candidate.imageUrl,
+                originalUrl: candidate.imageUrl,
+                sourceName: candidate.sourceName,
+                sourceUrl: candidate.sourceUrl,
+                imageType: "web_candidate",
+                licenseType: candidate.licenseType,
+                licenseUrl: candidate.licenseUrl,
+                attributionText: candidate.text,
+                commercialUseAllowed: false,
+                modificationAllowed: false,
+                isPrimary: false,
+                isPlaceholder: false,
+                width: candidate.width,
+                height: candidate.height,
+                confidenceScore: candidate.score,
+                validationStatus: "À vérifier",
+              },
+            });
+          }
         }
       }
       if (search.candidates.length === 0) {

@@ -175,6 +175,44 @@ const adminPharmacies = PHARMACY_PORTAL_PHARMACIES.map((pharmacy, index) => ({
   operationalStatus: pharmacy.guard === "De garde" ? "Ouvert" : pharmacy.guard,
 }));
 
+type AdminDashboardSummary = {
+  totalUsers: number;
+  activeUsers: number;
+  usersWithCredits: number;
+  totalCreditsSold: number;
+  transactionsToday: number;
+  totalPharmacies: number;
+  validatedPharmacies: number;
+  pendingPharmacies: number;
+  suspendedPharmacies: number;
+  referencedMedications: number;
+  medicationRequestsPending: number;
+  recentImports: number;
+  staleData: number;
+  pendingConfirmations: number;
+  pendingUserRequests: number;
+  dataQualityPercent: number;
+};
+
+const adminDashboardFallback: AdminDashboardSummary = {
+  totalUsers: 0,
+  activeUsers: 0,
+  usersWithCredits: 0,
+  totalCreditsSold: 0,
+  transactionsToday: 0,
+  totalPharmacies: 0,
+  validatedPharmacies: 0,
+  pendingPharmacies: 0,
+  suspendedPharmacies: 0,
+  referencedMedications: 0,
+  medicationRequestsPending: 0,
+  recentImports: 0,
+  staleData: 0,
+  pendingConfirmations: 0,
+  pendingUserRequests: 0,
+  dataQualityPercent: 0,
+};
+
 function statusClass(label: string) {
   const value = label.toLowerCase();
   if (value.includes("valid") || value.includes("confirm") || value.includes("réussi") || value.includes("à jour") || value.includes("actif") || value.includes("ouvert")) return "bg-success-light text-success";
@@ -681,23 +719,47 @@ function Stat({ label, value, badge }: { label: string; value: string | number; 
 }
 
 function Dashboard() {
+  const [summary, setSummary] = useState<AdminDashboardSummary>(adminDashboardFallback);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingSummary(true);
+    fetch("/api/admin/dashboard-summary", {
+      headers: { "x-sablin-session-kind": "admin" },
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (active && ok) setSummary({ ...adminDashboardFallback, ...data });
+      })
+      .catch(() => {
+        if (active) setSummary(adminDashboardFallback);
+      })
+      .finally(() => {
+        if (active) setLoadingSummary(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const stats = [
-    ["Nombre total d’utilisateurs", 326, "Actif"],
-    ["Utilisateurs actifs", 214, "Actif"],
-    ["Utilisateurs avec crédits", 137, "Crédits SABLIN"],
-    ["Total des crédits vendus", "18 420", "Confirmé"],
-    ["Transactions du jour", 42, "Réussi"],
-    ["Nombre total de pharmacies", adminPharmacies.length, "Toutes pharmacies"],
-    ["Pharmacies validées", 4, "Validée"],
-    ["Pharmacies en attente", 1, "En attente"],
-    ["Pharmacies suspendues", 1, "Suspendue"],
-    ["Médicaments référencés", 1240, "Actif"],
-    ["Demandes d’ajout médicament", 9, "En attente"],
-    ["Imports récents", 8, "Import réussi"],
-    ["Données anciennes", 38, "Données anciennes"],
-    ["Confirmations en attente", 17, "En cours"],
-    ["Demandes utilisateurs en attente", 27, "Nouvelle"],
-    ["Qualité globale des données", "82%", "Données à jour"],
+    ["Nombre total d’utilisateurs", summary.totalUsers, "Actif"],
+    ["Utilisateurs actifs", summary.activeUsers, "Actif"],
+    ["Utilisateurs avec crédits", summary.usersWithCredits, "Crédits SABLIN"],
+    ["Total des crédits vendus", summary.totalCreditsSold.toLocaleString("fr-FR"), "Confirmé"],
+    ["Transactions du jour", summary.transactionsToday, "Réussi"],
+    ["Nombre total de pharmacies", summary.totalPharmacies, "Toutes pharmacies"],
+    ["Pharmacies validées", summary.validatedPharmacies, "Validée"],
+    ["Pharmacies en attente", summary.pendingPharmacies, "En attente"],
+    ["Pharmacies suspendues", summary.suspendedPharmacies, "Suspendue"],
+    ["Médicaments référencés", summary.referencedMedications, "Actif"],
+    ["Demandes d’ajout médicament", summary.medicationRequestsPending, "En attente"],
+    ["Imports récents", summary.recentImports, "Import réussi"],
+    ["Données anciennes", summary.staleData, "Données anciennes"],
+    ["Confirmations en attente", summary.pendingConfirmations, "En cours"],
+    ["Demandes utilisateurs en attente", summary.pendingUserRequests, "Nouvelle"],
+    ["Qualité globale des données", `${summary.dataQualityPercent}%`, "Données à jour"],
   ];
 
   return (
@@ -712,7 +774,9 @@ function Dashboard() {
         </div>
       </Card>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(([label, value, badge]) => <Stat key={String(label)} label={String(label)} value={value} badge={String(badge)} />)}
+        {stats.map(([label, value, badge]) => (
+          <Stat key={String(label)} label={String(label)} value={loadingSummary ? "..." : value} badge={String(badge)} />
+        ))}
       </div>
     </div>
   );

@@ -89,6 +89,30 @@ const navItems: { page: PharmacyPage; label: string; icon: typeof LayoutDashboar
 
 const PHARMACY_SESSION_SLUG = "pharmacie-sainte-marie-cocody";
 
+type PharmacyDashboardSummary = {
+  medicationCount: number;
+  staleAvailabilityCount: number;
+  receivedRequests: number;
+  pendingRequests: number;
+  pendingConfirmations: number;
+  dutyStatus: string;
+  dataQualityPercent: number;
+  lastDataUpdateLabel: string;
+  priceToCheck: number;
+};
+
+const pharmacyDashboardFallback: PharmacyDashboardSummary = {
+  medicationCount: 0,
+  staleAvailabilityCount: 0,
+  receivedRequests: 0,
+  pendingRequests: 0,
+  pendingConfirmations: 0,
+  dutyStatus: "Inactif",
+  dataQualityPercent: 0,
+  lastDataUpdateLabel: "Non renseignée",
+  priceToCheck: 0,
+};
+
 function downloadImportTemplate(fileName = "modele-import-ma-pharmacie.csv") {
   const header = IMPORT_TEMPLATE_COLUMNS.join(";");
   const example = [
@@ -567,6 +591,30 @@ function PharmacyRegistration() {
 function Dashboard() {
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const pending = params?.get("pending") === "1";
+  const [summary, setSummary] = useState<PharmacyDashboardSummary>(pharmacyDashboardFallback);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingSummary(true);
+    fetch("/api/pharmacy-platform/dashboard-summary", {
+      headers: { "x-sablin-session-kind": "pharmacy" },
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (active && ok) setSummary({ ...pharmacyDashboardFallback, ...data });
+      })
+      .catch(() => {
+        if (active) setSummary(pharmacyDashboardFallback);
+      })
+      .finally(() => {
+        if (active) setLoadingSummary(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="space-y-6">
       {pending && (
@@ -578,14 +626,14 @@ function Dashboard() {
         </Card>
       )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Médicaments de ma pharmacie" value={128} badge="Données à jour" />
-        <Stat label="Disponibilités à mettre à jour" value={18} badge="À confirmer" />
-        <Stat label="Demandes reçues" value={6} badge="Nouvelle" />
-        <Stat label="Confirmations en attente" value={4} badge="En cours" />
-        <Stat label="Statut de garde" value="Actif" badge="De garde" />
-        <Stat label="Qualité de mes données" value="86%" badge="Données à jour" />
-        <Stat label="Dernière mise à jour" value="10:05" badge="Confirmé" />
-        <Stat label="Prix à vérifier" value={7} badge="À vérifier" />
+        <Stat label="Médicaments de ma pharmacie" value={loadingSummary ? "..." : summary.medicationCount} badge="Données à jour" />
+        <Stat label="Disponibilités à mettre à jour" value={loadingSummary ? "..." : summary.staleAvailabilityCount} badge="À confirmer" />
+        <Stat label="Demandes reçues" value={loadingSummary ? "..." : summary.receivedRequests} badge="Nouvelle" />
+        <Stat label="Confirmations en attente" value={loadingSummary ? "..." : summary.pendingConfirmations} badge="En cours" />
+        <Stat label="Statut de garde" value={loadingSummary ? "..." : summary.dutyStatus} badge={summary.dutyStatus === "Actif" ? "De garde" : "Fermé"} />
+        <Stat label="Qualité de mes données" value={loadingSummary ? "..." : `${summary.dataQualityPercent}%`} badge="Données à jour" />
+        <Stat label="Dernière mise à jour" value={loadingSummary ? "..." : summary.lastDataUpdateLabel} badge="Confirmé" />
+        <Stat label="Prix à vérifier" value={loadingSummary ? "..." : summary.priceToCheck} badge="À vérifier" />
       </div>
       <DataVisibilityBlocks />
       <SectionBlock title="Connexion avec la plateforme utilisateur" description="Seules les données validées et non confidentielles sont publiées côté utilisateur.">

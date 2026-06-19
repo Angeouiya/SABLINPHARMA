@@ -23,7 +23,7 @@ export function MedicationCard({ med }: { med: Medication }) {
       className="group min-w-0 gap-0 cursor-pointer overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-avance-lg"
     >
       {/* Header visual */}
-      <div className="relative flex h-32 items-center justify-center overflow-hidden bg-brand-light">
+      <div className="relative flex h-24 items-center justify-center overflow-hidden bg-brand-light sm:h-32">
         {med.imageUrl ? (
           <img
             src={med.imageUrl}
@@ -33,7 +33,7 @@ export function MedicationCard({ med }: { med: Medication }) {
         ) : (
           <>
             <div className="absolute inset-0 opacity-[0.07] bg-dotted" />
-            <div className="relative flex size-16 items-center justify-center rounded-2xl bg-background shadow-avance">
+            <div className="relative flex size-12 items-center justify-center rounded-2xl bg-background shadow-avance sm:size-16">
               {med.category ? (
                 <CategoryIcon
                   name={med.category.iconName}
@@ -66,30 +66,30 @@ export function MedicationCard({ med }: { med: Medication }) {
       </div>
 
       {/* Body */}
-      <div className="space-y-2 p-4">
+      <div className="space-y-2 p-2.5 sm:p-4">
         <div>
-          <h3 className="line-clamp-2 break-words text-sm font-bold leading-snug text-foreground">
+          <h3 className="line-clamp-2 break-words text-xs font-bold leading-snug text-foreground sm:text-sm">
             {med.name}
           </h3>
-          <p className="line-clamp-2 break-words text-xs text-muted-foreground">{med.genericName}</p>
+          <p className="line-clamp-2 break-words text-[11px] text-muted-foreground sm:text-xs">{med.genericName}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground sm:gap-1.5 sm:text-[11px]">
           <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium leading-tight">{med.form}</span>
           <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium leading-tight">{med.dosage}</span>
         </div>
         <Badge
           variant="outline"
-          className="w-fit max-w-full whitespace-normal border-border bg-muted px-2 py-1 text-[11px] font-bold leading-tight text-foreground"
+          className="w-full max-w-full whitespace-normal border-border bg-muted px-1.5 py-1 text-[10px] font-bold leading-tight text-foreground sm:w-fit sm:px-2 sm:text-[11px]"
         >
           <Lock className="size-3" /> Disponibilité verrouillée — 1 crédit
         </Badge>
 
-        <div className="flex flex-col items-start gap-2 border-t border-border/50 pt-2.5 min-[380px]:flex-row min-[380px]:items-end min-[380px]:justify-between">
-          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-extrabold text-foreground">
+        <div className="flex flex-col items-start gap-1.5 border-t border-border/50 pt-2.5 min-[520px]:flex-row min-[520px]:items-end min-[520px]:justify-between">
+          <span className="inline-flex w-full items-center gap-1 rounded-md bg-muted px-1.5 py-1 text-[10px] font-extrabold leading-tight text-foreground sm:w-auto sm:px-2 sm:text-xs">
             <Lock className="size-3.5 text-brand" />
             Prix verrouillé — 1 crédit
           </span>
-          <span className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
+          <span className="flex items-center gap-1 text-[10px] font-bold leading-tight text-muted-foreground sm:text-xs">
             <Lock className="size-3.5 text-brand" />
             Voir pharmacies — 1 crédit
           </span>
@@ -98,7 +98,7 @@ export function MedicationCard({ med }: { med: Medication }) {
         <Button
           size="sm"
           variant="outline"
-          className="min-h-10 w-full whitespace-normal border-brand/30 text-brand-dark hover:bg-brand-light hover:text-brand-dark"
+          className="min-h-9 w-full whitespace-normal border-brand/30 px-2 text-[11px] leading-tight text-brand-dark hover:bg-brand-light hover:text-brand-dark sm:min-h-10 sm:text-sm"
           onClick={(e) => {
             e.stopPropagation();
             navigate("medication-detail", { slug: med.slug });
@@ -109,7 +109,7 @@ export function MedicationCard({ med }: { med: Medication }) {
         <div className="grid gap-2">
           <Button
             size="sm"
-            className="min-h-10 w-full whitespace-normal bg-brand px-2 text-xs leading-tight text-white hover:bg-brand-dark"
+            className="min-h-9 w-full whitespace-normal bg-brand px-2 text-[11px] leading-tight text-white hover:bg-brand-dark sm:min-h-10 sm:text-xs"
             onClick={(e) => {
               e.stopPropagation();
               navigate("medication-detail", { slug: med.slug });
@@ -120,7 +120,7 @@ export function MedicationCard({ med }: { med: Medication }) {
           <Button
             size="sm"
             variant="outline"
-            className="min-h-10 w-full whitespace-normal border-brand/30 px-2 text-xs leading-tight text-brand-dark hover:bg-brand-light hover:text-brand-dark"
+            className="min-h-9 w-full whitespace-normal border-brand/30 px-2 text-[11px] leading-tight text-brand-dark hover:bg-brand-light hover:text-brand-dark sm:min-h-10 sm:text-xs"
             onClick={(e) => {
               e.stopPropagation();
               navigate("prescription", { estimateItems: [{ slug: med.slug, quantity: 1 }] });
@@ -129,7 +129,7 @@ export function MedicationCard({ med }: { med: Medication }) {
             Ajouter ordonnance — 1 crédit
           </Button>
         </div>
-        <p className="text-[11px] font-medium leading-snug text-muted-foreground">
+        <p className="text-[10px] font-medium leading-snug text-muted-foreground sm:text-[11px]">
           Connectez-vous et utilisez vos crédits SABLIN pour voir les prix.
         </p>
       </div>

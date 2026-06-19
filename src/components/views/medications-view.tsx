@@ -442,9 +442,9 @@ export function MedicationsView() {
 
           {/* Results display */}
           {loading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-64 rounded-2xl" />
+                <Skeleton key={i} className="h-72 rounded-2xl sm:h-64" />
               ))}
             </div>
           ) : filteredMeds.length === 0 ? (
@@ -455,7 +455,7 @@ export function MedicationsView() {
               action={{ label: "Réinitialiser la recherche", onClick: resetFilters }}
             />
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
               {filteredMeds.map((m) => (
                 <MedicationCard key={m.id} med={m} />
               ))}

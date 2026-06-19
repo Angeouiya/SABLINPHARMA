@@ -54,7 +54,6 @@ import {
   INTERNAL_PHARMACY_DATA,
   PHARMACY_IMAGE_FIELDS,
   PHARMACY_OPERATION_STATUSES,
-  PHARMACY_PORTAL_MEDICATIONS,
   PHARMACY_PROFILE_STEPS,
   PHARMACY_SERVICES,
   PUBLIC_AVAILABILITY_STATUSES,
@@ -267,6 +266,24 @@ type PharmacyProfileData = {
   mediaCount: number;
   medicationCount: number;
   completenessScore: number;
+};
+
+type PharmacyInventoryItem = {
+  id: string;
+  pharmacy: string;
+  medication: string;
+  dci: string;
+  dosage: string;
+  form: string;
+  category: string;
+  price: number;
+  internalQuantity: number | null;
+  privateStatus: string;
+  publicStatus: string;
+  dataSource: string;
+  reliabilityLevel: string;
+  lastUpdatedAt: string;
+  remark?: string | null;
 };
 
 function formatDateTime(value?: string | Date | null) {
@@ -848,14 +865,57 @@ function Dashboard() {
 
 function Medications() {
   const [query, setQuery] = useState("");
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [reliabilityFilter, setReliabilityFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [inventory, setInventory] = useState<PharmacyInventoryItem[]>([]);
+  const [loadingInventory, setLoadingInventory] = useState(true);
   const [requestName, setRequestName] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
+
+  const loadInventory = useCallback(async () => {
+    setLoadingInventory(true);
+    try {
+      const res = await fetch(`/api/pharmacy-platform/inventory?pharmacySlug=${encodeURIComponent(PHARMACY_SESSION_SLUG)}`, {
+        headers: { "X-Sablin-Session-Kind": "pharmacy" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement de l’inventaire impossible.");
+      setInventory(data.inventory ?? []);
+    } catch (error) {
+      setRequestMessage(error instanceof Error ? error.message : "Chargement de l’inventaire impossible.");
+      setInventory([]);
+    } finally {
+      setLoadingInventory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInventory();
+  }, [loadInventory]);
+
+  const categories = useMemo(() => [...new Set(inventory.map((item) => item.category).filter(Boolean))].sort(), [inventory]);
+  const sources = useMemo(() => [...new Set(inventory.map((item) => item.dataSource).filter(Boolean))].sort(), [inventory]);
   const rows = useMemo(() => {
     const q = query.toLowerCase().trim();
-    const source = q ? PHARMACY_PORTAL_MEDICATIONS.filter((m) => `${m.name} ${m.dci}`.toLowerCase().includes(q)) : PHARMACY_PORTAL_MEDICATIONS;
-    return source.map((item) => ({ ...item, status: statusOverrides[item.name] ?? item.status }));
-  }, [query, statusOverrides]);
+    return inventory.filter((item) => {
+      const searchable = `${item.medication} ${item.dci} ${item.dosage} ${item.form} ${item.category} ${item.dataSource}`.toLowerCase();
+      return (
+        (!q || searchable.includes(q)) &&
+        (statusFilter === "all" || item.publicStatus === statusFilter || item.privateStatus === statusFilter) &&
+        (categoryFilter === "all" || item.category === categoryFilter) &&
+        (reliabilityFilter === "all" || item.reliabilityLevel === reliabilityFilter) &&
+        (sourceFilter === "all" || item.dataSource === sourceFilter)
+      );
+    });
+  }, [categoryFilter, inventory, query, reliabilityFilter, sourceFilter, statusFilter]);
+  const stats = useMemo(() => ({
+    total: inventory.length,
+    visible: inventory.filter((item) => item.publicStatus !== "À confirmer").length,
+    toConfirm: inventory.filter((item) => item.publicStatus === "À confirmer" || item.reliabilityLevel !== "Confirmé").length,
+    stale: inventory.filter((item) => item.dataSource === "Donnée ancienne" || item.reliabilityLevel === "Ancien").length,
+  }), [inventory]);
   const requestReferentialAdd = async () => {
     const proposedName = requestName.trim() || query.trim();
     if (!proposedName) {
@@ -876,73 +936,172 @@ function Medications() {
       setRequestMessage(error instanceof Error ? error.message : "Demande impossible.");
     }
   };
+  const clearFilters = () => {
+    setQuery("");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+    setReliabilityFilter("all");
+    setSourceFilter("all");
+  };
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <Heading level="h2">Médicaments & disponibilités</Heading>
-          <Muted>Vous gérez uniquement les données de votre pharmacie.</Muted>
-        </div>
-        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = "/pharmacie/import-inventaire")}><Upload className="size-4" /> Import inventaire</Button>
-      </div>
-      <div className="relative mt-4">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher médicament, DCI..." className="pl-9" />
-      </div>
-      {rows.length === 0 && (
-        <Card className="mt-4 border-amber-200 bg-amber-50 p-4">
-          <p className="font-extrabold text-amber-900">Médicament non trouvé dans le référentiel</p>
-          <p className="mt-1 text-sm font-semibold text-amber-800">La pharmacie ne peut pas publier librement un médicament non validé. Envoyez une demande à l’administration.</p>
-          <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
-            <Input value={requestName} onChange={(event) => setRequestName(event.target.value)} placeholder={query || "Nom proposé"} />
-            <Button className="bg-brand text-white hover:bg-brand-dark" onClick={requestReferentialAdd}>Demander l’ajout au référentiel</Button>
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <Heading level="h2">Médicaments & disponibilités</Heading>
+            <Muted>Inventaire réel de votre pharmacie, synchronisé avec les imports, les validations et la marketplace utilisateur.</Muted>
           </div>
-          {requestMessage && <p className="mt-3 text-sm font-bold text-amber-900">{requestMessage}</p>}
-        </Card>
-      )}
-      <div className="mt-4 overflow-x-auto rounded-xl border border-border">
-        <table className="w-full min-w-[880px] text-sm">
-          <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-            <tr>{["Médicament", "Prix indicatif", "Statut public", "Interne", "Source", "Fiabilité", "Mise à jour rapide"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-white">
-            {rows.map((m) => (
-              <tr key={m.name}>
-                <td className="px-4 py-3"><p className="font-bold text-foreground">{m.name}</p><p className="text-xs text-muted-foreground">{m.dci} · {m.form} · {m.dosage}</p></td>
-                <td className="px-4 py-3"><Price amount={m.price} size="sm" variant="brand" /></td>
-                <td className="px-4 py-3"><StatusBadge label={m.status} /></td>
-                <td className="px-4 py-3 text-muted-foreground">Quantité interne : {m.internalQuantity}. Non visible côté utilisateur.</td>
-                <td className="px-4 py-3 text-muted-foreground">{m.source}</td>
-                <td className="px-4 py-3"><StatusBadge label={m.reliability} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {PUBLIC_AVAILABILITY_STATUSES.map((s) => (
-                      <ProfessionalActionButton
-                        key={s}
-                        action="quick-availability"
-                        label={s}
-                        pharmacySlug={PHARMACY_SESSION_SLUG}
-                        medicationName={m.name}
-                        payload={{ availabilityStatus: s, reliabilityLevel: s === "À confirmer" ? "À vérifier" : "Confirmé", dataSource: "Saisie pharmacie" }}
-                        onSuccess={() => setStatusOverrides((current) => ({ ...current, [m.name]: s }))}
-                        size="sm"
-                        variant="outline"
-                        className="h-8 border-brand/20 text-xs text-brand-dark"
-                      >
-                        {s}
-                      </ProfessionalActionButton>
-                    ))}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
-        Prix indicatif, à confirmer auprès de la pharmacie. Le stock exact n’est jamais affiché côté utilisateur.
-      </p>
-    </Card>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = "/pharmacie/import-inventaire")}><Upload className="size-4" /> Import inventaire</Button>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat label="Inventaire réel" value={loadingInventory ? "..." : stats.total} badge="Base de données" />
+          <Stat label="Publiables après contrôle" value={loadingInventory ? "..." : stats.visible} badge="Marketplace" />
+          <Stat label="À confirmer" value={loadingInventory ? "..." : stats.toConfirm} badge="Validation" />
+          <Stat label="Données anciennes" value={loadingInventory ? "..." : stats.stale} badge="Qualité" />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border bg-white p-3">
+          <div className="grid gap-3 lg:grid-cols-[1.4fr_repeat(4,0.8fr)_auto]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher médicament, DCI, catégorie..." className="pl-9" />
+            </div>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="all">Tous les statuts</option>
+              {PUBLIC_AVAILABILITY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="all">Toutes catégories</option>
+              {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+            <select value={reliabilityFilter} onChange={(event) => setReliabilityFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="all">Toute fiabilité</option>
+              {RELIABILITY_LEVELS.map((level) => <option key={level} value={level}>{level}</option>)}
+            </select>
+            <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="all">Toutes sources</option>
+              {sources.map((source) => <option key={source} value={source}>{source}</option>)}
+            </select>
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={clearFilters}>
+              <Filter className="size-4" /> Réinitialiser
+            </Button>
+          </div>
+        </div>
+
+        {requestMessage && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{requestMessage}</p>}
+
+        {loadingInventory && (
+          <Card className="mt-4 border-border/70 p-4 text-sm font-bold text-muted-foreground">Chargement de l’inventaire réel...</Card>
+        )}
+        {!loadingInventory && rows.length === 0 && (
+          <Card className="mt-4 border-amber-200 bg-amber-50 p-4">
+            <p className="font-extrabold text-amber-900">Aucun médicament trouvé dans l’inventaire réel</p>
+            <p className="mt-1 text-sm font-semibold text-amber-800">Importez un fichier, modifiez vos filtres ou demandez l’ajout d’un médicament au référentiel.</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+              <Input value={requestName} onChange={(event) => setRequestName(event.target.value)} placeholder={query || "Nom proposé"} />
+              <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={clearFilters}>Voir tout</Button>
+              <Button className="bg-brand text-white hover:bg-brand-dark" onClick={requestReferentialAdd}>Demander l’ajout au référentiel</Button>
+            </div>
+          </Card>
+        )}
+
+        <div className="mt-4 grid gap-3 lg:hidden">
+          {rows.map((m) => (
+            <Card key={m.id} className="border-border/70 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-extrabold text-foreground">{m.medication}</p>
+                  <p className="text-xs font-bold text-muted-foreground">{m.dci} · {m.form} · {m.dosage}</p>
+                  <p className="mt-1 text-xs font-semibold text-muted-foreground">{m.category} · {formatDateTime(m.lastUpdatedAt)}</p>
+                </div>
+                <StatusBadge label={m.publicStatus} />
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="text-xs font-bold text-muted-foreground">Prix indicatif</p>
+                  <Price amount={m.price} size="sm" variant="brand" />
+                </div>
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="text-xs font-bold text-muted-foreground">Quantité interne</p>
+                  <p className="text-sm font-extrabold text-foreground">{m.internalQuantity ?? "Non renseignée"}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <StatusBadge label={m.dataSource} />
+                <StatusBadge label={m.reliabilityLevel} />
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {PUBLIC_AVAILABILITY_STATUSES.map((s) => (
+                  <ProfessionalActionButton
+                    key={s}
+                    action="quick-availability"
+                    label={s}
+                    pharmacySlug={PHARMACY_SESSION_SLUG}
+                    medicationName={m.medication}
+                    entityId={m.id}
+                    entityType="pharmacy-medication"
+                    payload={{ availabilityStatus: s, reliabilityLevel: s === "À confirmer" ? "À vérifier" : "Confirmé", dataSource: "Saisie pharmacie" }}
+                    onSuccess={() => void loadInventory()}
+                    size="sm"
+                    variant="outline"
+                    className="min-h-10 whitespace-normal border-brand/20 text-xs text-brand-dark"
+                  >
+                    {s}
+                  </ProfessionalActionButton>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <div className="mt-4 hidden overflow-x-auto rounded-xl border border-border lg:block">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+              <tr>{["Médicament", "Prix indicatif", "Statut public", "Interne", "Source", "Fiabilité", "Dernière mise à jour", "Mise à jour rapide"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-white">
+              {rows.map((m) => (
+                <tr key={m.id}>
+                  <td className="px-4 py-3"><p className="font-bold text-foreground">{m.medication}</p><p className="text-xs text-muted-foreground">{m.dci} · {m.form} · {m.dosage} · {m.category}</p></td>
+                  <td className="px-4 py-3"><Price amount={m.price} size="sm" variant="brand" /></td>
+                  <td className="px-4 py-3"><StatusBadge label={m.publicStatus} /></td>
+                  <td className="px-4 py-3 text-muted-foreground">Quantité interne : {m.internalQuantity ?? "Non renseignée"}. Non visible côté utilisateur.</td>
+                  <td className="px-4 py-3 text-muted-foreground">{m.dataSource}</td>
+                  <td className="px-4 py-3"><StatusBadge label={m.reliabilityLevel} /></td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDateTime(m.lastUpdatedAt)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {PUBLIC_AVAILABILITY_STATUSES.map((s) => (
+                        <ProfessionalActionButton
+                          key={s}
+                          action="quick-availability"
+                          label={s}
+                          pharmacySlug={PHARMACY_SESSION_SLUG}
+                          medicationName={m.medication}
+                          entityId={m.id}
+                          entityType="pharmacy-medication"
+                          payload={{ availabilityStatus: s, reliabilityLevel: s === "À confirmer" ? "À vérifier" : "Confirmé", dataSource: "Saisie pharmacie" }}
+                          onSuccess={() => void loadInventory()}
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-brand/20 text-xs text-brand-dark"
+                        >
+                          {s}
+                        </ProfessionalActionButton>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+          Prix indicatif, à confirmer auprès de la pharmacie. Le stock exact n’est jamais affiché côté utilisateur.
+        </p>
+      </Card>
+    </div>
   );
 }
 

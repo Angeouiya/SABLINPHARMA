@@ -100,19 +100,26 @@ async function getPharmacy(pharmacySlug?: string) {
 
 async function updateMedicationForPharmacy(input: {
   pharmacyId: string;
+  inventoryItemId?: string;
   medicationName?: string;
   availabilityStatus?: string;
   reliabilityLevel?: string;
   dataSource?: string;
 }) {
-  if (!input.medicationName) return false;
-  const item = await db.pharmacyMedication.findFirst({
-    where: {
-      pharmacyId: input.pharmacyId,
-      medication: { name: { contains: input.medicationName } },
-    },
-    include: { medication: true },
-  });
+  const item = input.inventoryItemId
+    ? await db.pharmacyMedication.findFirst({
+        where: { id: input.inventoryItemId, pharmacyId: input.pharmacyId },
+        include: { medication: true },
+      })
+    : input.medicationName
+      ? await db.pharmacyMedication.findFirst({
+          where: {
+            pharmacyId: input.pharmacyId,
+            medication: { name: { contains: input.medicationName } },
+          },
+          include: { medication: true },
+        })
+      : null;
   if (!item) return false;
 
   const availabilityStatus = (PUBLIC_AVAILABILITY_STATUSES as readonly string[]).includes(input.availabilityStatus ?? "")
@@ -252,6 +259,7 @@ export async function POST(req: NextRequest) {
     } else if (action === "quick-availability" || action === "mark-inventory-verified" || action === "publish-inventory") {
       const updated = await updateMedicationForPharmacy({
         pharmacyId: pharmacy.id,
+        inventoryItemId: body.entityType === "pharmacy-medication" ? body.entityId : undefined,
         medicationName: body.medicationName,
         availabilityStatus: body.availabilityStatus,
         reliabilityLevel: action === "mark-inventory-verified" ? "Confirmé" : body.reliabilityLevel,

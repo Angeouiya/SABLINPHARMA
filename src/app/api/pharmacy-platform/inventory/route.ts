@@ -9,7 +9,7 @@ import {
 import { hasPharmacyPermission, requirePharmacyPermission } from "@/lib/pharmacy-access";
 
 export async function GET(req: NextRequest) {
-  const access = requirePharmacyPermission(req, "update_inventory");
+  const access = requirePharmacyPermission(req, "pharmacy.inventory.read");
   if (access.response) return access.response;
 
   const { searchParams } = new URL(req.url);
@@ -22,7 +22,11 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const where = pharmacySlug ? { pharmacy: { slug: pharmacySlug } } : {};
+  const where = pharmacySlug
+    ? { pharmacy: { slug: pharmacySlug } }
+    : hasPharmacyPermission(access.role, "manage_any_inventory")
+      ? {}
+      : { pharmacy: { slug: access.session?.pharmacySlug } };
   const inventory = await db.pharmacyMedication.findMany({
     where,
     include: {
@@ -41,7 +45,7 @@ export async function GET(req: NextRequest) {
       dci: item.medication.genericName,
       dosage: item.medication.dosage,
       form: item.medication.form,
-      category: item.medication.category.name,
+      category: item.medication.category?.name ?? "Autres",
       price: item.price,
       internalQuantity: item.internalQuantity,
       privateStatus: item.availabilityStatus,
@@ -59,7 +63,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const access = requirePharmacyPermission(req, "update_inventory");
+  const access = requirePharmacyPermission(req, "pharmacy.inventory.update");
   if (access.response) return access.response;
 
   const body = await req.json();

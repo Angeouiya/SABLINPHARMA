@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUserId } from "@/lib/auth/guard";
 
+function sanitizeUserNotification<T extends { title: string; message: string; icon: string; link: string | null }>(notification: T): T {
+  const sensitivePattern = /disponible|stock faible|rupture|en stock|prix indicatif|pharmacies disponibles/i;
+  if (!sensitivePattern.test(`${notification.title} ${notification.message}`)) {
+    return notification;
+  }
+  return {
+    ...notification,
+    title: "Information avancée verrouillée",
+    message:
+      "Les disponibilités, prix détaillés et pharmacies associées nécessitent des crédits SABLIN avant affichage.",
+    icon: "Lock",
+    link: notification.link ?? "wallet",
+  };
+}
+
 export async function GET() {
   const userId = await requireUserId();
   if (!userId) {
@@ -16,32 +31,32 @@ export async function GET() {
       data: [
         {
           userId,
-          type: "success",
-          title: "Médicament disponible",
+          type: "info",
+          title: "Disponibilité verrouillée",
           message:
-            "Le Paracétamol 500 mg est disponible à la Pharmacie de la Riviera (Cocody). Prix indicatif : 150 FCFA.",
-          icon: "CheckCircle2",
+            "Connectez-vous à une fiche médicament et utilisez 1 crédit pour voir les pharmacies qui possèdent réellement le produit.",
+          icon: "Lock",
           link: "medications",
           createdAt: hoursAgo(1),
         },
         {
           userId,
           type: "warning",
-          title: "Stock faible",
+          title: "Service verrouillé",
           message:
-            "L'Amoxicilline 500 mg est en stock faible à la Pharmacie de Marcory Zone 4. Réservez rapidement.",
-          icon: "AlertTriangle",
+            "Les prix détaillés, contacts pharmacies et confirmations nécessitent des crédits SABLIN.",
+          icon: "Lock",
           link: "medications",
           createdAt: hoursAgo(3),
         },
         {
           userId,
-          type: "alert",
-          title: "Rupture confirmée",
+          type: "info",
+          title: "Coût affiché avant validation",
           message:
-            "Le Coartem est actuellement en rupture à la Pharmacie d'Abobo. Disponible dans 8 autres pharmacies.",
-          icon: "AlertTriangle",
-          link: "medications",
+            "Aucun crédit n’est débité sans confirmation claire avant une action avancée.",
+          icon: "Coins",
+          link: "wallet",
           createdAt: hoursAgo(5),
         },
         {
@@ -163,7 +178,10 @@ export async function GET() {
     take: 50,
   });
   const unread = notifications.filter((n) => !n.read).length;
-  return NextResponse.json({ notifications, unread });
+  return NextResponse.json({
+    notifications: notifications.map(sanitizeUserNotification),
+    unread,
+  });
 }
 
 export async function POST(req: NextRequest) {

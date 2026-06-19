@@ -123,7 +123,7 @@ export const FEATURE_RESTRICTIONS: Record<FeatureKey, FeatureRestriction> = {
   addMedicationToPrescription: creditFeature("addMedicationToPrescription", "Ajouter un médicament à une ordonnance", "Ajouter un médicament à l’ordonnance en cours.", 1, true),
   estimatePrescription: creditFeature("estimatePrescription", "Estimer l’ordonnance", "Obtenir le coût total estimatif et les pharmacies recommandées.", 2, true),
   bestPharmacy: creditFeature("bestPharmacy", "Trouver la meilleure pharmacie", "Identifier la pharmacie la plus pertinente.", 1, true),
-  comparePharmacies: creditFeature("comparePharmacies", "Comparer les pharmacies", "Comparer les pharmacies par disponibilité et distance.", 1, true),
+  comparePharmacies: creditFeature("comparePharmacies", "Comparer les pharmacies", "Comparer les pharmacies par disponibilité et distance.", 2, true),
   comparePharmacyPrices: creditFeature("comparePharmacyPrices", "Comparer les prix dans les pharmacies", "Comparer les prix dans les pharmacies disponibles.", 1, true),
   seePharmacyContact: creditFeature("seePharmacyContact", "Voir le contact complet d’une pharmacie", "Débloquer le numéro complet de la pharmacie.", 1),
   callPharmacy: creditFeature("callPharmacy", "Appeler une pharmacie", "Débloquer le bouton d’appel direct.", 1),

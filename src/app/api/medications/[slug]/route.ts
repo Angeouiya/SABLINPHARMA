@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentUserCreditAccess } from "@/lib/credit-gates";
 import { isOpenNow } from "@/lib/format";
 import { isPublicPharmacyMedia, publicAvailabilityStatus } from "@/lib/pharmacy-platform";
 import { buildMedicationPlaceholderUrl } from "@/lib/medication-enrichment";
@@ -38,11 +39,11 @@ export async function GET(
     include: {
       category: true,
       images: {
-        where: { validationStatus: { in: ["Validée", "Publiée"] } },
+        where: { validationStatus: "Publiée" },
         orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
       },
       descriptions: {
-        where: { validationStatus: { in: ["Validée", "Publiée"] } },
+        where: { validationStatus: "Publiée" },
         orderBy: [{ validatedAt: "desc" }, { createdAt: "desc" }],
       },
       pharmacies: {
@@ -63,8 +64,21 @@ export async function GET(
     return NextResponse.json({ error: "Médicament introuvable" }, { status: 404 });
   }
 
-  const pharmacies = med.pharmacies
-    .map((pm) => {
+  const [pharmacyAccess, pricesAccess] = await Promise.all([
+    getCurrentUserCreditAccess({
+      featureKey: "seeMedicationPharmacies",
+      entityType: "medication",
+      entityId: med.id,
+    }),
+    getCurrentUserCreditAccess({
+      featureKey: "seeDetailedPrices",
+      entityType: "medication",
+      entityId: med.id,
+    }),
+  ]);
+
+  const pharmacies = pharmacyAccess.isUnlocked
+    ? med.pharmacies.map((pm) => {
       const publicMedia = pm.pharmacy.media.filter(isPublicPharmacyMedia);
       const logo = publicMedia.find((media) => media.type === "logo");
       const facade = publicMedia.find((media) => media.type === "facade" || media.type === "exterior");
@@ -90,7 +104,8 @@ export async function GET(
       facadeUrl: facade?.url ?? null,
       coverImageUrl: cover?.url ?? null,
       publicMedia: publicMedia.map(safePharmacyMedia),
-      price: pm.price,
+      price: pricesAccess.isUnlocked ? pm.price : null,
+      priceLocked: !pricesAccess.isUnlocked,
       inStock: pm.inStock,
       availabilityStatus: publicAvailabilityStatus({
         status: pm.availabilityStatus,
@@ -107,8 +122,9 @@ export async function GET(
     })
     .sort((a, b) => {
       if (a.inStock !== b.inStock) return a.inStock ? -1 : 1;
-      return a.price - b.price;
-    });
+      return (a.price ?? Number.MAX_SAFE_INTEGER) - (b.price ?? Number.MAX_SAFE_INTEGER);
+    })
+    : [];
 
   const primaryImage = med.images.find((image) => image.validationStatus === "Publiée") ?? med.images[0];
   const placeholderUrl = buildMedicationPlaceholderUrl({
@@ -163,6 +179,8 @@ export async function GET(
     requiresRx: med.requiresRx,
     avgPrice: med.avgPrice,
     createdAt: med.createdAt,
+    pharmaciesAccess: pharmacyAccess.locked,
+    pricesAccess: pricesAccess.locked,
     pharmacies,
   });
 }

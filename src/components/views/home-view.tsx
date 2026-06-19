@@ -13,10 +13,10 @@ import {
   ShieldAlert,
   Timer,
   Wallet,
+  Lock,
 } from "lucide-react";
 import { SearchBar } from "@/components/shared/search-bar";
 import { SectionHeader } from "@/components/shared/section-header";
-import { MedicationStatusBadge } from "@/components/shared/status-badge";
 import { GoogleMap } from "@/components/shared/google-map";
 import { CreditCost } from "@/components/shared/credit-cost";
 import { CategoryIcon } from "@/components/category-icons";
@@ -41,14 +41,6 @@ const HOME_CATEGORIES: { slug: string; fallbackName: string }[] = [
   { slug: "dermatologie", fallbackName: "Peau" },
   { slug: "mere-enfant", fallbackName: "Maman" },
 ];
-
-function medStatus(med: Medication): "available" | "low-stock" | "out-of-stock" {
-  const hash = med.slug.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const pct = hash % 10;
-  if (pct < 7) return "available";
-  if (pct < 9) return "low-stock";
-  return "out-of-stock";
-}
 
 export function HomeView() {
   const { navigate } = useNav();
@@ -220,7 +212,7 @@ export function HomeView() {
               }}
             />
           </div>
-          <div className="grid gap-3 p-4 md:grid-cols-[1fr_220px]">
+          <div className="grid min-w-0 gap-3 p-3 sm:p-4 md:grid-cols-[minmax(0,1fr)_220px]">
             <div className="flex flex-col gap-2">
               {loading
                 ? Array.from({ length: 3 }).map((_, i) => (
@@ -343,41 +335,42 @@ function DutyPharmacyRow({ pharma }: { pharma: Pharmacy }) {
   return (
     <button
       onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
-      className="flex w-full items-center gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-brand/40 hover:bg-accent"
+      className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-brand/40 hover:bg-accent sm:flex sm:items-center"
     >
       <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-brand text-white">
         <Plus className="size-5" strokeWidth={3} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
-          <span className="truncate text-sm font-bold text-foreground">{pharma.name}</span>
+        <span className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
+          <span className="min-w-0 break-words text-sm font-bold leading-snug text-foreground sm:truncate">
+            {pharma.name}
+          </span>
           {pharma.isOnDuty && (
-            <Badge className="border-0 bg-warning text-[10px] text-warning-foreground">
+            <Badge className="shrink-0 border-0 bg-warning text-[10px] text-warning-foreground">
               Garde
             </Badge>
           )}
         </span>
-        <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-          <MapPin className="size-3" />
-          <span className="truncate">
+        <span className="mt-1 flex min-w-0 items-start gap-1 text-xs text-muted-foreground">
+          <MapPin className="mt-0.5 size-3 shrink-0" />
+          <span className="min-w-0 break-words leading-snug sm:truncate">
             {quartier}, {pharma.commune}
           </span>
         </span>
       </span>
-      <span className="shrink-0 text-right">
+      <span className="col-span-2 flex min-w-0 items-center justify-between gap-2 rounded-md bg-muted/30 px-2 py-1.5 text-left sm:ml-auto sm:block sm:bg-transparent sm:p-0 sm:text-right">
         <span className="block text-xs font-bold text-brand-dark">{dist} km</span>
-        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+        <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
           <Clock className="size-3" /> Ouvert
         </span>
       </span>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground sm:block" />
     </button>
   );
 }
 
 function MedicationAppRow({ med }: { med: Medication }) {
   const { navigate } = useNav();
-  const status = medStatus(med);
 
   return (
     <button
@@ -404,13 +397,15 @@ function MedicationAppRow({ med }: { med: Medication }) {
         </span>
       </span>
       <span className="hidden shrink-0 sm:block">
-        <MedicationStatusBadge status={status} />
+        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">
+          <Lock className="size-3 text-brand" /> Verrouillé
+        </span>
       </span>
       <span className="shrink-0 text-right">
         <Price amount={med.avgPrice} size="sm" variant="brand" />
-        <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
-          <MapPin className="size-3" />
-          {med.pharmacyCount ?? 0}
+        <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-semibold text-muted-foreground">
+          <Lock className="size-3 text-brand" />
+          1 crédit
         </span>
       </span>
     </button>

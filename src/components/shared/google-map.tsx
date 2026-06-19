@@ -39,10 +39,10 @@ export function GoogleMap({
   const linkUrl = `https://www.google.com/maps?q=${lat},${lng}`;
 
   return (
-    <div className={cn("overflow-hidden", className)}>
+    <div className={cn("min-w-0 overflow-hidden", className)}>
       {title && (
-        <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-4 py-2.5">
-          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+        <div className="flex flex-col gap-1 border-b border-border/60 bg-muted/30 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 break-words text-xs font-bold uppercase tracking-wide text-muted-foreground">
             {title}
           </p>
           <span className="text-[10px] text-muted-foreground">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { lockedFeaturePayload } from "@/lib/credit-gates";
 import { buildMedicationPlaceholderUrl } from "@/lib/medication-enrichment";
 
 export async function GET(req: NextRequest) {
@@ -24,16 +25,13 @@ export async function GET(req: NextRequest) {
     include: {
       category: true,
       images: {
-        where: { validationStatus: { in: ["Validée", "Publiée"] } },
+        where: { validationStatus: "Publiée" },
         orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
       },
       descriptions: {
-        where: { validationStatus: { in: ["Validée", "Publiée"] } },
+        where: { validationStatus: "Publiée" },
         orderBy: [{ validatedAt: "desc" }, { createdAt: "desc" }],
         take: 1,
-      },
-      pharmacies: {
-        include: { pharmacy: true },
       },
     },
     orderBy: { name: "asc" },
@@ -74,13 +72,13 @@ export async function GET(req: NextRequest) {
     requiresRx: m.requiresRx,
     avgPrice: m.avgPrice,
     createdAt: m.createdAt,
-    pharmacyCount: m.pharmacies.filter(
-      (pm) =>
-        pm.inStock &&
-        pm.publicationStatus === "Publiée" &&
-        pm.pharmacy.accountStatus === "Validée" &&
-        pm.pharmacy.publicationStatus === "Publiée"
-    ).length,
+    availabilityLocked: true,
+    availabilityLabel: "Disponibilité verrouillée — 1 crédit",
+    pharmacyCountLocked: true,
+    access: lockedFeaturePayload({
+      featureKey: "seeMedicationPharmacies",
+      isAuthenticated: false,
+    }),
   });
   });
 

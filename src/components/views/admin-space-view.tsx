@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   History,
   LayoutDashboard,
+  Loader2,
   LogOut,
   Pill,
   Search,
@@ -66,6 +67,7 @@ export type AdminPage =
   | "comptes-professionnels"
   | "referentiel-medicaments"
   | "enrichissement-medicaments"
+  | "moteur-marketplace"
   | "sources-licences-images"
   | "imports"
   | "synchronisations"
@@ -73,6 +75,7 @@ export type AdminPage =
   | "utilisateurs"
   | "utilisateur-detail"
   | "credits-transactions"
+  | "payments-fraud"
   | "demandes-utilisateurs"
   | "qualite-donnees"
   | "historique"
@@ -97,12 +100,14 @@ const adminNavItems: { page: AdminPage; label: string; icon: typeof LayoutDashbo
   { page: "utilisateurs", label: "Utilisateurs", icon: Users, href: "/admin/utilisateurs" },
   { page: "referentiel-medicaments", label: "Référentiel médicaments", icon: Pill, href: "/admin/referentiel-medicaments" },
   { page: "enrichissement-medicaments", label: "Enrichissement", icon: Database, href: "/admin/enrichissement-medicaments" },
+  { page: "moteur-marketplace", label: "Moteur Marketplace", icon: Database, href: "/admin/moteur-marketplace" },
   { page: "sources-licences-images", label: "Sources images", icon: ShieldCheck, href: "/admin/sources-licences-images" },
   { page: "imports", label: "Imports", icon: FileSpreadsheet, href: "/admin/imports" },
   { page: "synchronisations", label: "Synchronisations", icon: Database, href: "/admin/synchronisations" },
   { page: "qualite-donnees", label: "Qualité données", icon: Database, href: "/admin/qualite-donnees" },
   { page: "demandes-utilisateurs", label: "Demandes utilisateurs", icon: ClipboardList, href: "/admin/demandes-utilisateurs" },
   { page: "credits-transactions", label: "Crédits & transactions", icon: WalletCards, href: "/admin/credits-transactions" },
+  { page: "payments-fraud", label: "Paiements & fraudes", icon: ShieldCheck, href: "/admin/paiements-fraudes" },
   { page: "historique", label: "Historique", icon: History, href: "/admin/historique" },
   { page: "administrateurs", label: "Administrateurs", icon: ShieldCheck, href: "/admin/administrateurs" },
   { page: "parametres", label: "Paramètres", icon: Settings, href: "/admin/parametres" },
@@ -433,9 +438,21 @@ function GlobalAdminImports() {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
-  const uploadImport = async () => {
+  const [preview, setPreview] = useState<{
+    totalRows: number;
+    validRows: number;
+    incompleteRows: number;
+    invalidRows: number;
+    recognizedMedications: number;
+    unknownMedications: number;
+    duplicateRows: number;
+    missingPrices: number;
+    invalidStatuses: number;
+    detectedColumns?: Record<string, string>;
+  } | null>(null);
+  const previewImport = async () => {
     if (!file) {
-      setMessage("Choisissez un fichier CSV, XLS ou XLSX.");
+      setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
       return;
     }
     setUploading(true);
@@ -444,11 +461,35 @@ function GlobalAdminImports() {
       const form = new FormData();
       form.set("pharmacySlug", pharmacySlug);
       form.set("file", file);
-      const res = await fetch("/api/pharmacy-platform/imports", { method: "POST", headers: { "X-Sablin-Session-Kind": "admin" }, body: form });
+      const res = await fetch("/api/imports/preview", { method: "POST", headers: { "X-Sablin-Session-Kind": "admin" }, body: form });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Aperçu impossible.");
+      setPreview(data);
+      setMessage(`Aperçu prêt : ${data.totalRows} ligne(s), ${data.recognizedMedications} reconnue(s), ${data.unknownMedications} à valider.`);
+    } catch (error) {
+      setPreview(null);
+      setMessage(error instanceof Error ? error.message : "Aperçu impossible.");
+    } finally {
+      setUploading(false);
+    }
+  };
+  const uploadImport = async () => {
+    if (!file) {
+      setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
+      return;
+    }
+    setUploading(true);
+    setMessage("");
+    try {
+      const form = new FormData();
+      form.set("pharmacySlug", pharmacySlug);
+      form.set("file", file);
+      const res = await fetch("/api/imports/confirm", { method: "POST", headers: { "X-Sablin-Session-Kind": "admin" }, body: form });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Import impossible.");
       setMessage(`Rapport généré : ${data.report.validRows} valide(s), ${data.report.invalidRows} à vérifier, ${data.report.unknownMedications} non reconnu(s).`);
       setFile(null);
+      setPreview(data.report);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import impossible.");
     } finally {
@@ -459,19 +500,32 @@ function GlobalAdminImports() {
     <div className="space-y-5">
       <Card className="border-border/70 p-5 shadow-card">
         <Heading level="h2">Imports globaux</Heading>
-        <Muted>Imports inventaire, photos publiques, photos des locaux et documents administratifs pour toutes les pharmacies.</Muted>
+        <Muted>Imports inventaire multi-format : CSV, Excel, Word et PowerPoint. Les données non reconnues restent bloquées avant validation Admin.</Muted>
         <div className="mt-4 max-w-xl">
           <Label className="text-xs font-extrabold text-foreground">Pharmacie cible</Label>
           <select value={pharmacySlug} onChange={(e) => setPharmacySlug(e.target.value)} className="mt-2 h-11 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
             {adminPharmacies.map((pharmacy) => <option key={pharmacy.slug} value={pharmacy.slug}>{pharmacy.name}</option>)}
           </select>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
-          <Input type="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
+          <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); }} />
           <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate(`modele-import-${pharmacySlug}.csv`)}>Télécharger modèle Excel</Button>
-          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading}>{uploading ? "Import..." : "Importer fichier"}</Button>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Aperçu avant validation"}</Button>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading}>{uploading ? "Import..." : "Valider import"}</Button>
         </div>
         {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+        {preview && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat label="Lignes détectées" value={preview.totalRows} badge="Aperçu" />
+            <Stat label="Lignes valides" value={preview.validRows} badge="Confirmé" />
+            <Stat label="À corriger" value={preview.incompleteRows + preview.invalidRows} badge="À vérifier" />
+            <Stat label="Médicaments non reconnus" value={preview.unknownMedications} badge="Validation Admin" />
+            <Stat label="Doublons" value={preview.duplicateRows} badge="Conflit" />
+            <Stat label="Prix manquants" value={preview.missingPrices} badge="À compléter" />
+            <Stat label="Statuts invalides" value={preview.invalidStatuses} badge="Normalisation" />
+            <Stat label="Médicaments reconnus" value={preview.recognizedMedications} badge="Référentiel" />
+          </div>
+        )}
       </Card>
       <AdminMediaUploadPanel pharmacySlug={pharmacySlug} />
       <SimpleAdmin title="Imports inventaire et contrôles" items={["Import pharmacie Cocody", "Import admin Plateau", "Import avec erreurs", "Import corrigé", "Médicaments non reconnus", "Prix manquants", "Statuts invalides"]} />
@@ -1200,7 +1254,8 @@ type EnrichmentData = {
     originalJson: string;
     normalizedJson: string;
     pharmacy?: { name: string; slug: string };
-    medication?: { name: string; slug: string; dosage: string; form: string } | null;
+    enrichmentRequired?: boolean;
+    medication?: { id: string; name: string; slug: string; dosage: string; form: string } | null;
   }>;
   jobs?: Array<{ id: string; status: string; provider: string; query: string; confidenceScore: number }>;
   candidates?: Array<{
@@ -1210,18 +1265,23 @@ type EnrichmentData = {
     status: string;
     licenseType?: string | null;
     sourceName?: string | null;
+    sourceUrl?: string | null;
     imageUrl?: string | null;
+    job?: { medicationId?: string | null; medication?: { id: string; name: string } | null } | null;
     proposedMedication?: { name: string; dosage: string; form: string } | null;
   }>;
   images?: Array<{
     id: string;
     url: string;
+    sourceUrl?: string | null;
+    confidenceScore?: number;
     sourceName: string;
     licenseType: string;
     validationStatus: string;
     imageType: string;
     isPlaceholder: boolean;
-    medication: { name: string; dosage: string; form: string };
+    commercialUseAllowed?: boolean;
+    medication: { id: string; name: string; dosage: string; form: string };
   }>;
   descriptions?: Array<{
     id: string;
@@ -1231,6 +1291,21 @@ type EnrichmentData = {
     medication: { name: string };
   }>;
   providers?: Array<{ id: string; name: string; providerType: string; active: boolean; priority: number; lastErrorMessage?: string | null }>;
+  externalEnrichment?: {
+    externalEnrichmentEnabled: boolean;
+    googleApiConfigured: boolean;
+    googleSearchEngineConfigured: boolean;
+    providerStatus: "active" | "disabled" | "misconfigured";
+    mode: "google_web" | "internal_fallback";
+    modeLabel: string;
+    reason: string;
+    dailyLimit: number;
+    confidenceThreshold: number;
+    lastTest?: { status: string; at: string | null; message: string };
+    lastError?: string | null;
+    lastErrorAt?: string | null;
+    adminMessage?: string;
+  };
 };
 
 function EnrichmentAdmin({ licenseOnly = false }: { licenseOnly?: boolean }) {
@@ -1361,6 +1436,363 @@ function EnrichmentAdmin({ licenseOnly = false }: { licenseOnly?: boolean }) {
   );
 }
 
+function ExternalEnrichmentStatusCard({
+  status,
+  onRefresh,
+  onTest,
+  onRelaunch,
+}: {
+  status?: EnrichmentData["externalEnrichment"];
+  onRefresh: () => void;
+  onTest: () => void;
+  onRelaunch: () => void;
+}) {
+  const enabled = status?.providerStatus === "active";
+  const modeLabel = status?.modeLabel ?? "Fallback interne";
+  return (
+    <Card className="border-border/70 bg-white p-5 shadow-card">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <Badge className={cn("border-0 text-white", enabled ? "bg-brand" : "bg-amber-600")}>
+            État de l’enrichissement externe
+          </Badge>
+          <Heading level="h3" className="mt-3">Google/Web côté serveur</Heading>
+          <Muted>
+            {status?.adminMessage ??
+              "L’enrichissement Google/Web est prêt côté serveur, mais il fonctionne actuellement en mode fallback interne/placeholder. Configurez GOOGLE_SEARCH_API_KEY, GOOGLE_SEARCH_ENGINE_ID et ENABLE_EXTERNAL_ENRICHMENT=true pour activer les recherches externes."}
+          </Muted>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={onRefresh}>Actualiser</Button>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={onTest}>Tester la configuration</Button>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={onRelaunch}>Relancer l’enrichissement</Button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Enrichissement externe</p>
+          <p className="mt-1 font-extrabold text-foreground">{enabled ? "Activé" : "Désactivé"}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Google API Key</p>
+          <p className="mt-1 font-extrabold text-foreground">{status?.googleApiConfigured ? "Configurée" : "Manquante"}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Google Search Engine ID</p>
+          <p className="mt-1 font-extrabold text-foreground">{status?.googleSearchEngineConfigured ? "Configuré" : "Manquant"}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Mode actuel</p>
+          <p className="mt-1 font-extrabold text-foreground">{modeLabel}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-lg border border-border bg-white p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Dernier test</p>
+          <p className="mt-1 text-sm font-bold text-foreground">{status?.lastTest?.message ?? "Non exécuté."}</p>
+          {status?.lastTest?.at && <p className="mt-1 text-xs text-muted-foreground">{new Date(status.lastTest.at).toLocaleString("fr-FR")}</p>}
+        </div>
+        <div className="rounded-lg border border-border bg-white p-3">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Dernière erreur</p>
+          <p className="mt-1 text-sm font-bold text-foreground">{status?.lastError || status?.reason || "Aucune erreur."}</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function MarketplaceEngineAdmin() {
+  const [data, setData] = useState<EnrichmentData>({});
+  const [jobs, setJobs] = useState<Array<{ id: string; status: string; query: string; confidenceScore: number; candidates?: unknown[]; medication?: { name: string } | null }>>([]);
+  const [tab, setTab] = useState("Imports récents");
+  const [message, setMessage] = useState("");
+  const tabs = [
+    "Imports récents",
+    "Produits reconnus",
+    "Produits à enrichir",
+    "Images candidates",
+    "Descriptions à valider",
+    "Produits sans image",
+    "Produits prêts à publier",
+  ];
+
+  const load = useCallback(async () => {
+    const [enrichmentRes, jobsRes] = await Promise.all([
+      fetch("/api/medication-enrichment", { headers: { "X-Sablin-Session-Kind": "admin" } }),
+      fetch("/api/enrichment/jobs", { headers: { "X-Sablin-Session-Kind": "admin" } }),
+    ]);
+    const enrichmentJson = await enrichmentRes.json().catch(() => ({}));
+    const jobsJson = await jobsRes.json().catch(() => ({}));
+    if (enrichmentRes.ok) setData(enrichmentJson);
+    if (jobsRes.ok) setJobs(jobsJson.jobs ?? []);
+    if (!enrichmentRes.ok || !jobsRes.ok) setMessage(enrichmentJson.error ?? jobsJson.error ?? "Chargement moteur impossible.");
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const startEnrichment = async () => {
+    setMessage("");
+    const importRowIds = (data.rows ?? [])
+      .filter((row) => row.medication?.id || row.matchScore >= 60)
+      .slice(0, 20)
+      .map((row) => row.id);
+    const medicationIds = (data.rows ?? [])
+      .map((row) => row.medication?.id)
+      .filter(Boolean);
+    const res = await fetch("/api/enrichment/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+      body: JSON.stringify({ importRowIds, medicationIds }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setMessage(res.ok ? `${json.count ?? 0} job(s) d’enrichissement lancé(s).` : json.error ?? "Lancement impossible.");
+    if (res.ok) await load();
+  };
+
+  const postAction = async (url: string, payload: Record<string, unknown>, success: string) => {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    setMessage(res.ok ? success : json.error ?? "Action impossible.");
+    if (res.ok) await load();
+  };
+
+  const patchEnrichmentAction = async (payload: Record<string, unknown>, success: string) => {
+    const res = await fetch("/api/medication-enrichment", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => ({}));
+    setMessage(res.ok ? success : json.error ?? "Action impossible.");
+    if (res.ok) await load();
+  };
+
+  const testExternalConfig = async () => {
+    const res = await fetch("/api/enrichment/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+      body: JSON.stringify({ action: "test" }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setMessage(res.ok ? json.message ?? "Configuration testée." : json.error ?? "Test impossible.");
+    if (json.status) setData((current) => ({ ...current, externalEnrichment: json.status }));
+    await load();
+  };
+
+  const rows = data.rows ?? [];
+  const candidates = data.candidates ?? [];
+  const images = data.images ?? [];
+  const descriptions = data.descriptions ?? [];
+  const recognizedRows = rows.filter((row) => row.medication && row.matchScore >= 80);
+  const enrichRows = rows.filter((row) => row.enrichmentRequired || row.matchScore < 80);
+  const imageCandidates = candidates.filter((candidate) => candidate.candidateType === "image");
+  const productsWithoutImage = rows.filter((row) => row.medication && !images.some((image) => image.medication.name === row.medication?.name));
+  const readyToPublish = rows.filter((row) => row.medication && row.matchScore >= 95);
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Badge className="border-0 bg-brand text-white">Moteur Marketplace & Enrichissement</Badge>
+            <Heading level="h2" className="mt-3">Marketplace médicaments sans vente directe</Heading>
+            <Muted>Import CSV, Excel, Word et PowerPoint, normalisation, référentiel, images, descriptions, licence et publication contrôlée côté utilisateur.</Muted>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load}>Actualiser</Button>
+            <Button className="bg-brand text-white hover:bg-brand-dark" onClick={startEnrichment}>Lancer enrichissement</Button>
+          </div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat label="Lignes importées" value={rows.length} badge="Imports" />
+          <Stat label="Produits reconnus" value={recognizedRows.length} badge="Référentiel" />
+          <Stat label="Jobs enrichissement" value={jobs.length} badge="Asynchrone" />
+          <Stat label="Images à valider" value={images.filter((image) => image.validationStatus !== "Publiée").length + imageCandidates.length} badge="Licence" />
+          <Stat label="Descriptions" value={descriptions.length} badge="Validation" />
+          <Stat label="Sans image" value={productsWithoutImage.length} badge="Placeholder" />
+          <Stat label="Prêts à publier" value={readyToPublish.length} badge="Publication" />
+          <Stat label="Règle publique" value="0 vente" badge="Information" />
+        </div>
+      </Card>
+
+      <ExternalEnrichmentStatusCard
+        status={data.externalEnrichment}
+        onRefresh={load}
+        onTest={testExternalConfig}
+        onRelaunch={startEnrichment}
+      />
+
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {tabs.map((item) => (
+          <button
+            key={item}
+            onClick={() => setTab(item)}
+            className={cn(
+              "shrink-0 rounded-lg border px-3 py-2 text-xs font-extrabold",
+              tab === item ? "border-brand bg-brand text-white" : "border-border bg-white text-foreground"
+            )}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+
+      {tab === "Imports récents" && (
+        <SectionBlock title="Imports récents" description="Chaque ligne garde sa valeur originale, sa valeur normalisée, sa source et son score de confiance.">
+          <div className="grid gap-3 md:grid-cols-2">
+            {rows.slice(0, 12).map((row) => (
+              <Card key={row.id} className="border-border/70 p-4">
+                <div className="flex flex-wrap gap-2"><StatusBadge label={row.matchLevel} /><StatusBadge label={row.status} /></div>
+                <p className="mt-2 font-bold text-foreground">Ligne {row.lineNumber} · Score {row.matchScore}/100</p>
+                <p className="text-sm text-muted-foreground">{row.pharmacy?.name ?? "Pharmacie"} · {row.medication?.name ?? "À valider dans le référentiel"}</p>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+      )}
+
+      {tab === "Produits reconnus" && (
+        <SectionBlock title="Produits reconnus" description="Les correspondances exactes peuvent alimenter la marketplace après contrôle des données pharmacie.">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {recognizedRows.slice(0, 12).map((row) => (
+              <Card key={row.id} className="border-border/70 p-4">
+                <StatusBadge label="Reconnu" />
+                <p className="mt-2 font-bold text-foreground">{row.medication?.name}</p>
+                <p className="text-sm text-muted-foreground">{row.medication?.dosage} · {row.medication?.form} · Score {row.matchScore}/100</p>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+      )}
+
+      {tab === "Produits à enrichir" && (
+        <SectionBlock title="Produits à enrichir" description="Les cas ambigus restent en validation individuelle.">
+          <div className="grid gap-3 md:grid-cols-2">
+            {enrichRows.slice(0, 12).map((row) => (
+              <Card key={row.id} className="border-border/70 p-4">
+                <StatusBadge label={row.matchLevel} />
+                <p className="mt-2 font-bold text-foreground">{row.medication?.name ?? "Produit non reconnu"}</p>
+                <p className="text-sm text-muted-foreground">Score {row.matchScore}/100 · publication bloquée avant validation.</p>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+      )}
+
+      {tab === "Images candidates" && (
+        <SectionBlock title="Images candidates" description="Une image web avec licence inconnue ne doit pas être publiée côté utilisateur.">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {images.slice(0, 12).map((image) => (
+              <Card key={image.id} className="overflow-hidden border-border/70">
+                <div className="h-36 bg-muted/30"><img src={image.url} alt={image.medication.name} className="h-full w-full object-cover" /></div>
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-2"><StatusBadge label={image.validationStatus} /><StatusBadge label={image.licenseType} /></div>
+                  <p className="mt-2 font-bold text-foreground">{image.medication.name}</p>
+                  <p className="text-sm text-muted-foreground">{image.sourceName} · {image.imageType}</p>
+                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    <p>Score : {image.confidenceScore ?? 0}/100</p>
+                    <p>Licence : {image.commercialUseAllowed ? "Usage autorisé" : "À vérifier"}</p>
+                    {image.sourceUrl && (
+                      <a href={image.sourceUrl} target="_blank" rel="noreferrer" className="block break-words font-bold text-brand-dark">
+                        Source image
+                      </a>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => postAction("/api/enrichment/validate-image", { imageId: image.id, commercialUseAllowed: true }, "Image validée.")}>Valider licence</Button>
+                    <Button size="sm" className="bg-brand text-white" onClick={() => postAction("/api/enrichment/publish", { imageId: image.id }, "Image publiée.")}>Publier</Button>
+                    <Button size="sm" variant="outline" className="border-red-300 text-red-700" onClick={() => postAction("/api/enrichment/reject-image", { imageId: image.id }, "Image refusée.")}>Refuser</Button>
+                    <Button size="sm" variant="outline" onClick={() => patchEnrichmentAction({ action: "use-placeholder", medicationId: image.medication.id }, "Placeholder SABLIN PHARMA utilisé.")}>Utiliser placeholder</Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+            {imageCandidates.slice(0, 12).map((candidate) => (
+              <Card key={candidate.id} className="overflow-hidden border-border/70">
+                <div className="h-36 bg-muted/30">
+                  {candidate.imageUrl ? (
+                    <img src={candidate.imageUrl} alt={candidate.sourceName ?? "Image candidate"} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center p-4 text-center text-sm font-bold text-muted-foreground">Image du produit non disponible</div>
+                  )}
+                </div>
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-2"><StatusBadge label={candidate.status} /><StatusBadge label={candidate.licenseType ?? "Licence à confirmer"} /></div>
+                  <p className="mt-2 font-bold text-foreground">{candidate.sourceName ?? "Source web"}</p>
+                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    <p>Score : {candidate.score}/100</p>
+                    <p>Statut validation : À vérifier</p>
+                    {candidate.sourceUrl && (
+                      <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" className="block break-words font-bold text-brand-dark">
+                        URL source
+                      </a>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" className="border-red-300 text-red-700" onClick={() => postAction("/api/enrichment/reject-image", { candidateId: candidate.id }, "Image candidate refusée.")}>Refuser</Button>
+                    <Button size="sm" variant="outline" onClick={() => patchEnrichmentAction({ action: "use-placeholder", candidateId: candidate.id }, "Placeholder SABLIN PHARMA utilisé.")}>Utiliser placeholder</Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+            {!images.length && !imageCandidates.length && (
+              <Card className="border-border/70 p-5 text-sm font-bold text-muted-foreground">
+                Aucun candidat image à traiter. Les produits sans image fiable utilisent le placeholder SABLIN PHARMA.
+              </Card>
+            )}
+          </div>
+        </SectionBlock>
+      )}
+
+      {tab === "Descriptions à valider" && (
+        <SectionBlock title="Descriptions à valider" description="Descriptions neutres, sans posologie personnalisée ni promesse médicale.">
+          <div className="grid gap-3 md:grid-cols-2">
+            {descriptions.slice(0, 10).map((description) => (
+              <Card key={description.id} className="border-border/70 p-4">
+                <StatusBadge label={description.validationStatus} />
+                <p className="mt-2 font-bold text-foreground">{description.medication.name}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{description.shortText}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => postAction("/api/enrichment/validate-description", { descriptionId: description.id }, "Description validée.")}>Valider</Button>
+                  <Button size="sm" className="bg-brand text-white" onClick={() => postAction("/api/enrichment/publish", { descriptionId: description.id }, "Description publiée.")}>Publier</Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+      )}
+
+      {(tab === "Produits sans image" || tab === "Produits prêts à publier") && (
+        <SectionBlock title={tab} description="Les produits sans image fiable utilisent un placeholder SABLIN PHARMA propre et transparent.">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {(tab === "Produits sans image" ? productsWithoutImage : readyToPublish).slice(0, 12).map((row) => (
+              <Card key={row.id} className="border-border/70 p-4">
+                <StatusBadge label={tab === "Produits sans image" ? "Placeholder" : "Prêt à publier"} />
+                <p className="mt-2 font-bold text-foreground">{row.medication?.name ?? "Produit"}</p>
+                <p className="text-sm text-muted-foreground">Score {row.matchScore}/100 · {row.medication?.dosage} · {row.medication?.form}</p>
+                {row.medication?.id && (
+                  <Button size="sm" className="mt-3 bg-brand text-white" onClick={() => postAction("/api/enrichment/publish", { medicationId: row.medication?.id }, "Produit publié.")}>
+                    Publier produit
+                  </Button>
+                )}
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+      )}
+    </div>
+  );
+}
+
 function UsersList() {
   return (
     <Card className="border-border/70 p-5 shadow-card">
@@ -1433,6 +1865,164 @@ function Transactions() {
         {rows.map((row, index) => <Card key={row} className="border-border/70 p-4"><StatusBadge label={index === 4 ? "Échoué" : "Réussi"} /><p className="mt-3 font-bold text-foreground">{row}</p><p className="text-sm text-muted-foreground">Utilisateur · {index + 1} crédit(s) · 100 FCFA · Solde avant/après · Référence SB-{index + 101}</p></Card>)}
       </div>
     </Card>
+  );
+}
+
+type AdminPaymentRow = {
+  reference: string;
+  providerReference?: string | null;
+  user: string;
+  amount: number;
+  productType: string;
+  expectedCredits: number;
+  provider: string;
+  status: string;
+  statusLabel: string;
+  riskStatus: string;
+  riskReasons?: string | null;
+  createdAt: string;
+  expiresAt?: string | null;
+};
+
+function PaymentsFraud() {
+  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [payments, setPayments] = useState<AdminPaymentRow[]>([]);
+  const [filter, setFilter] = useState("");
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/payments/reconcile", { headers: { "x-sablin-session-kind": "admin" } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Chargement impossible");
+      setSummary(data.summary ?? {});
+      setPayments(data.payments ?? []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Erreur de chargement");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const action = async (endpoint: string, body: Record<string, unknown>) => {
+    setMessage("");
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMessage(res.ok ? "Action enregistrée." : data.error ?? data.message ?? "Action refusée.");
+    await load();
+  };
+
+  const visiblePayments = payments.filter((payment) => {
+    const q = filter.toLowerCase().trim();
+    if (!q) return true;
+    return [payment.reference, payment.user, payment.provider, payment.status, payment.riskStatus]
+      .join(" ")
+      .toLowerCase()
+      .includes(q);
+  });
+
+  const cards = [
+    ["Paiements totaux", summary.total ?? 0, "Tous statuts"],
+    ["Confirmés", summary.success ?? 0, "SUCCESS"],
+    ["En attente", summary.pending ?? 0, "À vérifier"],
+    ["Échoués", summary.failed ?? 0, "Bloqués"],
+    ["Expirés", summary.expired ?? 0, "Sans crédit"],
+    ["Suspects", summary.suspicious ?? 0, "Fraude"],
+    ["Vérification manuelle", summary.manualReview ?? 0, "Finance"],
+  ];
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <Heading level="h2">Paiements & Fraudes</Heading>
+            <Muted>
+              Supervision des intentions, webhooks, statuts prestataires, risques, remboursements et validations manuelles.
+              Aucun crédit ni Pass n’est activé sans statut SUCCESS côté serveur.
+            </Muted>
+          </div>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={load} disabled={loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+            Actualiser
+          </Button>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {cards.map(([label, value, badge]) => (
+            <Stat key={label} label={String(label)} value={value} badge={String(badge)} />
+          ))}
+        </div>
+        <div className="mt-4 rounded-lg border border-warning/30 bg-warning-light px-3 py-2 text-sm font-medium text-warning-foreground">
+          Les captures d’écran ne valident jamais un paiement. Toute validation manuelle exige un rôle FINANCE_ADMIN ou SUPER_ADMIN, un motif et la saisie “VALIDER”.
+        </div>
+      </Card>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrer par référence, utilisateur, statut, risque..." />
+          <Button variant="outline" onClick={() => setFilter("")}>Réinitialiser</Button>
+        </div>
+        {message && (
+          <div className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-semibold text-foreground">
+            {message}
+          </div>
+        )}
+        <div className="mt-4 grid gap-3">
+          {visiblePayments.map((payment) => (
+            <Card key={payment.reference} className="border-border/70 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="break-words font-mono text-sm font-extrabold text-foreground">{payment.reference}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {payment.user} · {payment.provider.toUpperCase()} · {payment.amount.toLocaleString("fr-FR")} FCFA
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {payment.productType === "pass_ordonnance" ? "Pass Ordonnance Unique" : `${payment.expectedCredits} crédits`} ·
+                    Réf. prestataire : {payment.providerReference ?? "En attente"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <StatusBadge label={payment.statusLabel} />
+                  <StatusBadge label={payment.riskStatus} />
+                </div>
+              </div>
+              {payment.riskReasons && (
+                <p className="mt-3 rounded-lg bg-danger-light px-3 py-2 text-xs font-semibold text-danger">
+                  {payment.riskReasons}
+                </p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => action("/api/payments/reconcile", { reference: payment.reference })}>
+                  Vérifier prestataire
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => action("/api/payments/manual-review", { reference: payment.reference, reason: "Analyse manuelle demandée depuis le tableau anti-fraude." })}>
+                  Revue manuelle
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => action("/api/payments/refund", { reference: payment.reference, reason: "Remboursement demandé depuis Paiements & Fraudes." })}>
+                  Rembourser
+                </Button>
+              </div>
+            </Card>
+          ))}
+          {!loading && visiblePayments.length === 0 && (
+            <Card className="border-border/70 p-6 text-center">
+              <p className="font-bold text-foreground">Aucun paiement trouvé</p>
+              <p className="text-sm text-muted-foreground">Modifiez vos filtres ou actualisez la réconciliation.</p>
+            </Card>
+          )}
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -1579,6 +2169,7 @@ export function AdminSpaceView({ page, pharmacyId, userId }: { page: AdminPage; 
       {page === "comptes-professionnels" && <ProfessionalAccounts />}
       {page === "referentiel-medicaments" && <Reference />}
       {page === "enrichissement-medicaments" && <EnrichmentAdmin />}
+      {page === "moteur-marketplace" && <MarketplaceEngineAdmin />}
       {page === "sources-licences-images" && <EnrichmentAdmin licenseOnly />}
       {page === "imports" && <GlobalAdminImports />}
       {page === "synchronisations" && <InventorySyncPanel kind="admin" />}
@@ -1586,6 +2177,7 @@ export function AdminSpaceView({ page, pharmacyId, userId }: { page: AdminPage; 
       {page === "utilisateurs" && <UsersList />}
       {page === "utilisateur-detail" && <UserDetail userId={userId} />}
       {page === "credits-transactions" && <Transactions />}
+      {page === "payments-fraud" && <PaymentsFraud />}
       {page === "demandes-utilisateurs" && <ProfessionalRequestsPanel kind="admin" />}
       {page === "qualite-donnees" && <Quality />}
       {page === "historique" && <SimpleAdmin title="Historique global" items={["Action utilisateur", "Action pharmacie", "Action admin", "Import", "Validation", "Suspension", "Transaction"]} />}

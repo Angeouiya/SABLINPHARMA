@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth/session";
 import { PASS_ORDONNANCE_PRICE } from "@/lib/restrictions";
+import { createPaymentIntent } from "@/lib/payment-security";
+import { db } from "@/lib/db";
 
 // Achat du Pass Ordonnance Unique (500 FCFA) — valable pour une seule ordonnance. Expire après utilisation.
 const PASS_PRICE = PASS_ORDONNANCE_PRICE;
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json().catch(() => ({}));
-    const provider = typeof body.provider === "string" ? body.provider : "orange";
+    const provider = typeof body.provider === "string" ? body.provider : "paydunya";
 
     // Vérifier qu'il n'a pas déjà un pass actif
     const existing = await db.passOrdonnance.findFirst({
@@ -26,52 +27,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Créer le pass
-    const pass = await db.passOrdonnance.create({
-      data: {
-        userId: user.id,
-        active: true,
-        status: "active",
-        price: PASS_PRICE,
-      },
-    });
-
-    // Enregistrer le paiement
-    await db.payment.create({
-      data: {
-        userId: user.id,
-        amount: PASS_PRICE,
-        method: "mobile_money",
-        provider,
-        reference: `SPL-PASS-${Date.now()}`,
-        status: "success",
-      },
-    });
-
-    // Transaction crédit (type "pass", amount 0 car pas de crédits ajoutés)
-    const fullUser = await db.user.findUnique({
-      where: { id: user.id },
-      select: { credits: true },
-    });
-    const balance = fullUser?.credits ?? 0;
-    await db.creditTransaction.create({
-      data: {
-        userId: user.id,
-        type: "pass",
-        amount: 0,
-        description: `Pass Ordonnance Unique — ${PASS_PRICE} FCFA (${provider})`,
-        fcfaEquivalent: PASS_PRICE,
-        balanceBefore: balance,
-        balanceAfter: balance,
-        status: "réussi",
-      },
+    const result = await createPaymentIntent({
+      userId: user.id,
+      purchaseType: "pass_ordonnance",
+      amount: PASS_PRICE,
+      provider,
+      idempotencyKey: req.headers.get("x-idempotency-key") ?? body.idempotencyKey,
+      req,
+      metadata: body,
     });
 
     return NextResponse.json({
       success: true,
-      pass,
-      hasPass: true,
+      pending: true,
+      reference: result.payment.reference,
+      checkoutUrl: result.checkoutUrl,
+      status: result.payment.status,
+      hasPass: false,
       price: PASS_PRICE,
+      message: "Paiement en cours de vérification. Le Pass sera activé uniquement après confirmation officielle.",
     });
   } catch {
     return NextResponse.json({ error: "Erreur" }, { status: 500 });

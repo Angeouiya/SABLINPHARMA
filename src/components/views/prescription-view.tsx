@@ -10,12 +10,10 @@ import {
   Trash2,
   Pencil,
   CheckCircle2,
-  XCircle,
-  HelpCircle,
   Crown,
   ShieldAlert,
   Pill,
-  MapPin,
+  Lock,
   X,
   Loader2,
   Calculator,
@@ -23,7 +21,6 @@ import {
   RotateCcw,
   ArrowRight,
   Info,
-  AlertTriangle,
   Store,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -108,23 +105,6 @@ interface EstimateResult {
   totalMax: number;
   availablePharmacies: number;
 }
-
-// Deterministic status for cart items
-function itemStatus(item: CartItem): "available" | "low-stock" | "to-confirm" | "out-of-stock" {
-  if (item.pharmacyCount === 0) return "out-of-stock";
-  const hash = item.slug.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const pct = hash % 10;
-  if (pct < 6) return "available";
-  if (pct < 9) return "low-stock";
-  return "to-confirm";
-}
-
-const STATUS_CONFIG = {
-  available: { label: "Disponible", icon: CheckCircle2, className: "bg-success-light text-success" },
-  "low-stock": { label: "Stock faible", icon: AlertTriangle, className: "bg-warning-light text-warning-foreground" },
-  "to-confirm": { label: "À confirmer", icon: HelpCircle, className: "bg-neutral-light text-neutral-foreground" },
-  "out-of-stock": { label: "Rupture", icon: XCircle, className: "bg-danger-light text-danger" },
-} as const;
 
 export function PrescriptionView() {
   const { navigate } = useNav();
@@ -317,11 +297,7 @@ export function PrescriptionView() {
     const total = items.length;
     const totalUnits = items.reduce((s, it) => s + it.quantity, 0);
     const totalCost = items.reduce((s, it) => s + it.avgPrice * it.quantity, 0);
-    const available = items.filter((i) => itemStatus(i) === "available").length;
-    const lowStock = items.filter((i) => itemStatus(i) === "low-stock").length;
-    const toConfirm = items.filter((i) => itemStatus(i) === "to-confirm").length;
-    const outStock = items.filter((i) => itemStatus(i) === "out-of-stock").length;
-    return { total, totalUnits, totalCost, available, lowStock, toConfirm, outStock };
+    return { total, totalUnits, totalCost };
   }, [items]);
 
   const canUsePrescription = !!user && (credits > 0 || hasPass);
@@ -729,9 +705,6 @@ export function PrescriptionView() {
             ) : (
               <div className="space-y-2.5">
                 {items.map((item, idx) => {
-                  const status = itemStatus(item);
-                  const sc = STATUS_CONFIG[status];
-                  const StatusIcon = sc.icon;
                   return (
                     <Card
                       key={item.slug}
@@ -775,13 +748,8 @@ export function PrescriptionView() {
                                 <ShieldAlert className="size-2.5" /> Rx
                               </Badge>
                             )}
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold",
-                                sc.className
-                              )}
-                            >
-                              <StatusIcon className="size-2.5" /> {sc.label}
+                            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">
+                              <Lock className="size-2.5 text-brand" /> Disponibilité verrouillée
                             </span>
                           </div>
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -831,7 +799,7 @@ export function PrescriptionView() {
                           )}
                           {item.avgPrice > 0 && (
                             <p className="text-[10px] text-muted-foreground">
-                              {item.pharmacyCount} pharmacies
+                              Comparaison verrouillée
                             </p>
                           )}
                         </div>
@@ -881,10 +849,8 @@ export function PrescriptionView() {
             <div className="mt-4 grid grid-cols-2 gap-2">
               <StatBox label="Médicaments" value={stats.total} tone="brand" />
               <StatBox label="Unités" value={stats.totalUnits} tone="neutral" />
-              <StatBox label="Disponibles" value={stats.available} tone="success" />
-              <StatBox label="Stock faible" value={stats.lowStock} tone="warning" />
-              <StatBox label="À confirmer" value={stats.toConfirm} tone="info" />
-              <StatBox label="Rupture" value={stats.outStock} tone="danger" />
+              <StatBox label="Disponibilité" value="Verrouillée" tone="neutral" />
+              <StatBox label="Comparaison" value="Payante" tone="brand" />
             </div>
 
             {/* Total cost */}
@@ -1110,7 +1076,7 @@ function StatBox({
   tone,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   tone: "brand" | "success" | "warning" | "danger" | "info" | "neutral";
 }) {
   const tones = {
@@ -1123,7 +1089,7 @@ function StatBox({
   };
   return (
     <div className={cn("rounded-lg px-3 py-2 text-center", tones[tone])}>
-      <p className="text-xl font-extrabold leading-none tabular-nums">{value}</p>
+      <p className="text-base font-extrabold leading-none tabular-nums sm:text-xl">{value}</p>
       <p className="mt-0.5 text-[10px] font-semibold leading-tight">{label}</p>
     </div>
   );

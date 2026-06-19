@@ -47,6 +47,7 @@ import { LockedContact } from "@/components/shared/locked-contact";
 import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { useCredits, CREDIT_COSTS } from "@/store/credits";
+import { useAuth } from "@/store/auth";
 import { distanceKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -62,11 +63,28 @@ interface PharmacyMedicationItem {
   packSize: string;
   requiresRx: boolean;
   category: { id: string; name: string; slug: string; iconName: string; color: string };
-  price: number;
+  price: number | null;
+  priceLocked?: boolean;
   inStock: boolean;
 }
 
+interface LockedAccess {
+  locked: boolean;
+  requiresAuth: boolean;
+  requiresCredits: boolean;
+  isUnlocked: boolean;
+  featureKey: string;
+  cost: number;
+  currentBalance: number;
+  missingCredits: number;
+  title: string;
+  message: string;
+  actions: string[];
+}
+
 interface PharmacyDetail extends Pharmacy {
+  inventoryAccess?: LockedAccess;
+  pricesAccess?: LockedAccess;
   medications: PharmacyMedicationItem[];
 }
 
@@ -116,6 +134,7 @@ export function PharmacyDetailView() {
   const [showConfirmPriceDialog, setShowConfirmPriceDialog] = useState(false);
   const [showConfirmFullDialog, setShowConfirmFullDialog] = useState(false);
   const refreshCredits = useCredits((s) => s.fetch);
+  const user = useAuth((s) => s.user);
 
   useEffect(() => {
     if (!params.slug) {
@@ -135,7 +154,11 @@ export function PharmacyDetailView() {
         const r = await fetch(`/api/pharmacies/${params.slug}`);
         if (!r.ok) throw new Error("not found");
         const data = await r.json();
-        if (active) setPharmacy(data);
+        if (active) {
+          setPharmacy(data);
+          setAvailabilityUnlocked(Boolean(data.inventoryAccess?.isUnlocked));
+          setPricesUnlocked(Boolean(data.pricesAccess?.isUnlocked));
+        }
       } catch {
         if (active) setNotFound(true);
       } finally {
@@ -146,6 +169,49 @@ export function PharmacyDetailView() {
       active = false;
     };
   }, [params.slug, navigate]);
+
+  useEffect(() => {
+    void refreshCredits();
+  }, [refreshCredits]);
+
+  const refetchPharmacy = async () => {
+    if (!pharmacy?.slug) return;
+    const r = await fetch(`/api/pharmacies/${pharmacy.slug}`, { cache: "no-store" });
+    if (!r.ok) throw new Error("Impossible de recharger la pharmacie.");
+    const data = await r.json();
+    setPharmacy(data);
+    setAvailabilityUnlocked(Boolean(data.inventoryAccess?.isUnlocked));
+    setPricesUnlocked(Boolean(data.pricesAccess?.isUnlocked));
+  };
+
+  const unlockPharmacyFeature = async (featureKey: "seePharmacyInventory" | "seeDetailedPrices") => {
+    if (!pharmacy) return;
+    if (!user) {
+      navigate("auth", { authMode: "login" });
+      throw new Error("Connectez-vous pour continuer.");
+    }
+    const res = await fetch("/api/credits/unlock", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": `${featureKey}:${pharmacy.id}:${Date.now()}`,
+      },
+      body: JSON.stringify({
+        featureKey,
+        entityType: "pharmacy",
+        entityId: pharmacy.id,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      if (res.status === 401) navigate("auth", { authMode: "login" });
+      if (res.status === 402) navigate("wallet");
+      throw new Error(data?.message ?? data?.error ?? "Déblocage impossible.");
+    }
+    await refreshCredits();
+    await refetchPharmacy();
+    toast.success(data?.message ?? "Service débloqué avec succès.");
+  };
 
   const filteredMeds = useMemo(() => {
     if (!pharmacy) return [];
@@ -315,7 +381,7 @@ export function PharmacyDetailView() {
 
             {/* Badges row */}
             <div className="mt-4 flex flex-wrap gap-1.5">
-              <StatusChip icon={CheckCircle2} label="Médicaments disponibles" tone="success" />
+              <StatusChip icon={Lock} label="Inventaire verrouillé par crédits" tone="neutral" />
               {dist <= 5 && (
                 <StatusChip icon={Navigation} label="À proximité" tone="info" />
               )}
@@ -484,9 +550,9 @@ export function PharmacyDetailView() {
               />
               <InfoCard
                 icon={Pill}
-                label="Médicaments en stock"
-                value={`${inStockCount} / ${pharmacy.medications.length}`}
-                sub="Disponibles maintenant"
+                label="Inventaire pharmacie"
+                value={availabilityUnlocked ? `${inStockCount} / ${pharmacy.medications.length}` : "Verrouillé"}
+                sub={availabilityUnlocked ? "Débloqué avec crédits" : "Voir médicaments disponibles — 1 crédit"}
               />
             </div>
           </section>
@@ -564,11 +630,20 @@ export function PharmacyDetailView() {
               variant="outline"
               className="mt-2 w-full border-brand/30 text-brand-dark hover:bg-brand-light"
               onClick={() => {
-                const el = document.getElementById("medicaments");
-                el?.scrollIntoView({ behavior: "smooth" });
+                if (availabilityUnlocked) {
+                  const el = document.getElementById("medicaments");
+                  el?.scrollIntoView({ behavior: "smooth" });
+                } else if (pharmacy.inventoryAccess?.requiresAuth) {
+                  navigate("auth", { authMode: "login" });
+                } else if ((pharmacy.inventoryAccess?.missingCredits ?? 0) > 0) {
+                  navigate("wallet");
+                } else {
+                  setShowAvailabilityDialog(true);
+                }
               }}
             >
               <Pill className="size-4" /> Voir médicaments disponibles
+              <CreditCost cost={1} className="ml-1" />
             </Button>
 
             {/* Comparer avec d'autres pharmacies — 1 crédit */}
@@ -654,65 +729,87 @@ export function PharmacyDetailView() {
       <section id="medicaments" className="mt-10 scroll-mt-20">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Eyebrow>Stock de la pharmacie</Eyebrow>
-            <Heading level="h2">Médicaments disponibles</Heading>
+            <Eyebrow>Inventaire pharmacie</Eyebrow>
+            <Heading level="h2">
+              {availabilityUnlocked ? "Médicaments disponibles" : "Inventaire pharmacie verrouillé"}
+            </Heading>
             <Muted className="mt-0.5">
-              {inStockCount} médicament{inStockCount > 1 ? "s" : ""} en stock sur{" "}
-              {pharmacy.medications.length} référencés
+              {availabilityUnlocked
+                ? `${inStockCount} médicament${inStockCount > 1 ? "s" : ""} consultable${inStockCount > 1 ? "s" : ""} après déblocage.`
+                : "Utilisez vos crédits pour voir les médicaments disponibles dans cette pharmacie."}
             </Muted>
           </div>
         </div>
 
-        {/* Local search */}
-        <div className="mt-4 relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={medQuery}
-            onChange={(e) => setMedQuery(e.target.value)}
-            placeholder="Filtrer les médicaments (nom, principe actif, catégorie...)"
-            className="h-11 rounded-xl border-border/70 bg-background pl-11 pr-10 text-sm"
-          />
-          {medQuery && (
-            <button
-              onClick={() => setMedQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Effacer le filtre"
-            >
-              <X className="size-4" />
-            </button>
-          )}
-        </div>
+        {!availabilityUnlocked ? (
+          <Card className="mt-4 border-brand/20 p-6 text-center shadow-card sm:p-8">
+            <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
+              <Lock className="size-7" />
+            </span>
+            <h3 className="mt-4 text-lg font-extrabold text-foreground">
+              Inventaire pharmacie verrouillé
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+              {pharmacy.inventoryAccess?.message ??
+                "Connectez-vous et utilisez vos crédits SABLIN pour accéder à cette information."}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Coût : <span className="font-bold text-foreground">1 crédit</span>
+              {" "}· Solde :{" "}
+              <span className="font-bold text-foreground">
+                {pharmacy.inventoryAccess?.currentBalance ?? 0} crédit
+                {(pharmacy.inventoryAccess?.currentBalance ?? 0) > 1 ? "s" : ""}
+              </span>
+            </p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+              {pharmacy.inventoryAccess?.requiresAuth ? (
+                <Button
+                  className="bg-brand text-white hover:bg-brand-dark"
+                  onClick={() => navigate("auth", { authMode: "login" })}
+                >
+                  Se connecter
+                </Button>
+              ) : (pharmacy.inventoryAccess?.missingCredits ?? 0) > 0 ? (
+                <Button
+                  className="bg-brand text-white hover:bg-brand-dark"
+                  onClick={() => navigate("wallet")}
+                >
+                  Recharger maintenant
+                </Button>
+              ) : (
+                <Button
+                  className="bg-brand text-white hover:bg-brand-dark"
+                  onClick={() => setShowAvailabilityDialog(true)}
+                >
+                  <Coins className="size-4" /> Voir médicaments disponibles — 1 crédit
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => navigate("pharmacies")}>
+                Retour
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <>
+            <div className="mt-4 relative">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={medQuery}
+                onChange={(e) => setMedQuery(e.target.value)}
+                placeholder="Filtrer les médicaments (nom, principe actif, catégorie...)"
+                className="h-11 rounded-xl border-border/70 bg-background pl-11 pr-10 text-sm"
+              />
+              {medQuery && (
+                <button
+                  onClick={() => setMedQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Effacer le filtre"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
+            </div>
 
-        {/* Bannières de déverrouillage créditées : disponibilité + prix */}
-        {(!availabilityUnlocked || !pricesUnlocked) && (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {!availabilityUnlocked && (
-              <Card className="border-brand/20 p-4">
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
-                      <Package className="size-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-extrabold text-foreground">
-                        Voir la disponibilité
-                      </h3>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Stock exact par médicament dans cette pharmacie.
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="bg-brand text-white hover:bg-brand-dark"
-                    onClick={() => setShowAvailabilityDialog(true)}
-                  >
-                    <Coins className="size-4" /> Voir la disponibilité
-                    <CreditCost cost={CREDIT_COSTS.alertAvailability} className="ml-1" />
-                  </Button>
-                </div>
-              </Card>
-            )}
             {!pricesUnlocked && (
               <Card className="border-brand/20 p-4">
                 <div className="flex flex-col gap-3">
@@ -732,7 +829,11 @@ export function PharmacyDetailView() {
                   <Button
                     size="sm"
                     className="bg-brand text-white hover:bg-brand-dark"
-                    onClick={() => setShowPricesDialog(true)}
+                    onClick={() => {
+                      if (!user) navigate("auth", { authMode: "login" });
+                      else if ((pharmacy.pricesAccess?.missingCredits ?? 0) > 0) navigate("wallet");
+                      else setShowPricesDialog(true);
+                    }}
                   >
                     <Coins className="size-4" /> Voir les prix
                     <CreditCost cost={CREDIT_COSTS.seePrices} className="ml-1" />
@@ -740,28 +841,25 @@ export function PharmacyDetailView() {
                 </div>
               </Card>
             )}
-          </div>
-        )}
 
-        {/* Medication list */}
-        <div className="mt-4 space-y-2.5">
-          {filteredMeds.length === 0 ? (
-            <EmptyState
-              icon={Search}
-              title="Aucun médicament ne correspond"
-              description="Essayez un autre terme de recherche."
-            />
-          ) : (
-            filteredMeds.map((m) => {
-              const status = medStatus(m.inStock, m.slug);
-              return (
-                <Card
-                  key={m.id}
-                  className={cn(
-                    "border-border/60 py-0 transition-all hover:border-brand/30 hover:shadow-avance",
-                    !m.inStock && "opacity-70"
-                  )}
-                >
+            <div className="mt-4 space-y-2.5">
+              {filteredMeds.length === 0 ? (
+                <EmptyState
+                  icon={Search}
+                  title="Aucun médicament ne correspond"
+                  description="Essayez un autre terme de recherche."
+                />
+              ) : (
+                filteredMeds.map((m) => {
+                  const status = medStatus(m.inStock, m.slug);
+                  return (
+                    <Card
+                      key={m.id}
+                      className={cn(
+                        "border-border/60 py-0 transition-all hover:border-brand/30 hover:shadow-avance",
+                        !m.inStock && "opacity-70"
+                      )}
+                    >
                   <div className="flex items-center gap-3 p-3.5">
                     <button
                       onClick={() => navigate("medication-detail", { slug: m.slug })}
@@ -793,7 +891,7 @@ export function PharmacyDetailView() {
                       </div>
                     </button>
                     <div className="flex shrink-0 flex-col items-end gap-1">
-                      {pricesUnlocked ? (
+                      {pricesUnlocked && m.price !== null ? (
                         <Price amount={m.price} size="sm" variant="brand" />
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
@@ -822,11 +920,13 @@ export function PharmacyDetailView() {
                       <span className="hidden sm:inline">Ordonnance</span>
                     </Button>
                   </div>
-                </Card>
-              );
-            })
-          )}
-        </div>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
       </section>
 
       {/* ============ SERVICES DISPONIBLES ============ */}
@@ -871,14 +971,15 @@ export function PharmacyDetailView() {
       <CreditConfirmDialog
         open={showAvailabilityDialog}
         onOpenChange={setShowAvailabilityDialog}
-        title="Disponibilité des médicaments"
+        title="Voir médicaments disponibles"
         cost={CREDIT_COSTS.alertAvailability}
-        description="Voir quels médicaments sont en stock dans cette pharmacie."
+        description="Débloquez l’inventaire public contrôlé de cette pharmacie."
         benefits={[
-          "Stock exact par médicament",
-          "Disponibilité en temps réel",
+          "Médicaments disponibles dans cette pharmacie",
+          "Statuts publics contrôlés",
         ]}
-        onConfirm={() => setAvailabilityUnlocked(true)}
+        debitOnConfirm={false}
+        onConfirm={() => unlockPharmacyFeature("seePharmacyInventory")}
       />
       <CreditConfirmDialog
         open={showPricesDialog}
@@ -891,7 +992,8 @@ export function PharmacyDetailView() {
           "Comparaison rapide",
           "Budget maîtrisé",
         ]}
-        onConfirm={() => setPricesUnlocked(true)}
+        debitOnConfirm={false}
+        onConfirm={() => unlockPharmacyFeature("seeDetailedPrices")}
       />
       <CreditConfirmDialog
         open={showCompareDialog}

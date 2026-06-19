@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 import { FCFA_PER_CREDIT } from "@/lib/restrictions";
 
 type Provider = "wave" | "orange" | "mtn" | "moov";
-type PaymentState = "idle" | "pending" | "success" | "failed" | "cancelled";
+type PaymentState = "idle" | "pending" | "processing" | "success" | "failed" | "cancelled" | "expired" | "suspicious";
 
 const PROVIDERS: {
   id: Provider;
@@ -49,14 +49,16 @@ const PROVIDERS: {
   bgClass: string;
   textClass: string;
   desc: string;
+  logoLabel: string;
 }[] = [
   {
     id: "wave",
-    label: "Wave",
+    label: "Wave CI",
     short: "W",
     bgClass: "bg-sky-500",
     textClass: "text-white",
-    desc: "Transfert instantané, sans frais",
+    desc: "Choix disponible sur PayDunya",
+    logoLabel: "Wave",
   },
   {
     id: "orange",
@@ -64,7 +66,8 @@ const PROVIDERS: {
     short: "OM",
     bgClass: "bg-orange-500",
     textClass: "text-white",
-    desc: "Orange Money, partout en CI",
+    desc: "Choix disponible sur PayDunya",
+    logoLabel: "Orange",
   },
   {
     id: "mtn",
@@ -72,7 +75,8 @@ const PROVIDERS: {
     short: "MTN",
     bgClass: "bg-yellow-400",
     textClass: "text-black",
-    desc: "MTN MoMo, rapide et sûr",
+    desc: "Choix disponible sur PayDunya",
+    logoLabel: "MTN",
   },
   {
     id: "moov",
@@ -80,7 +84,8 @@ const PROVIDERS: {
     short: "Moov",
     bgClass: "bg-blue-600",
     textClass: "text-white",
-    desc: "Moov Money, facile et fiable",
+    desc: "Choix disponible sur PayDunya",
+    logoLabel: "Moov",
   },
 ];
 
@@ -126,7 +131,7 @@ const PAYMENT_HISTORY = [
 export function PaymentView() {
   const { navigate, params } = useNav();
   const { user } = useAuth();
-  const { recharge, fetch: fetchCredits, hasPass } = useCredits();
+  const { fetch: fetchCredits, hasPass } = useCredits();
 
   // Mode dérivé des params (wallet → payment) ou du state local
   const [mode, setMode] = useState<PaymentMode>(
@@ -136,18 +141,11 @@ export function PaymentView() {
     params.packAmount ?? 500
   );
 
-  const [provider, setProvider] = useState<Provider>("orange");
-  const [phone, setPhone] = useState("");
   const [holderName, setHolderName] = useState(user?.name ?? "");
   const [state, setState] = useState<PaymentState>("idle");
   const [showSuccess, setShowSuccess] = useState(false);
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
-
-  const formattedPhone = useMemo(() => {
-    const digits = phone.replace(/\D/g, "").slice(0, 10);
-    return digits.replace(/(\d{2})(?=\d)/g, "$1 ").trim();
-  }, [phone]);
 
   // Montant et libellé dynamiques selon le mode
   const currentAmount = useMemo(() => {
@@ -195,62 +193,79 @@ export function PaymentView() {
   }
 
   const handlePay = async () => {
-    // Validation
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length !== 10) {
-      toast.error("Numéro de téléphone invalide", {
-        description: "Saisissez un numéro ivoirien à 10 chiffres (07 XX XX XX XX).",
-      });
-      return;
-    }
-    if (holderName.trim().length < 3) {
-      toast.error("Nom du titulaire manquant", {
-        description: "Saisissez le nom du titulaire du compte.",
-      });
-      return;
-    }
-
-    setState("pending");
+    setState("processing");
     try {
-      if (mode === "recharge") {
-        const result = await recharge(selectedPackAmount, provider);
-        if (!result.success) {
-          throw new Error(result.error ?? "Échec de la recharge");
-        }
-        const ref = `SPL-RECHARGE-${Date.now()}`;
-        const now = new Date();
-        setTransactionRef(ref);
-        setPaymentDate(now.toISOString());
-        setState("success");
-        setShowSuccess(true);
-        toast.success("Recharge réussie !", {
-          description: `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits ajoutés à votre compte.`,
-        });
-      } else {
-        const res = await fetch("/api/credits/pass", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ provider }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => null);
-          throw new Error(data?.error ?? "Échec de l'achat du Pass");
-        }
-        await fetchCredits();
-        const ref = `SPL-PASS-${Date.now()}`;
-        const now = new Date();
-        setTransactionRef(ref);
-        setPaymentDate(now.toISOString());
-        setState("success");
-        setShowSuccess(true);
-        toast.success("Pass Ordonnance Unique activé !", {
-          description: "Votre Pass Ordonnance Unique est actif pour une seule ordonnance.",
-        });
+      const idempotencyKey = `sablin-${mode}-${currentAmount}-paydunya-${Date.now()}`;
+      const res = await fetch("/api/payments/create-intent", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-idempotency-key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          purchaseType: mode === "recharge" ? "credit_pack" : "pass_ordonnance",
+          amount: currentAmount,
+          provider: "paydunya",
+          holderName: holderName.trim() || user.name,
+          idempotencyKey,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error ?? "Impossible d’initier le paiement.");
+      }
+      setTransactionRef(data.payment?.reference ?? "");
+      setPaymentDate(new Date().toISOString());
+      setState("pending");
+      setShowSuccess(true);
+      toast.info("Paiement en cours de vérification", {
+        description:
+          "Aucun crédit et aucun Pass n’est activé tant que le prestataire n’a pas confirmé le paiement.",
+      });
+      if (data.payment?.checkoutUrl) {
+        window.location.assign(data.payment.checkoutUrl);
       }
     } catch (err) {
       setState("failed");
       const msg = err instanceof Error ? err.message : "Erreur inconnue";
       toast.error("Paiement échoué", { description: msg });
+    }
+  };
+
+  const verifyCurrentPayment = async () => {
+    if (!transactionRef) return;
+    setState("processing");
+    try {
+      await fetch("/api/payments/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reference: transactionRef }),
+      });
+      const res = await fetch(`/api/payments/status/${encodeURIComponent(transactionRef)}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Statut indisponible.");
+      if (data.status === "SUCCESS") {
+        setState("success");
+        await fetchCredits();
+        toast.success("Paiement confirmé", { description: data.message });
+      } else if (data.status === "EXPIRED") {
+        setState("expired");
+        toast.error("Paiement expiré", { description: data.message });
+      } else if (data.status === "SUSPICIOUS" || data.status === "MANUAL_REVIEW") {
+        setState("suspicious");
+        toast.warning("Paiement en vérification", { description: data.message });
+      } else if (["FAILED", "CANCELLED", "REJECTED"].includes(data.status)) {
+        setState("failed");
+        toast.error("Paiement non confirmé", { description: data.message });
+      } else {
+        setState("pending");
+        toast.info("Paiement en attente", { description: data.message });
+      }
+    } catch (error) {
+      setState("pending");
+      toast.error("Vérification impossible", {
+        description: error instanceof Error ? error.message : "Réessayez dans quelques instants.",
+      });
     }
   };
 
@@ -263,7 +278,6 @@ export function PaymentView() {
 
   const resetState = () => {
     setState("idle");
-    setPhone("");
   };
 
   return (
@@ -488,12 +502,12 @@ export function PaymentView() {
         )}
 
         {/* ============ PAYMENT STATE BANNERS ============ */}
-        {state === "pending" && (
+        {(state === "pending" || state === "processing") && (
           <StateBanner
             icon={Loader2}
             iconClass="animate-spin text-brand"
-            title="Paiement en attente"
-            message="Veuillez patienter pendant le traitement de votre paiement..."
+            title={state === "processing" ? "Création du paiement" : "Paiement en cours de vérification"}
+            message="Aucun crédit et aucun Pass ne sera activé tant que le prestataire n’a pas confirmé le paiement côté serveur."
             tone="info"
           />
         )}
@@ -517,55 +531,58 @@ export function PaymentView() {
             action={{ label: "Reprendre", onClick: resetState }}
           />
         )}
+        {(state === "expired" || state === "suspicious") && (
+          <StateBanner
+            icon={AlertCircle}
+            iconClass="text-warning-foreground"
+            title={state === "expired" ? "Paiement expiré" : "Paiement en vérification"}
+            message={
+              state === "expired"
+                ? "Le délai de paiement est dépassé. Aucun crédit n’a été ajouté."
+                : "Le paiement nécessite une vérification manuelle. Aucun service n’est débloqué."
+            }
+            tone="warning"
+            action={{ label: "Réessayer", onClick: resetState }}
+          />
+        )}
 
         <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_380px] lg:gap-8">
           {/* LEFT — Payment form */}
           <div className="space-y-6">
             {/* Moyens de paiement */}
             <Card className="border-border/70 p-5 shadow-avance sm:p-6">
-              <div className="mb-4 flex items-center gap-2">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-2">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-brand-light text-brand">
                   <Smartphone className="size-4" />
                 </span>
-                <h2 className="text-base font-bold text-foreground">
-                  Choisissez votre moyen de paiement
-                </h2>
+                  <div className="min-w-0">
+                    <h2 className="text-base font-bold text-foreground">
+                      Moyens disponibles sur PayDunya
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      Le choix se fait sur la page sécurisée PayDunya, pas sur SABLIN PHARMA.
+                    </p>
+                  </div>
+                </div>
+                <Badge className="w-fit border-0 bg-brand text-white">PayDunya</Badge>
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {PROVIDERS.map((p) => {
-                  const active = provider === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setProvider(p.id)}
-                      className={cn(
-                        "flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-all",
-                        active
-                          ? "border-brand bg-brand-light/40 ring-2 ring-brand/20"
-                          : "border-border/70 hover:border-brand/30 hover:bg-accent/30"
-                      )}
-                      aria-pressed={active}
-                    >
-                      <span
-                        className={cn(
-                          "flex size-11 items-center justify-center rounded-xl text-xs font-extrabold shadow-sm",
-                          p.bgClass,
-                          p.textClass
-                        )}
-                      >
-                        {p.short}
-                      </span>
-                      <span className="text-[11px] font-bold leading-tight text-foreground">
-                        {p.label}
-                      </span>
-                      {active && (
-                        <CheckCircle2 className="size-3.5 text-brand" />
-                      )}
-                    </button>
-                  );
-                })}
+                {PROVIDERS.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-border/70 bg-background p-3 text-center"
+                  >
+                    <PaymentMethodLogo provider={p.id} label={p.logoLabel} />
+                    <span className="text-[11px] font-bold leading-tight text-foreground">
+                      {p.label}
+                    </span>
+                    <span className="text-[10px] leading-snug text-muted-foreground">
+                      {p.desc}
+                    </span>
+                  </div>
+                ))}
               </div>
             </Card>
 
@@ -581,65 +598,40 @@ export function PaymentView() {
               </div>
 
               <div className="space-y-4">
-                {/* Opérateur sélectionné (read-only display) */}
-                <div className="space-y-1.5">
-                  <Label>Opérateur sélectionné</Label>
-                  <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                    <span
-                      className={cn(
-                        "flex size-7 items-center justify-center rounded-lg text-[10px] font-extrabold",
-                        PROVIDERS.find((p) => p.id === provider)?.bgClass,
-                        PROVIDERS.find((p) => p.id === provider)?.textClass
-                      )}
-                    >
-                      {PROVIDERS.find((p) => p.id === provider)?.short}
+                <div className="rounded-xl border border-brand/20 bg-brand-light/30 p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white">
+                      <ShieldCheck className="size-5" />
                     </span>
-                    <span className="text-sm font-semibold text-foreground">
-                      {PROVIDERS.find((p) => p.id === provider)?.label}
-                    </span>
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {PROVIDERS.find((p) => p.id === provider)?.desc}
-                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-foreground">
+                        Paiement via PayDunya Checkout
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        SABLIN PHARMA transmet uniquement le montant et la référence.
+                        PayDunya affiche ensuite Wave CI, Orange Money, MTN Money ou Moov Money
+                        selon les moyens activés sur le compte marchand.
+                      </p>
+                    </div>
                   </div>
-                </div>
-
-                {/* Numéro de téléphone */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="phone">
-                    Numéro de téléphone Mobile Money <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="relative">
-                    <Smartphone className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="phone"
-                      inputMode="tel"
-                      placeholder="07 00 00 00 00"
-                      value={formattedPhone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="h-11 pl-9 text-base tracking-wide"
-                      maxLength={19}
-                      disabled={state === "pending"}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Saisissez le numéro ivoirien lié à votre compte{" "}
-                    {PROVIDERS.find((p) => p.id === provider)?.label}.
-                  </p>
                 </div>
 
                 {/* Nom du titulaire */}
                 <div className="space-y-1.5">
                   <Label htmlFor="holder">
-                    Nom du titulaire <span className="text-destructive">*</span>
+                    Nom du payeur <span className="text-muted-foreground">(optionnel)</span>
                   </Label>
                   <Input
                     id="holder"
-                    placeholder="Nom complet du titulaire"
+                    placeholder="Nom complet si vous souhaitez le préremplir"
                     value={holderName}
                     onChange={(e) => setHolderName(e.target.value)}
                     className="h-11"
-                    disabled={state === "pending"}
+                    disabled={state === "processing" || state === "pending"}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Le numéro et le moyen de paiement seront saisis ou confirmés sur PayDunya.
+                  </p>
                 </div>
 
                 {/* Montant (read-only) */}
@@ -653,11 +645,11 @@ export function PaymentView() {
 
                 {/* Bouton Payer maintenant */}
                 <Button
-                  className="h-12 w-full bg-brand text-base font-semibold text-white shadow-avance hover:bg-brand-dark"
+                  className="min-h-12 w-full whitespace-normal bg-brand px-3 py-3 text-sm font-semibold text-white shadow-avance hover:bg-brand-dark sm:text-base"
                   onClick={handlePay}
-                  disabled={state === "pending" || (mode === "pass" && hasPass)}
+                  disabled={state === "processing" || state === "pending" || (mode === "pass" && hasPass)}
                 >
-                  {state === "pending" ? (
+                  {state === "processing" ? (
                     <>
                       <Loader2 className="size-4 animate-spin" />
                       Traitement en cours…
@@ -667,7 +659,7 @@ export function PaymentView() {
                   ) : (
                     <>
                       <Lock className="size-4" />
-                      Payer {formatFCFA(currentAmount)}
+                      Continuer sur PayDunya
                     </>
                   )}
                 </Button>
@@ -676,7 +668,7 @@ export function PaymentView() {
                   variant="ghost"
                   className="w-full text-muted-foreground"
                   onClick={handleCancel}
-                  disabled={state === "pending"}
+                  disabled={state === "processing"}
                 >
                   Annuler
                 </Button>
@@ -694,10 +686,10 @@ export function PaymentView() {
               <ul className="mt-3 space-y-2">
                 <SecurityItem text="Paiement sécurisé — toutes les transactions sont chiffrées." />
                 <SecurityItem text="Vos informations sont protégées et ne sont jamais partagées." />
-                <SecurityItem text="Activation automatique après paiement confirmé." />
+                <SecurityItem text="Crédits et Pass activés uniquement après confirmation officielle du prestataire." />
               </ul>
               <p className="mt-3 rounded-lg bg-background/60 px-3 py-2 text-[11px] text-muted-foreground">
-                Environnement de démonstration — aucun débit réel n&apos;est effectué.
+                Les captures d’écran et les références saisies manuellement ne valident jamais un paiement.
               </p>
             </Card>
           </div>
@@ -728,8 +720,8 @@ export function PaymentView() {
                   <p className="text-sm font-bold text-foreground">{currentShortLabel}</p>
                   <p className="text-xs text-muted-foreground">
                     {mode === "pass"
-                      ? "Une seule ordonnance · Activation immédiate"
-                      : `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits · Activation immédiate`}
+                      ? "Une seule ordonnance · Activation après confirmation"
+                      : `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits · Ajout après confirmation`}
                   </p>
                 </div>
                 <Badge className="border-0 bg-success text-white">
@@ -778,12 +770,12 @@ export function PaymentView() {
               </div>
 
               <Button
-                className="mt-4 w-full bg-brand text-white hover:bg-brand-dark"
+                className="mt-4 min-h-11 w-full whitespace-normal bg-brand px-3 py-2.5 text-sm text-white hover:bg-brand-dark"
                 size="lg"
                 onClick={handlePay}
-                disabled={state === "pending" || (mode === "pass" && hasPass)}
+                disabled={state === "processing" || state === "pending" || (mode === "pass" && hasPass)}
               >
-                {state === "pending" ? (
+                {state === "processing" ? (
                   <>
                     <Loader2 className="size-4 animate-spin" /> Traitement…
                   </>
@@ -791,7 +783,7 @@ export function PaymentView() {
                   <>Pass déjà actif</>
                 ) : (
                   <>
-                    <Lock className="size-4" /> Payer {formatFCFA(currentAmount)}
+                    <Lock className="size-4" /> Continuer sur PayDunya
                   </>
                 )}
               </Button>
@@ -800,7 +792,7 @@ export function PaymentView() {
                 variant="ghost"
                 className="mt-2 w-full text-muted-foreground"
                 onClick={() => navigate("wallet")}
-                disabled={state === "pending"}
+                disabled={state === "processing"}
               >
                 <ChevronLeft className="size-4" /> Retour au portefeuille
               </Button>
@@ -882,38 +874,56 @@ export function PaymentView() {
       <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
         <DialogContent className="max-w-md border-brand/30 p-0">
           <DialogHeader className="sr-only">
-            <DialogTitle>Paiement confirmé</DialogTitle>
+            <DialogTitle>
+              {state === "success" ? "Paiement confirmé" : "Paiement en cours de vérification"}
+            </DialogTitle>
           </DialogHeader>
           <div className="overflow-hidden rounded-xl">
             {/* Header succès */}
             <div className="relative flex flex-col items-center bg-brand px-6 py-8 text-center text-white">
               <span className="relative flex size-16 items-center justify-center rounded-full bg-white/15 ring-8 ring-white/10 animate-scale-in">
-                <CheckCircle2 className="size-9 text-white" />
+                {state === "success" ? (
+                  <CheckCircle2 className="size-9 text-white" />
+                ) : state === "failed" || state === "expired" ? (
+                  <XCircle className="size-9 text-white" />
+                ) : (
+                  <Loader2 className="size-9 animate-spin text-white" />
+                )}
               </span>
               <h2 className="relative mt-4 text-xl font-extrabold">
-                Paiement confirmé !
+                {state === "success"
+                  ? "Paiement confirmé"
+                  : state === "failed"
+                    ? "Paiement échoué"
+                    : state === "expired"
+                      ? "Paiement expiré"
+                      : state === "suspicious"
+                        ? "Paiement en vérification"
+                        : "Paiement en cours de vérification"}
               </h2>
               <p className="relative mt-1 text-sm text-white/85">
-                {mode === "pass"
-                  ? "Pass Ordonnance Unique activé avec succès"
-                  : "Recharge de crédits effectuée avec succès"}
+                {state === "success"
+                  ? mode === "pass"
+                    ? "Pass Ordonnance Unique activé avec succès"
+                    : "Crédits ajoutés à votre compte"
+                  : "Aucun crédit ni Pass n’est activé tant que le fournisseur n’a pas confirmé SUCCESS."}
               </p>
             </div>
 
             {/* Détails */}
             <div className="space-y-3 p-6">
               <div className="grid grid-cols-2 gap-3">
-                <DetailItem label="Montant payé" value={formatFCFA(currentAmount)} />
+                <DetailItem label={state === "success" ? "Montant payé" : "Montant à vérifier"} value={formatFCFA(currentAmount)} />
                 <DetailItem label="Date de paiement" value={paymentDate ? formatDate(paymentDate) : "—"} />
                 <DetailItem
-                  label={mode === "recharge" ? "Crédits obtenus" : "Validité du pass"}
+                  label={mode === "recharge" ? (state === "success" ? "Crédits obtenus" : "Crédits attendus") : "Validité du pass"}
                   value={
                     mode === "recharge"
                       ? `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits`
                       : "Une seule ordonnance"
                   }
                 />
-                <DetailItem label="Moyen de paiement" value={PROVIDERS.find((p) => p.id === provider)?.label ?? "—"} />
+                <DetailItem label="Moyen de paiement" value="Choisi sur PayDunya" />
               </div>
 
               <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5">
@@ -939,6 +949,24 @@ export function PaymentView() {
               <Button
                 className="w-full bg-brand text-white hover:bg-brand-dark"
                 size="lg"
+                onClick={verifyCurrentPayment}
+                disabled={state === "processing" || state === "success"}
+              >
+                {state === "processing" ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" /> Vérification…
+                  </>
+                ) : state === "success" ? (
+                  <>Paiement confirmé</>
+                ) : (
+                  <>Vérifier le statut</>
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+                size="lg"
                 onClick={() => {
                   setShowSuccess(false);
                   navigate("wallet");
@@ -961,6 +989,38 @@ export function PaymentView() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function PaymentMethodLogo({ provider, label }: { provider: Provider; label: string }) {
+  if (provider === "wave") {
+    return (
+      <span className="flex h-12 w-full max-w-24 items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-2 text-center text-sm font-black text-sky-700">
+        {label}
+        <span className="ml-1 text-[10px] font-bold text-sky-600">CI</span>
+      </span>
+    );
+  }
+  if (provider === "orange") {
+    return (
+      <span className="flex h-12 w-full max-w-24 items-center justify-center rounded-xl bg-black px-2 text-center text-[11px] font-black leading-tight text-white">
+        <span className="mr-1 inline-flex size-4 rounded-sm bg-orange-500" />
+        Orange
+      </span>
+    );
+  }
+  if (provider === "mtn") {
+    return (
+      <span className="flex h-12 w-full max-w-24 items-center justify-center rounded-xl border border-yellow-300 bg-yellow-300 px-2 text-center text-sm font-black text-black">
+        MTN
+      </span>
+    );
+  }
+  return (
+    <span className="flex h-12 w-full max-w-24 items-center justify-center rounded-xl bg-blue-700 px-2 text-center text-xs font-black leading-tight text-white">
+      Moov
+      <span className="ml-1 text-[10px] font-bold">Money</span>
+    </span>
   );
 }
 

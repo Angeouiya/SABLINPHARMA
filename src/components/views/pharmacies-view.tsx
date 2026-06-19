@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   Search,
   ChevronLeft,
@@ -104,6 +104,15 @@ export function PharmaciesView() {
     commune: "all",
   });
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+  const mobileFiltersRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showFiltersMobile) return;
+    const id = window.setTimeout(() => {
+      mobileFiltersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 40);
+    return () => window.clearTimeout(id);
+  }, [showFiltersMobile]);
 
   // Fetch all pharmacies once
   useEffect(() => {
@@ -236,7 +245,7 @@ export function PharmaciesView() {
       </div>
 
       {/* ============ SEARCH ZONE ============ */}
-      <Card className="mt-6 border-border/70 p-4 shadow-avance sm:p-5">
+      <Card className="mt-6 overflow-hidden border-border/70 p-4 shadow-avance sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
@@ -259,15 +268,17 @@ export function PharmaciesView() {
           </div>
           <Button
             size="lg"
-            className="h-12 shrink-0 bg-brand text-white hover:opacity-90"
+            className="h-12 w-full shrink-0 bg-brand text-white hover:opacity-90 sm:w-auto"
           >
             <Search className="size-4" /> Rechercher
           </Button>
           <Button
             size="lg"
             variant="outline"
-            className="relative h-12 shrink-0 lg:hidden"
+            className="relative h-12 w-full shrink-0 lg:hidden"
             onClick={() => setShowFiltersMobile((v) => !v)}
+            aria-expanded={showFiltersMobile}
+            aria-controls="pharmacies-mobile-filters"
           >
             <SlidersHorizontal className="size-4" /> Filtres
             {activeFiltersCount > 0 && (
@@ -311,6 +322,33 @@ export function PharmaciesView() {
         </div>
       </Card>
 
+      {/* Mobile filters: close to the trigger so the button never feels inactive */}
+      {showFiltersMobile && (
+        <Card
+          id="pharmacies-mobile-filters"
+          ref={mobileFiltersRef}
+          className="mt-4 overflow-hidden border-border/70 p-4 shadow-avance lg:hidden"
+        >
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-bold">Filtres pharmacies</h3>
+            <button
+              onClick={() => setShowFiltersMobile(false)}
+              className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Fermer les filtres"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <FiltersPanel
+            filters={filters}
+            setFilters={setFilters}
+            activeCount={activeFiltersCount}
+            onReset={() => setFilters(DEFAULT_FILTERS)}
+            isMobile
+          />
+        </Card>
+      )}
+
       {/* ============ ON-DUTY SECTION (highlighted) ============ */}
       {!loading && onDutyPharmacies.length > 0 && (
         <section className="mt-6">
@@ -336,7 +374,7 @@ export function PharmaciesView() {
                 Voir tout <ArrowRight className="size-3.5" />
               </Button>
             </div>
-            <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
               {onDutyPharmacies.map((p) => (
                 <OnDutyMiniCard key={p.id} pharma={p} />
               ))}
@@ -360,7 +398,7 @@ export function PharmaciesView() {
       </section>
 
       {/* ============ MAIN LAYOUT: filters sidebar + results ============ */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-[270px_1fr]">
+      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[270px_1fr]">
         {/* Desktop filters sidebar */}
         <aside className="hidden lg:block">
           <FiltersPanel
@@ -371,32 +409,10 @@ export function PharmaciesView() {
           />
         </aside>
 
-        {/* Mobile filters (collapsible) */}
-        {showFiltersMobile && (
-          <Card className="border-border/70 p-4 lg:hidden">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold">Filtres</h3>
-              <button
-                onClick={() => setShowFiltersMobile(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <FiltersPanel
-              filters={filters}
-              setFilters={setFilters}
-              activeCount={activeFiltersCount}
-              onReset={() => setFilters(DEFAULT_FILTERS)}
-              isMobile
-            />
-          </Card>
-        )}
-
         {/* Results */}
-        <div>
+        <div className="min-w-0">
           {/* Toolbar */}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
               {loading ? (
                 "Chargement..."
@@ -464,7 +480,7 @@ function FiltersPanel({
   isMobile?: boolean;
 }) {
   return (
-    <div className={cn("space-y-5", !isMobile && "sticky top-24")}>
+    <div className={cn("min-w-0 space-y-5", !isMobile && "sticky top-24")}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="size-4 text-brand" />
@@ -491,7 +507,7 @@ function FiltersPanel({
           value={filters.commune}
           onValueChange={(v) => setFilters((f) => ({ ...f, commune: v }))}
         >
-          <SelectTrigger className="h-10">
+          <SelectTrigger className="h-10 w-full min-w-0">
             <SelectValue placeholder="Toutes les communes" />
           </SelectTrigger>
           <SelectContent>
@@ -511,7 +527,7 @@ function FiltersPanel({
           value={filters.quartier}
           onChange={(e) => setFilters((f) => ({ ...f, quartier: e.target.value }))}
           placeholder="Ex : Riviera, Zone 4…"
-          className="h-10"
+          className="h-10 w-full min-w-0"
         />
       </FilterGroup>
 
@@ -545,7 +561,7 @@ function FiltersPanel({
           value={filters.maxDistance}
           onValueChange={(v) => setFilters((f) => ({ ...f, maxDistance: v }))}
         >
-          <SelectTrigger className="h-10">
+          <SelectTrigger className="h-10 w-full min-w-0">
             <SelectValue placeholder="Toutes distances" />
           </SelectTrigger>
           <SelectContent>
@@ -566,7 +582,7 @@ function FiltersPanel({
             value={filters.medication}
             onChange={(e) => setFilters((f) => ({ ...f, medication: e.target.value }))}
             placeholder="Nom du médicament…"
-            className="h-10 pl-9"
+            className="h-10 w-full min-w-0 pl-9"
           />
         </div>
       </FilterGroup>
@@ -577,7 +593,7 @@ function FiltersPanel({
           value={filters.service}
           onValueChange={(v) => setFilters((f) => ({ ...f, service: v }))}
         >
-          <SelectTrigger className="h-10">
+          <SelectTrigger className="h-10 w-full min-w-0">
             <SelectValue placeholder="Tous les services" />
           </SelectTrigger>
           <SelectContent>
@@ -620,14 +636,14 @@ function ToggleRow({
     <button
       onClick={() => onChange(!checked)}
       className={cn(
-        "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors",
+        "flex w-full min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors",
         checked
           ? "border-brand bg-brand-light text-brand-dark"
           : "border-border bg-background text-muted-foreground hover:border-brand/30"
       )}
     >
-      <Icon className="size-4" />
-      <span className="flex-1">{label}</span>
+      <Icon className="size-4 shrink-0" />
+      <span className="min-w-0 flex-1">{label}</span>
       <span
         className={cn(
           "flex size-4 items-center justify-center rounded-full border",
@@ -653,20 +669,20 @@ function OnDutyMiniCard({ pharma }: { pharma: Pharmacy & { distance?: number } }
   return (
     <button
       onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
-      className="group flex items-center gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all hover:border-brand/30 hover:shadow-avance"
+      className="group flex min-w-0 items-start gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all hover:border-brand/30 hover:shadow-avance min-[420px]:items-center"
     >
       <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
         <Plus className="size-5" strokeWidth={3} />
         <span className="absolute -right-1 -top-1 flex size-3.5 items-center justify-center rounded-full bg-amber-400 ring-2 ring-background" />
       </span>
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-bold text-foreground">
+        <h3 className="break-words text-sm font-bold leading-snug text-foreground">
           {pharma.name}
         </h3>
-        <p className="truncate text-xs text-muted-foreground">
+        <p className="break-words text-xs text-muted-foreground">
           {quartier}, {pharma.commune} · {dist} km
         </p>
-        <div className="mt-1 flex items-center gap-1.5">
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
           <span className="inline-flex items-center gap-0.5 rounded-full bg-success-light px-1.5 py-0.5 text-[9px] font-bold text-success">
             <span className="size-1.5 rounded-full bg-success animate-pulse" /> Ouvert
           </span>
@@ -698,9 +714,9 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
   const todayHours = pharma.hoursWeekday;
 
   return (
-    <Card className="gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-avance-lg">
+    <Card className="min-w-0 gap-0 overflow-hidden border-border/70 py-0 shadow-card transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-avance-lg">
       {/* Header banner */}
-      <div className="relative flex items-center justify-between bg-brand px-4 py-3">
+      <div className="relative flex items-center justify-between gap-3 bg-brand px-4 py-3">
         {pharma.imageUrl && (
           <img
             src={pharma.imageUrl}
@@ -718,14 +734,14 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
             {pharma.rating.toFixed(1)}
           </span>
         </div>
-        <div className="relative flex items-center gap-1.5">
+        <div className="relative flex max-w-[50%] flex-wrap items-center justify-end gap-1.5">
           {pharma.isOnDuty && (
-            <Badge className="border-0 bg-amber-400 text-[10px] font-bold text-amber-950">
+            <Badge className="whitespace-normal border-0 bg-amber-400 text-[10px] font-bold leading-tight text-amber-950">
               <Timer className="size-3" /> De garde
             </Badge>
           )}
           {pharma.isOpen247 && (
-            <Badge className="border-0 bg-white/20 text-[10px] font-bold text-white backdrop-blur-sm">
+            <Badge className="whitespace-normal border-0 bg-white/20 text-[10px] font-bold leading-tight text-white backdrop-blur-sm">
               <Clock className="size-3" /> 24/7
             </Badge>
           )}
@@ -735,12 +751,12 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
       {/* Body */}
       <div className="space-y-3 p-4">
         <div>
-          <h3 className="text-sm font-bold leading-tight text-foreground">
+          <h3 className="break-words text-sm font-bold leading-tight text-foreground">
             {pharma.name}
           </h3>
           <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
             <MapPin className="mt-0.5 size-3.5 shrink-0 text-brand/70" />
-            <span>
+            <span className="break-words">
               {quartier}, <span className="font-medium text-foreground/70">{pharma.commune}</span>
             </span>
           </p>
@@ -777,32 +793,32 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
         </div>
 
         {/* Info grid: distance + hours */}
-        <div className="grid grid-cols-2 gap-2 border-t border-border/50 pt-2.5">
+        <div className="grid grid-cols-1 gap-2 border-t border-border/50 pt-2.5 min-[380px]:grid-cols-2">
           <div className="flex items-center gap-1.5 text-xs">
             <Navigation className="size-3.5 text-brand" />
             <span className="font-bold text-foreground">{dist} km</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs">
             <Clock className="size-3.5 text-brand" />
-            <span className="truncate text-muted-foreground">{todayHours}</span>
+            <span className="break-words text-muted-foreground">{todayHours}</span>
           </div>
         </div>
 
         {/* Contact verrouillé — aucune info téléphone affichée, aucun lien tel: */}
-        <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-2.5 py-2">
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
+        <div className="flex flex-col gap-1.5 rounded-lg bg-muted/60 px-2.5 py-2 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold leading-tight text-muted-foreground">
             <Lock className="size-3.5" /> Contact verrouillé
           </span>
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-dark">
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold leading-tight text-brand-dark">
             <Phone className="size-3.5" /> Voir contact <CreditCost cost={1} />
           </span>
         </div>
 
         {/* Actions — aucun lien tel: généré */}
-        <div className="grid grid-cols-2 gap-2 pt-1">
+        <div className="grid grid-cols-1 gap-2 pt-1 min-[380px]:grid-cols-2">
           <Button
             size="sm"
-            className="bg-brand text-white hover:bg-brand-dark"
+            className="min-h-10 whitespace-normal bg-brand px-2 leading-tight text-white hover:bg-brand-dark"
             onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
           >
             Voir détails <ChevronRight className="size-3.5" />
@@ -810,12 +826,12 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
           <Button
             size="sm"
             variant="outline"
-            className="border-brand/30 text-brand-dark hover:bg-brand-light"
+            className="min-h-10 whitespace-normal border-brand/30 px-2 leading-tight text-brand-dark hover:bg-brand-light"
             onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
           >
             <Phone className="size-3.5" /> Voir contact
           </Button>
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" variant="outline" className="min-h-10 whitespace-normal px-2 leading-tight" asChild>
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
               <Navigation className="size-3.5" /> Itinéraire
             </a>
@@ -823,7 +839,7 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
           <Button
             size="sm"
             variant="outline"
-            className="border-brand/30 text-brand-dark hover:bg-brand-light"
+            className="min-h-10 whitespace-normal border-brand/30 px-2 leading-tight text-brand-dark hover:bg-brand-light"
             onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
           >
             <Pill className="size-3.5" /> Médicaments

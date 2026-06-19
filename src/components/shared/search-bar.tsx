@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, X, ChevronRight } from "lucide-react";
+import { Search, X, ChevronRight, Lock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useNav } from "@/store/nav";
@@ -139,10 +139,11 @@ export function SearchBar({ variant = "compact", initialQuery = "", placeholder 
                         {med.name}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {med.form} · {med.dosage} · {med.pharmacyCount} pharmacies
+                        {med.form} · {med.dosage} · disponibilité verrouillée
                       </span>
                     </span>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                    <Lock className="size-3.5 shrink-0 text-brand" />
                   </button>
                 </li>
               ))}

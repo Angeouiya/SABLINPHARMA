@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentUserCreditAccess } from "@/lib/credit-gates";
 import { isOpenNow } from "@/lib/format";
 import { isPublicPharmacyMedia, publicAvailabilityStatus } from "@/lib/pharmacy-platform";
 
@@ -52,7 +53,20 @@ export async function GET(
     return NextResponse.json({ error: "Pharmacie introuvable" }, { status: 404 });
   }
 
-  const medications = pharma.medications.map((pm) => ({
+  const [inventoryAccess, pricesAccess] = await Promise.all([
+    getCurrentUserCreditAccess({
+      featureKey: "seePharmacyInventory",
+      entityType: "pharmacy",
+      entityId: pharma.id,
+    }),
+    getCurrentUserCreditAccess({
+      featureKey: "seeDetailedPrices",
+      entityType: "pharmacy",
+      entityId: pharma.id,
+    }),
+  ]);
+
+  const medications = inventoryAccess.isUnlocked ? pharma.medications.map((pm) => ({
     id: pm.medication.id,
     name: pm.medication.name,
     slug: pm.medication.slug,
@@ -62,7 +76,8 @@ export async function GET(
     packSize: pm.medication.packSize,
     requiresRx: pm.medication.requiresRx,
     category: pm.medication.category,
-    price: pm.price,
+    price: pricesAccess.isUnlocked ? pm.price : null,
+    priceLocked: !pricesAccess.isUnlocked,
     inStock: pm.inStock,
     availabilityStatus: publicAvailabilityStatus({
       status: pm.availabilityStatus,
@@ -81,7 +96,7 @@ export async function GET(
     dataSource: pm.dataSource,
     reliabilityLevel: pm.reliabilityLevel,
     lastUpdatedAt: pm.lastUpdatedAt,
-  }));
+  })) : [];
 
   const publicMedia = pharma.media.filter(isPublicPharmacyMedia);
   const primary = publicMedia.find((media) => media.isPrimary);
@@ -118,6 +133,8 @@ export async function GET(
     coverImageUrl: cover?.url ?? null,
     publicMedia: publicMedia.map(safeMedia),
     openNow: isOpenNow(pharma),
+    inventoryAccess: inventoryAccess.locked,
+    pricesAccess: pricesAccess.locked,
     medications,
   });
 }

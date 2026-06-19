@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$projectRef = "pztpdigzgukntmvfsqmt"
+$projectRef = "umockhnaabuxdmeeyszy"
 
 if ($env:DATABASE_URL) {
   $databaseUrl = $env:DATABASE_URL

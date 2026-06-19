@@ -4,38 +4,24 @@ import {
   Pill,
   ChevronRight,
   ShieldAlert,
-  CheckCircle2,
-  MapPin,
+  Lock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CategoryIcon } from "@/components/category-icons";
-import { MedicationStatusBadge } from "@/components/shared/status-badge";
 import { Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { cn } from "@/lib/utils";
-import type { Medication, MedicationStatus } from "@/lib/types";
-
-/** Deterministic status derived from medication data for consistent display */
-export function getMedStatus(med: Pick<Medication, "slug" | "pharmacyCount">): MedicationStatus {
-  const hash = med.slug.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const pct = hash % 10;
-  const count = med.pharmacyCount ?? 0;
-  if (count === 0) return "out-of-stock";
-  if (pct < 6) return "available";
-  if (pct < 9) return "low-stock";
-  return "to-confirm";
-}
+import type { Medication } from "@/lib/types";
 
 export function MedicationCard({ med }: { med: Medication }) {
   const { navigate } = useNav();
-  const status = getMedStatus(med);
 
   return (
     <Card
       onClick={() => navigate("medication-detail", { slug: med.slug })}
-      className="group gap-0 cursor-pointer overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-avance-lg"
+      className="group min-w-0 gap-0 cursor-pointer overflow-hidden border-border/70 py-0 transition-all hover:-translate-y-1 hover:border-brand/30 hover:shadow-avance-lg"
     >
       {/* Header visual */}
       <div className="relative flex h-32 items-center justify-center overflow-hidden bg-brand-light">
@@ -69,7 +55,9 @@ export function MedicationCard({ med }: { med: Medication }) {
           </span>
         )}
         <span className="absolute bottom-2 left-2">
-          <MedicationStatusBadge status={status} />
+          <Badge className="border-0 bg-white text-[10px] font-bold text-brand-dark shadow-sm">
+            <Lock className="size-3" /> Verrouillé
+          </Badge>
         </span>
         <span className="absolute bottom-2 right-2">
           <Badge className="border-0 bg-white text-[10px] font-bold text-brand-dark shadow-sm">
@@ -81,28 +69,34 @@ export function MedicationCard({ med }: { med: Medication }) {
       {/* Body */}
       <div className="space-y-2 p-4">
         <div>
-          <h3 className="line-clamp-1 text-sm font-bold text-foreground">
+          <h3 className="line-clamp-2 break-words text-sm font-bold leading-snug text-foreground">
             {med.name}
           </h3>
-          <p className="line-clamp-1 text-xs text-muted-foreground">{med.genericName}</p>
+          <p className="line-clamp-2 break-words text-xs text-muted-foreground">{med.genericName}</p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium">{med.form}</span>
-          <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium">{med.dosage}</span>
+          <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium leading-tight">{med.form}</span>
+          <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium leading-tight">{med.dosage}</span>
         </div>
+        <Badge
+          variant="outline"
+          className="w-fit max-w-full whitespace-normal border-border bg-muted px-2 py-1 text-[11px] font-bold leading-tight text-foreground"
+        >
+          <Lock className="size-3" /> Disponibilité verrouillée — 1 crédit
+        </Badge>
 
-        <div className="flex items-end justify-between border-t border-border/50 pt-2.5">
+        <div className="flex flex-col items-start gap-2 border-t border-border/50 pt-2.5 min-[380px]:flex-row min-[380px]:items-end min-[380px]:justify-between">
           <Price amount={med.avgPrice} size="md" variant="brand" from />
-          <span className="flex items-center gap-0.5 text-xs font-medium text-muted-foreground">
-            <MapPin className="size-3.5 text-brand" />
-            {med.pharmacyCount ?? 0} pharmacies
+          <span className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
+            <Lock className="size-3.5 text-brand" />
+            Voir pharmacies — 1 crédit
           </span>
         </div>
 
         <Button
           size="sm"
           variant="outline"
-          className="w-full border-brand/30 text-brand-dark hover:bg-brand-light hover:text-brand-dark"
+          className="min-h-10 w-full whitespace-normal border-brand/30 text-brand-dark hover:bg-brand-light hover:text-brand-dark"
           onClick={(e) => {
             e.stopPropagation();
             navigate("medication-detail", { slug: med.slug });
@@ -110,6 +104,32 @@ export function MedicationCard({ med }: { med: Medication }) {
         >
           Voir détails <ChevronRight className="size-3.5" />
         </Button>
+        <div className="grid gap-2">
+          <Button
+            size="sm"
+            className="min-h-10 w-full whitespace-normal bg-brand px-2 text-xs leading-tight text-white hover:bg-brand-dark"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate("medication-detail", { slug: med.slug });
+            }}
+          >
+            Voir pharmacies — 1 crédit
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="min-h-10 w-full whitespace-normal border-brand/30 px-2 text-xs leading-tight text-brand-dark hover:bg-brand-light hover:text-brand-dark"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate("prescription", { estimateItems: [{ slug: med.slug, quantity: 1 }] });
+            }}
+          >
+            Ajouter ordonnance — 1 crédit
+          </Button>
+        </div>
+        <p className="text-[11px] font-medium leading-snug text-muted-foreground">
+          Prix indicatif, à confirmer auprès de la pharmacie.
+        </p>
       </div>
     </Card>
   );
@@ -117,12 +137,11 @@ export function MedicationCard({ med }: { med: Medication }) {
 
 export function MedicationRow({ med }: { med: Medication }) {
   const { navigate } = useNav();
-  const status = getMedStatus(med);
   return (
     <button
       onClick={() => navigate("medication-detail", { slug: med.slug })}
       className={cn(
-        "group flex w-full items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 text-left transition-all hover:border-brand/30 hover:bg-accent/40"
+        "group flex w-full min-w-0 items-start gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 text-left transition-all hover:border-brand/30 hover:bg-accent/40 sm:items-center"
       )}
     >
       <span
@@ -136,8 +155,8 @@ export function MedicationRow({ med }: { med: Medication }) {
         )}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2">
-          <span className="truncate text-sm font-bold text-foreground">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 break-words text-sm font-bold text-foreground">
             {med.name}
           </span>
           {med.requiresRx && (
@@ -156,19 +175,24 @@ export function MedicationRow({ med }: { med: Medication }) {
               {med.informationBadge}
             </Badge>
           )}
-          <MedicationStatusBadge status={status} />
+          <Badge
+            variant="outline"
+            className="border-border bg-muted px-1.5 py-0 text-[9px] font-semibold text-foreground"
+          >
+            <Lock className="size-2.5" /> Verrouillé
+          </Badge>
         </span>
-        <span className="block truncate text-xs text-muted-foreground">
+        <span className="block break-words text-xs text-muted-foreground">
           {med.genericName} · {med.form} {med.dosage}
         </span>
       </span>
-      <span className="flex flex-col items-end shrink-0">
+      <span className="flex shrink-0 flex-col items-end">
         <span className="text-sm font-extrabold text-brand-dark">
           {med.avgPrice.toLocaleString("fr-FR")} F
         </span>
-        <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-          <CheckCircle2 className="size-3 text-brand" />
-          {med.pharmacyCount ?? 0} pharmacies
+        <span className="flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
+          <Lock className="size-3 text-brand" />
+          1 crédit
         </span>
       </span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />

@@ -34,17 +34,14 @@ import { AlertMessage } from "@/components/shared/alert-message";
 import { GoogleMap } from "@/components/shared/google-map";
 import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
 import { CreditCost } from "@/components/shared/credit-cost";
-import {
-  MedicationStatusBadge,
-} from "@/components/shared/status-badge";
-import { getMedStatus } from "@/components/shared/medication-card";
-import { Heading, Eyebrow, Price, PriceRange, Muted } from "@/components/ui/typography";
+import { Heading, Eyebrow, Price, Muted } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { useCredits, CREDIT_COSTS } from "@/store/credits";
-import { formatFCFA, distanceKm, formatDate } from "@/lib/format";
+import { useAuth } from "@/store/auth";
+import { distanceKm, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { Medication, MedicationStatus } from "@/lib/types";
+import type { Medication } from "@/lib/types";
 
 interface PharmacyWithMed {
   id: string;
@@ -59,9 +56,26 @@ interface PharmacyWithMed {
   latitude: number;
   longitude: number;
   rating: number;
-  price: number;
+  price: number | null;
+  priceLocked?: boolean;
   inStock: boolean;
+  availabilityStatus?: string;
+  freshnessLabel?: string;
   openNow: boolean;
+}
+
+interface LockedAccess {
+  locked: boolean;
+  requiresAuth: boolean;
+  requiresCredits: boolean;
+  isUnlocked: boolean;
+  featureKey: string;
+  cost: number;
+  currentBalance: number;
+  missingCredits: number;
+  title: string;
+  message: string;
+  actions: string[];
 }
 
 interface MedDetail {
@@ -86,6 +100,8 @@ interface MedDetail {
   verifiedAt?: string | null;
   safetyNotice?: string | null;
   createdAt: string;
+  pharmaciesAccess?: LockedAccess;
+  pricesAccess?: LockedAccess;
   pharmacies: PharmacyWithMed[];
 }
 
@@ -107,6 +123,8 @@ export function MedicationDetailView() {
   const [showPricesDialog, setShowPricesDialog] = useState(false);
   const [pricesUnlocked, setPricesUnlocked] = useState(false);
   const { credits, hasPass } = useCredits();
+  const refreshCredits = useCredits((s) => s.fetch);
+  const user = useAuth((s) => s.user);
 
   // Fetch medication detail
   useEffect(() => {
@@ -126,6 +144,8 @@ export function MedicationDetailView() {
         const data = await r.json();
         if (!active) return;
         setMed(data);
+        setPharmaciesUnlocked(Boolean(data.pharmaciesAccess?.isUnlocked));
+        setPricesUnlocked(Boolean(data.pricesAccess?.isUnlocked));
         // Fetch alternatives (same genericName, different slug)
         if (data.genericName) {
           const altRes = await fetch(
@@ -149,6 +169,10 @@ export function MedicationDetailView() {
     };
   }, [params.slug, navigate]);
 
+  useEffect(() => {
+    void refreshCredits();
+  }, [refreshCredits]);
+
   // Quick search (debounced)
   useEffect(() => {
     if (!quickQuery.trim() || quickQuery.trim().length < 2) {
@@ -168,33 +192,62 @@ export function MedicationDetailView() {
     return () => clearTimeout(t);
   }, [quickQuery]);
 
+  const refetchMedication = async () => {
+    if (!med?.slug) return;
+    const r = await fetch(`/api/medications/${med.slug}`, { cache: "no-store" });
+    if (!r.ok) throw new Error("Impossible de recharger les données.");
+    const data = await r.json();
+    setMed(data);
+    setPharmaciesUnlocked(Boolean(data.pharmaciesAccess?.isUnlocked));
+    setPricesUnlocked(Boolean(data.pricesAccess?.isUnlocked));
+  };
+
+  const unlockMedicationFeature = async (
+    featureKey: "seeMedicationPharmacies" | "seeDetailedPrices" | "addMedicationToPrescription"
+  ) => {
+    if (!med) return;
+    if (!user) {
+      navigate("auth", { authMode: "login" });
+      throw new Error("Connectez-vous pour continuer.");
+    }
+    const res = await fetch("/api/credits/unlock", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": `${featureKey}:${med.id}:${Date.now()}`,
+      },
+      body: JSON.stringify({
+        featureKey,
+        entityType: "medication",
+        entityId: med.id,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      if (res.status === 401) navigate("auth", { authMode: "login" });
+      if (res.status === 402) navigate("wallet");
+      throw new Error(data?.message ?? data?.error ?? "Déblocage impossible.");
+    }
+    await refreshCredits();
+    await refetchMedication();
+    toast.success(data?.message ?? "Service débloqué avec succès.");
+  };
+
   // Derived data
   const inStock = useMemo(
-    () => (med?.pharmacies ?? []).filter((p) => p.inStock),
-    [med]
+    () => (pharmaciesUnlocked ? (med?.pharmacies ?? []).filter((p) => p.inStock) : []),
+    [med, pharmaciesUnlocked]
   );
-  const globalStatus: MedicationStatus = useMemo(() => {
-    if (!med) return "to-confirm";
-    if (inStock.length === 0) return "out-of-stock";
-    return getMedStatus({ slug: med.slug, pharmacyCount: inStock.length });
-  }, [med, inStock]);
-
-  const minPrice = inStock.length
-    ? Math.min(...inStock.map((p) => p.price))
-    : med?.avgPrice ?? 0;
-  const maxPrice = inStock.length
-    ? Math.max(...inStock.map((p) => p.price))
-    : med?.avgPrice ?? 0;
 
   const sortedPharmacies = useMemo(() => {
-    if (!med) return [];
+    if (!med || !pharmaciesUnlocked) return [];
     return [...med.pharmacies].sort((a, b) => {
       if (a.inStock !== b.inStock) return a.inStock ? -1 : 1;
       const da = distanceKm(ABIDJAN_CENTER.lat, ABIDJAN_CENTER.lon, a.latitude, a.longitude);
       const db = distanceKm(ABIDJAN_CENTER.lat, ABIDJAN_CENTER.lon, b.latitude, b.longitude);
       return da - db;
     });
-  }, [med]);
+  }, [med, pharmaciesUnlocked]);
 
   if (loading) {
     return (
@@ -290,7 +343,7 @@ export function MedicationDetailView() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">{m.name}</span>
                         <span className="block truncate text-xs text-muted-foreground">
-                          {m.form} {m.dosage} · {m.pharmacyCount} pharmacies
+                          {m.form} {m.dosage} · disponibilité verrouillée
                         </span>
                       </span>
                       <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
@@ -345,7 +398,12 @@ export function MedicationDetailView() {
                   {med.category.name}
                 </Badge>
               )}
-              <MedicationStatusBadge status={globalStatus} size="md" />
+              <Badge
+                variant="outline"
+                className="border-border bg-muted text-foreground"
+              >
+                <Lock className="size-3" /> Disponibilité verrouillée — 1 crédit
+              </Badge>
               {med.requiresRx ? (
                 <Badge className="border-0 bg-amber-500/90 text-white">
                   <ShieldAlert className="size-3" /> Ordonnance requise
@@ -376,7 +434,7 @@ export function MedicationDetailView() {
               <InfoItem label="Conditionnement" value={med.packaging ?? med.packSize} />
               {med.manufacturer && <InfoItem label="Fabricant" value={med.manufacturer} />}
               <InfoItem label="Source" value={med.sourceName ?? "Référentiel SABLIN"} />
-              <InfoItem label="Vérification" value={med.verifiedAt ? formatDate(med.verifiedAt) : "À confirmer"} />
+              <InfoItem label="Vérification" value={med.verifiedAt ? formatDate(med.verifiedAt) : "Non vérifiée"} />
             </div>
 
             {/* Price + stats */}
@@ -385,36 +443,35 @@ export function MedicationDetailView() {
                 <p className="text-[10px] font-bold uppercase tracking-wide text-brand">
                   Prix indicatif
                 </p>
-                {minPrice === maxPrice ? (
-                  <Price amount={minPrice} size="lg" variant="brand" className="mt-1" />
+                <Price amount={med.avgPrice} size="lg" variant="brand" className="mt-1" />
+                <p className="mt-1 text-[11px] font-medium leading-snug text-brand-dark/80">
+                  Prix indicatif général, à confirmer auprès de la pharmacie.
+                </p>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-background p-3.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  Disponibilité réelle
+                </p>
+                {pharmaciesUnlocked ? (
+                  <p className="mt-1 text-2xl font-extrabold text-foreground">
+                    {inStock.length}
+                    <span className="ml-1 text-sm font-medium text-muted-foreground">
+                      / {med.pharmacies.length}
+                    </span>
+                  </p>
                 ) : (
-                  <PriceRange
-                    min={minPrice}
-                    max={maxPrice}
-                    size="lg"
-                    variant="brand"
-                    className="mt-1 block"
-                  />
+                  <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-bold text-foreground">
+                    <Lock className="size-3.5 text-brand" /> Verrouillée
+                  </p>
                 )}
               </div>
               <div className="rounded-xl border border-border/60 bg-background p-3.5">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  Pharmacies disponibles
-                </p>
-                <p className="mt-1 text-2xl font-extrabold text-foreground">
-                  {inStock.length}
-                  <span className="ml-1 text-sm font-medium text-muted-foreground">
-                    / {med.pharmacies.length}
-                  </span>
-                </p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-background p-3.5">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  Dernière mise à jour
+                  Données avancées
                 </p>
                 <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                  <RefreshCw className="size-3.5 text-brand" />
-                  {formatDate(med.createdAt)}
+                  <Lock className="size-3.5 text-brand" />
+                  Coût affiché avant validation
                 </p>
               </div>
             </div>
@@ -430,13 +487,15 @@ export function MedicationDetailView() {
                 className="bg-brand text-white hover:bg-brand-dark"
                 onClick={() => navigate("prescription")}
               >
-                <ClipboardList className="size-4" /> Comparer les prix des pharmacies
+                <ClipboardList className="size-4" /> Comparer pharmacies — 2 crédits
               </Button>
               <Button
                 variant="outline"
                 className="border-brand/30 text-brand-dark hover:bg-brand-light"
                 onClick={() => {
-                  if (hasPass) {
+                  if (!user) {
+                    navigate("auth", { authMode: "login" });
+                  } else if (hasPass) {
                     toast.success("Médicament ajouté à l'ordonnance");
                     navigate("prescription");
                   } else {
@@ -489,8 +548,9 @@ export function MedicationDetailView() {
             </div>
             <Heading level="h2">Pharmacies disponibles</Heading>
             <Muted className="mt-0.5">
-              {inStock.length} pharmacie{inStock.length > 1 ? "s" : ""} ont ce médicament en stock
-              à Abidjan
+              {pharmaciesUnlocked
+                ? `${inStock.length} pharmacie${inStock.length > 1 ? "s" : ""} consultable${inStock.length > 1 ? "s" : ""} après déblocage.`
+                : "Utilisez 1 crédit pour voir les pharmacies qui possèdent réellement ce médicament."}
             </Muted>
           </div>
           <Button
@@ -507,28 +567,49 @@ export function MedicationDetailView() {
           /* Portail crédits : l'utilisateur doit confirmer l'utilisation d'1 crédit */
           <Card className="mt-5 border-brand/20 p-6 text-center shadow-card sm:p-8">
             <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-light text-brand">
-              <Coins className="size-7" />
+              <Lock className="size-7" />
             </span>
             <h3 className="mt-4 text-lg font-extrabold text-foreground">
-              Voir les pharmacies disponibles
+              Pharmacies disponibles verrouillées
             </h3>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed break-words text-muted-foreground">
-              Cette action coûte 1 crédit. Elle vous permet de voir les pharmacies
-              où ce médicament est disponible.
+              {med.pharmaciesAccess?.message ??
+                "Connectez-vous et utilisez vos crédits SABLIN pour accéder à cette information."}
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Votre solde :{" "}
+              Coût :{" "}
               <span className="font-bold text-foreground">
-                {credits} crédit{credits !== 1 ? "s" : ""}
+                {med.pharmaciesAccess?.cost ?? 1} crédit
+              </span>
+              {" "}· Solde :{" "}
+              <span className="font-bold text-foreground">
+                {med.pharmaciesAccess?.currentBalance ?? credits} crédit
+                {(med.pharmaciesAccess?.currentBalance ?? credits) > 1 ? "s" : ""}
               </span>
             </p>
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              <Button
-                className="bg-brand text-white hover:bg-brand-dark"
-                onClick={() => setShowCreditDialog(true)}
-              >
-                <Coins className="size-4" /> Utiliser 1 crédit
-              </Button>
+              {med.pharmaciesAccess?.requiresAuth ? (
+                <Button
+                  className="bg-brand text-white hover:bg-brand-dark"
+                  onClick={() => navigate("auth", { authMode: "login" })}
+                >
+                  Se connecter
+                </Button>
+              ) : (med.pharmaciesAccess?.missingCredits ?? 0) > 0 ? (
+                <Button
+                  className="bg-brand text-white hover:bg-brand-dark"
+                  onClick={() => navigate("wallet")}
+                >
+                  Recharger maintenant
+                </Button>
+              ) : (
+                <Button
+                  className="bg-brand text-white hover:bg-brand-dark"
+                  onClick={() => setShowCreditDialog(true)}
+                >
+                  <Coins className="size-4" /> Débloquer — 1 crédit
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => navigate("medications")}
@@ -545,7 +626,7 @@ export function MedicationDetailView() {
                 <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3">
                     <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand">
-                      <Coins className="size-5" />
+                    <Coins className="size-5" />
                     </span>
                     <div>
                       <h3 className="text-sm font-extrabold text-foreground">
@@ -558,7 +639,11 @@ export function MedicationDetailView() {
                   </div>
                   <Button
                     className="bg-brand text-white hover:bg-brand-dark"
-                    onClick={() => setShowPricesDialog(true)}
+                    onClick={() => {
+                      if (!user) navigate("auth", { authMode: "login" });
+                      else if ((med.pricesAccess?.missingCredits ?? 0) > 0) navigate("wallet");
+                      else setShowPricesDialog(true);
+                    }}
                   >
                     <Coins className="size-4" /> Voir les prix détaillés
                     <CreditCost cost={1} className="ml-1" />
@@ -603,10 +688,11 @@ export function MedicationDetailView() {
           description="Liste exacte des pharmacies avec ce médicament en stock"
           benefits={[
             "Voir toutes les pharmacies qui ont ce médicament",
-            "Prix indicatif par pharmacie",
+            "Disponibilité réelle par pharmacie",
             "Distance et statut d'ouverture",
           ]}
-          onConfirm={() => setPharmaciesUnlocked(true)}
+          debitOnConfirm={false}
+          onConfirm={() => unlockMedicationFeature("seeMedicationPharmacies")}
         />
 
         {/* Ajouter à mon ordonnance — 1 crédit */}
@@ -620,7 +706,9 @@ export function MedicationDetailView() {
             "Médicament ajouté à votre liste",
             "Vous pouvez lancer l'estimation ensuite",
           ]}
-          onConfirm={() => {
+          debitOnConfirm={false}
+          onConfirm={async () => {
+            await unlockMedicationFeature("addMedicationToPrescription");
             toast.success("Médicament ajouté à l'ordonnance");
             navigate("prescription");
           }}
@@ -638,7 +726,8 @@ export function MedicationDetailView() {
             "Comparaison rapide des prix",
             "Meilleure option tarifaire",
           ]}
-          onConfirm={() => setPricesUnlocked(true)}
+          debitOnConfirm={false}
+          onConfirm={() => unlockMedicationFeature("seeDetailedPrices")}
         />
       </section>
 
@@ -657,7 +746,6 @@ export function MedicationDetailView() {
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {alternatives.map((alt) => {
-              const status = getMedStatus(alt);
               const dist = 0;
               void dist;
               return (
@@ -688,7 +776,9 @@ export function MedicationDetailView() {
                   </div>
                   <div className="flex items-center justify-between border-t border-border/50 px-3.5 py-2.5">
                     <Price amount={alt.avgPrice} size="sm" variant="brand" />
-                    <MedicationStatusBadge status={status} />
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">
+                      <Lock className="size-3" /> Verrouillé
+                    </span>
                   </div>
                 </Card>
               );
@@ -812,7 +902,7 @@ function PharmacyMedCard({
             Prix indicatif
           </p>
           {pharma.inStock ? (
-            pricesUnlocked ? (
+            pricesUnlocked && pharma.price !== null ? (
               <p className="mt-0.5 text-sm font-extrabold text-brand-dark">
                 {pharma.price.toLocaleString("fr-FR")} F
               </p>

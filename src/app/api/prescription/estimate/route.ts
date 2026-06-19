@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
         OR: [
           { description: { contains: "Estimer" } },
           { description: { contains: "ordonnance" } },
+          { description: { contains: "Comparer" } },
+          { description: { contains: "pharmacies" } },
         ],
       },
       orderBy: { createdAt: "desc" },

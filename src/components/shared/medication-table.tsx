@@ -1,9 +1,7 @@
 "use client";
 
-import { ShieldAlert, ChevronRight, MapPin } from "lucide-react";
+import { ShieldAlert, ChevronRight, Lock } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { MedicationStatusBadge } from "@/components/shared/status-badge";
-import { getMedStatus } from "@/components/shared/medication-card";
 import { Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import type { Medication } from "@/lib/types";
@@ -32,7 +30,42 @@ export function MedicationTable({ meds, loading = false }: MedicationTableProps)
 
   return (
     <Card className="overflow-hidden border-border/60 py-0 shadow-card">
-      <div className="overflow-x-auto scroll-thin">
+      <div className="grid gap-3 p-3 md:hidden">
+        {meds.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => navigate("medication-detail", { slug: m.slug })}
+              className="w-full rounded-xl border border-border/60 bg-background p-3 text-left transition-colors hover:border-brand/30 hover:bg-accent/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="break-words text-sm font-bold leading-snug text-foreground">
+                      {m.name}
+                    </h3>
+                    {m.requiresRx && <ShieldAlert className="size-3.5 shrink-0 text-amber-500" />}
+                  </div>
+                  <p className="mt-1 break-words text-xs text-muted-foreground">
+                    {m.genericName} · {m.form} · {m.dosage}
+                  </p>
+                </div>
+                <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
+                <Price amount={m.avgPrice} size="sm" variant="brand" />
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                  <Lock className="size-3.5 text-brand" />
+                  Voir pharmacies — 1 crédit
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">
+                  <Lock className="size-3" />
+                  Disponibilité verrouillée
+                </span>
+              </div>
+            </button>
+          ))}
+      </div>
+      <div className="hidden overflow-x-auto scroll-thin md:block">
         <table className="w-full min-w-[820px] text-left text-sm">
           <thead className="border-b border-border/60 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
@@ -42,14 +75,12 @@ export function MedicationTable({ meds, loading = false }: MedicationTableProps)
               <th className="px-5 py-3.5 font-semibold">Dosage</th>
               <th className="px-5 py-3.5 font-semibold">Prix indicatif</th>
               <th className="px-5 py-3.5 font-semibold">Pharmacies</th>
-              <th className="px-5 py-3.5 font-semibold">Statut</th>
+              <th className="px-5 py-3.5 font-semibold">Disponibilité</th>
               <th className="px-5 py-3.5 text-right font-semibold">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
-            {meds.map((m) => {
-              const status = getMedStatus(m);
-              return (
+            {meds.map((m) => (
                 <tr
                   key={m.id}
                   onClick={() => navigate("medication-detail", { slug: m.slug })}
@@ -70,13 +101,16 @@ export function MedicationTable({ meds, loading = false }: MedicationTableProps)
                     <Price amount={m.avgPrice} size="sm" variant="brand" />
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <MapPin className="size-3.5 text-brand" />
-                      {m.pharmacyCount ?? 0}
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground">
+                      <Lock className="size-3.5 text-brand" />
+                      1 crédit
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <MedicationStatusBadge status={status} />
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">
+                      <Lock className="size-3" />
+                      Verrouillée
+                    </span>
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <span className="inline-flex items-center gap-0.5 text-xs font-bold text-brand">
@@ -85,8 +119,7 @@ export function MedicationTable({ meds, loading = false }: MedicationTableProps)
                     </span>
                   </td>
                 </tr>
-              );
-            })}
+              ))}
           </tbody>
         </table>
       </div>

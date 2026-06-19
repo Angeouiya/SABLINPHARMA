@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getExternalEnrichmentAdminStatus } from "@/lib/enrichment/enrichment-service";
+import { canPublishMedicationImage } from "@/lib/enrichment/publication-guard";
 import { hasPharmacyPermission, requirePharmacyPermission } from "@/lib/pharmacy-access";
-import { matchMedicationInReferential, normalizeImportedRow, seedDefaultEnrichmentProviders } from "@/lib/medication-enrichment";
+import { ensurePlaceholderImage, matchMedicationInReferential, normalizeImportedRow, seedDefaultEnrichmentProviders } from "@/lib/medication-enrichment";
 import { writeAudit } from "@/lib/professional-auth";
 
 function getKind(req: NextRequest) {
@@ -26,7 +28,7 @@ export async function GET(req: NextRequest) {
       : {}
     : { pharmacy: { slug: access.session?.activePharmacySlug ?? access.session?.pharmacySlug } };
 
-  const [rows, jobs, candidates, images, descriptions, providers] = await Promise.all([
+  const [rows, jobs, candidates, images, descriptions, providers, externalEnrichment] = await Promise.all([
     db.inventoryImportRow.findMany({
       where: whereRows,
       include: {
@@ -64,6 +66,7 @@ export async function GET(req: NextRequest) {
       take: 80,
     }),
     db.enrichmentProviderConfig.findMany({ orderBy: [{ providerType: "asc" }, { priority: "asc" }] }),
+    getExternalEnrichmentAdminStatus(),
   ]);
 
   return NextResponse.json({
@@ -73,6 +76,7 @@ export async function GET(req: NextRequest) {
     images,
     descriptions,
     providers,
+    externalEnrichment,
     rules: {
       automaticPublication:
         "Publication automatique uniquement pour un médicament déjà référencé, correspondance exacte, dosage et forme identiques, image déjà validée et licence validée.",
@@ -179,8 +183,15 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (action === "validate-image" || action === "publish-image") {
+    const imageId = String(body.imageId ?? "");
+    const existingImage = await db.medicationImage.findUnique({ where: { id: imageId } });
+    if (!existingImage) return NextResponse.json({ error: "Image introuvable." }, { status: 404 });
+    if (action === "publish-image") {
+      const publication = canPublishMedicationImage(existingImage);
+      if (!publication.allowed) return NextResponse.json({ error: publication.reason }, { status: 400 });
+    }
     const image = await db.medicationImage.update({
-      where: { id: String(body.imageId ?? "") },
+      where: { id: imageId },
       data: {
         validationStatus: action === "publish-image" ? "Publiée" : "Validée",
         validatedBy: access.session?.name ?? access.role ?? null,
@@ -196,6 +207,32 @@ export async function PATCH(req: NextRequest) {
       });
     }
     return NextResponse.json({ image });
+  }
+
+  if (action === "use-placeholder") {
+    let medicationId = String(body.medicationId ?? "").trim();
+    const candidateId = String(body.candidateId ?? "").trim();
+    if (!medicationId && candidateId) {
+      const candidate = await db.enrichmentCandidate.findUnique({
+        where: { id: candidateId },
+        include: { job: true },
+      });
+      medicationId = candidate?.job.medicationId ?? "";
+    }
+    if (!medicationId) return NextResponse.json({ error: "Médicament obligatoire pour utiliser le placeholder." }, { status: 400 });
+    const placeholder = await ensurePlaceholderImage(medicationId);
+    if (!placeholder) return NextResponse.json({ error: "Placeholder impossible pour ce médicament." }, { status: 404 });
+    await writeAudit({
+      req,
+      platform: "admin",
+      action: "enrichment-placeholder-used",
+      entityType: "medication-image",
+      entityId: placeholder.id,
+      actorAccountId: access.session?.accountId,
+      actorName: access.session?.name,
+      actorRole: access.role ?? undefined,
+    });
+    return NextResponse.json({ image: placeholder, message: "Placeholder SABLIN PHARMA utilisé." });
   }
 
   if (action === "validate-description" || action === "publish-description") {

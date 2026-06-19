@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   Search,
   SlidersHorizontal,
@@ -12,9 +12,9 @@ import {
   LayoutGrid,
   List,
   Table2,
-  MapPin,
   CheckCircle2,
   Navigation,
+  Lock,
 } from "lucide-react";
 import { MedicationCard } from "@/components/shared/medication-card";
 import { MedicationTable } from "@/components/shared/medication-table";
@@ -38,12 +38,10 @@ import { cn } from "@/lib/utils";
 import type { Category, Medication } from "@/lib/types";
 
 type ViewMode = "grid" | "list" | "table";
-type Availability = "all" | "available" | "low-stock" | "out-of-stock";
 
 interface Filters {
   category: string | null;
   form: string;
-  availability: Availability;
   commune: string;
   maxPrice: string;
   nearMe: boolean;
@@ -52,7 +50,6 @@ interface Filters {
 const DEFAULT_FILTERS: Filters = {
   category: null,
   form: "all",
-  availability: "all",
   commune: "all",
   maxPrice: "all",
   nearMe: false,
@@ -96,6 +93,15 @@ export function MedicationsView() {
   });
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+  const mobileFiltersRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showFiltersMobile) return;
+    const id = window.setTimeout(() => {
+      mobileFiltersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 40);
+    return () => window.clearTimeout(id);
+  }, [showFiltersMobile]);
 
   // Fetch categories
   useEffect(() => {
@@ -159,21 +165,6 @@ export function MedicationsView() {
       result = result.filter((m) => m.form === filters.form);
     }
 
-    // Availability filter (deterministic based on slug hash)
-    if (filters.availability !== "all") {
-      result = result.filter((m) => {
-        const hash = m.slug.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-        const pct = hash % 10;
-        const count = m.pharmacyCount ?? 0;
-        let status: string;
-        if (count === 0) status = "out-of-stock";
-        else if (pct < 6) status = "available";
-        else if (pct < 9) status = "low-stock";
-        else status = "to-confirm";
-        return status === filters.availability;
-      });
-    }
-
     // Price filter
     if (filters.maxPrice !== "all") {
       const max = parseInt(filters.maxPrice, 10);
@@ -186,7 +177,6 @@ export function MedicationsView() {
   const activeFiltersCount =
     (filters.category ? 1 : 0) +
     (filters.form !== "all" ? 1 : 0) +
-    (filters.availability !== "all" ? 1 : 0) +
     (filters.commune !== "all" ? 1 : 0) +
     (filters.maxPrice !== "all" ? 1 : 0) +
     (filters.nearMe ? 1 : 0);
@@ -216,13 +206,13 @@ export function MedicationsView() {
         <Eyebrow>Recherche de médicaments</Eyebrow>
         <Heading level="h1">Médicaments</Heading>
         <p className="text-sm text-muted-foreground sm:text-base">
-          Recherchez un médicament, consultez son prix indicatif et identifiez les pharmacies
-          qui le possèdent à Abidjan.
+          Recherchez un médicament et consultez ses informations générales. Les disponibilités
+          réelles et pharmacies associées sont débloquées avec les crédits SABLIN.
         </p>
       </div>
 
       {/* ============ SEARCH ZONE ============ */}
-      <Card className="mt-6 border-border/70 p-4 shadow-avance sm:p-5">
+      <Card className="mt-6 overflow-hidden border-border/70 p-4 shadow-avance sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
@@ -251,7 +241,7 @@ export function MedicationsView() {
           </div>
           <Button
             size="lg"
-            className="h-12 shrink-0 bg-brand text-white hover:opacity-90"
+            className="h-12 w-full shrink-0 bg-brand text-white hover:opacity-90 sm:w-auto"
             onClick={() => {
               const q = query.trim();
               if (q) navigate("medications", { query: q });
@@ -263,8 +253,10 @@ export function MedicationsView() {
           <Button
             size="lg"
             variant="outline"
-            className="relative h-12 shrink-0 lg:hidden"
+            className="relative h-12 w-full shrink-0 lg:hidden"
             onClick={() => setShowFiltersMobile((v) => !v)}
+            aria-expanded={showFiltersMobile}
+            aria-controls="medications-mobile-filters"
           >
             <SlidersHorizontal className="size-4" /> Filtres
             {activeFiltersCount > 0 && (
@@ -280,6 +272,35 @@ export function MedicationsView() {
         </p>
       </Card>
 
+      {/* Mobile filters: rendered close to the button so the action feels immediate */}
+      {showFiltersMobile && (
+        <Card
+          id="medications-mobile-filters"
+          ref={mobileFiltersRef}
+          className="mt-4 overflow-hidden border-border/70 p-4 shadow-avance lg:hidden"
+        >
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-bold">Filtres médicaments</h3>
+            <button
+              onClick={() => setShowFiltersMobile(false)}
+              className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Fermer les filtres"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+          <FiltersPanel
+            filters={filters}
+            setFilters={setFilters}
+            forms={forms}
+            categories={categories}
+            activeCount={activeFiltersCount}
+            onReset={resetFilters}
+            isMobile
+          />
+        </Card>
+      )}
+
       {/* ============ CATEGORIES SECTION ============ */}
       <section className="mt-8">
         <div className="mb-4 flex items-end justify-between">
@@ -292,7 +313,7 @@ export function MedicationsView() {
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+        <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
           {loading
             ? Array.from({ length: 7 }).map((_, i) => (
                 <Skeleton key={i} className="h-24 rounded-2xl" />
@@ -336,7 +357,7 @@ export function MedicationsView() {
       </section>
 
       {/* ============ MAIN LAYOUT: filters sidebar + results ============ */}
-      <div className="mt-8 grid gap-6 lg:grid-cols-[260px_1fr]">
+      <div className="mt-8 grid min-w-0 gap-6 lg:grid-cols-[260px_1fr]">
         {/* Desktop filters sidebar */}
         <aside className="hidden lg:block">
           <FiltersPanel
@@ -349,34 +370,10 @@ export function MedicationsView() {
           />
         </aside>
 
-        {/* Mobile filters (collapsible) */}
-        {showFiltersMobile && (
-          <Card className="border-border/70 p-4 lg:hidden">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold">Filtres</h3>
-              <button
-                onClick={() => setShowFiltersMobile(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-            <FiltersPanel
-              filters={filters}
-              setFilters={setFilters}
-              forms={forms}
-              categories={categories}
-              activeCount={activeFiltersCount}
-              onReset={resetFilters}
-              isMobile
-            />
-          </Card>
-        )}
-
         {/* Results */}
-        <div>
+        <div className="min-w-0">
           {/* Toolbar */}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
               {loading ? (
                 "Chargement..."
@@ -390,7 +387,7 @@ export function MedicationsView() {
                 </>
               )}
             </p>
-            <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-0.5">
+            <div className="grid w-full grid-cols-3 gap-1 rounded-lg border border-border bg-background p-0.5 sm:flex sm:w-auto sm:items-center">
               {(
                 [
                   { mode: "grid" as const, icon: LayoutGrid, label: "Grille" },
@@ -402,7 +399,7 @@ export function MedicationsView() {
                   key={v.mode}
                   onClick={() => setViewMode(v.mode)}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    "flex min-h-9 items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
                     viewMode === v.mode
                       ? "bg-brand-light text-brand-dark"
                       : "text-muted-foreground hover:text-foreground"
@@ -429,18 +426,6 @@ export function MedicationsView() {
                 <FilterChip
                   label={filters.form}
                   onRemove={() => setFilters((f) => ({ ...f, form: "all" }))}
-                />
-              )}
-              {filters.availability !== "all" && (
-                <FilterChip
-                  label={
-                    {
-                      available: "Disponible",
-                      "low-stock": "Stock faible",
-                      "out-of-stock": "Rupture",
-                    }[filters.availability]
-                  }
-                  onRemove={() => setFilters((f) => ({ ...f, availability: "all" }))}
                 />
               )}
               {filters.commune !== "all" && (
@@ -472,7 +457,7 @@ export function MedicationsView() {
 
           {/* Results display */}
           {loading ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-64 rounded-2xl" />
               ))}
@@ -485,7 +470,7 @@ export function MedicationsView() {
               action={{ label: "Réinitialiser la recherche", onClick: resetFilters }}
             />
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredMeds.map((m) => (
                 <MedicationCard key={m.id} med={m} />
               ))}
@@ -526,7 +511,7 @@ function FiltersPanel({
   isMobile?: boolean;
 }) {
   return (
-    <div className={cn("space-y-5", !isMobile && "sticky top-24")}>
+    <div className={cn("min-w-0 space-y-5", !isMobile && "sticky top-24")}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="size-4 text-brand" />
@@ -555,7 +540,7 @@ function FiltersPanel({
             setFilters((f) => ({ ...f, category: v === "all" ? null : v }))
           }
         >
-          <SelectTrigger className="h-10">
+          <SelectTrigger className="h-10 w-full min-w-0">
             <SelectValue placeholder="Toutes les catégories" />
           </SelectTrigger>
           <SelectContent>
@@ -575,7 +560,7 @@ function FiltersPanel({
           value={filters.form}
           onValueChange={(v) => setFilters((f) => ({ ...f, form: v }))}
         >
-          <SelectTrigger className="h-10">
+          <SelectTrigger className="h-10 w-full min-w-0">
             <SelectValue placeholder="Toutes les formes" />
           </SelectTrigger>
           <SelectContent>
@@ -589,44 +574,15 @@ function FiltersPanel({
         </Select>
       </FilterGroup>
 
-      {/* Availability */}
-      <FilterGroup label="Disponibilité">
-        <div className="flex flex-col gap-1.5">
-          {(
-            [
-              { value: "all", label: "Tous les statuts" },
-              { value: "available", label: "Disponible" },
-              { value: "low-stock", label: "Stock faible" },
-              { value: "out-of-stock", label: "Rupture" },
-            ] as const
-          ).map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setFilters((f) => ({ ...f, availability: opt.value }))}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors",
-                filters.availability === opt.value
-                  ? "bg-brand-light font-semibold text-brand-dark"
-                  : "text-muted-foreground hover:bg-accent"
-              )}
-            >
-              <span
-                className={cn(
-                  "flex size-4 items-center justify-center rounded-full border",
-                  filters.availability === opt.value
-                    ? "border-brand bg-brand"
-                    : "border-border"
-                )}
-              >
-                {filters.availability === opt.value && (
-                  <CheckCircle2 className="size-3 text-white" />
-                )}
-              </span>
-              {opt.label}
-            </button>
-          ))}
+      <div className="rounded-xl border border-border bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+        <div className="flex items-start gap-2">
+          <Lock className="mt-0.5 size-4 shrink-0 text-brand" />
+          <p>
+            Les statuts de stock et pharmacies qui possèdent réellement un médicament
+            sont verrouillés. Utilisez “Voir pharmacies — 1 crédit” sur une fiche médicament.
+          </p>
         </div>
-      </FilterGroup>
+      </div>
 
       {/* Commune */}
       <FilterGroup label="Commune">
@@ -634,7 +590,7 @@ function FiltersPanel({
           value={filters.commune}
           onValueChange={(v) => setFilters((f) => ({ ...f, commune: v }))}
         >
-          <SelectTrigger className="h-10">
+          <SelectTrigger className="h-10 w-full min-w-0">
             <SelectValue placeholder="Toutes les communes" />
           </SelectTrigger>
           <SelectContent>
@@ -654,7 +610,7 @@ function FiltersPanel({
           value={filters.maxPrice}
           onValueChange={(v) => setFilters((f) => ({ ...f, maxPrice: v }))}
         >
-          <SelectTrigger className="h-10">
+          <SelectTrigger className="h-10 w-full min-w-0">
             <SelectValue placeholder="Tous les prix" />
           </SelectTrigger>
           <SelectContent>
@@ -672,14 +628,14 @@ function FiltersPanel({
         <button
           onClick={() => setFilters((f) => ({ ...f, nearMe: !f.nearMe }))}
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors",
+            "flex w-full min-w-0 items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-colors",
             filters.nearMe
               ? "border-brand bg-brand-light text-brand-dark"
               : "border-border bg-background text-muted-foreground hover:border-brand/30"
           )}
         >
-          <Navigation className="size-4" />
-          Pharmacie proche de moi
+          <Navigation className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1">Pharmacie proche de moi</span>
           <span
             className={cn(
               "ml-auto flex size-4 items-center justify-center rounded-full border",
@@ -732,7 +688,7 @@ function MedicationRowSimple({ med }: { med: Medication }) {
   return (
     <button
       onClick={() => navigate("medication-detail", { slug: med.slug })}
-      className="group flex w-full items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 text-left transition-all hover:border-brand/30 hover:bg-accent/40"
+      className="group flex w-full min-w-0 items-start gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 text-left transition-all hover:border-brand/30 hover:bg-accent/40 min-[420px]:items-center"
     >
       <span
         className="flex size-11 shrink-0 items-center justify-center rounded-lg text-white"
@@ -741,20 +697,20 @@ function MedicationRowSimple({ med }: { med: Medication }) {
         <CategoryIcon name={med.category?.iconName ?? "Pill"} size={22} color="#fff" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="truncate text-sm font-bold text-foreground">
+        <span className="block break-words text-sm font-bold leading-snug text-foreground">
           {med.name}
         </span>
-        <span className="block truncate text-xs text-muted-foreground">
+        <span className="mt-0.5 block break-words text-xs text-muted-foreground">
           {med.genericName} · {med.form} {med.dosage}
         </span>
       </span>
-      <span className="flex flex-col items-end shrink-0">
+      <span className="flex shrink-0 flex-col items-end">
         <span className="text-sm font-extrabold text-brand-dark">
           {med.avgPrice.toLocaleString("fr-FR")} F
         </span>
-        <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-          <MapPin className="size-3 text-brand" />
-          {med.pharmacyCount ?? 0} pharmacies
+        <span className="flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
+          <Lock className="size-3 text-brand" />
+          1 crédit
         </span>
       </span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />

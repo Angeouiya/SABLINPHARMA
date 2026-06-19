@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { lockedFeaturePayload } from "@/lib/credit-gates";
 import { isOpenNow } from "@/lib/format";
 import { isPublicPharmacyMedia } from "@/lib/pharmacy-platform";
 
@@ -63,7 +64,6 @@ export async function GET(req: NextRequest) {
     where,
     include: {
       media: { orderBy: [{ isPrimary: "desc" }, { displayOrder: "asc" }, { createdAt: "desc" }] },
-      _count: { select: { medications: true } },
     },
     orderBy: [{ isOnDuty: "desc" }, { rating: "desc" }],
   });
@@ -102,7 +102,12 @@ export async function GET(req: NextRequest) {
       facadeUrl: facade?.url ?? null,
       coverImageUrl: cover?.url ?? null,
       publicMedia: publicMedia.map(safeMedia),
-      medicationCount: p._count.medications,
+      inventoryLocked: true,
+      inventoryLabel: "Voir médicaments disponibles — 1 crédit",
+      inventoryAccess: lockedFeaturePayload({
+        featureKey: "seePharmacyInventory",
+        isAuthenticated: false,
+      }),
       openNow: isOpenNow(p),
     };
   });

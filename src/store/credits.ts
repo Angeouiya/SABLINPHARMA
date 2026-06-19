@@ -43,7 +43,9 @@ export const useCredits = create<CreditState>()(
       passStatus: "none",
       transactions: [],
       loading: false,
-      setCredits: (n) => set({ credits: n }),
+      setCredits: () => {
+        // Le solde est autoritaire côté serveur. Cette méthode reste no-op pour compatibilité.
+      },
       fetch: async () => {
         set({ loading: true });
         try {
@@ -74,9 +76,8 @@ export const useCredits = create<CreditState>()(
           if (!res.ok) {
             return { success: false, error: data.error ?? "Erreur" };
           }
-          set({ credits: data.balance });
-          get().fetch();
-          return { success: true, balance: data.balance };
+          await get().fetch();
+          return { success: true, balance: get().credits };
         } catch {
           return { success: false, error: "Erreur réseau" };
         }
@@ -92,9 +93,8 @@ export const useCredits = create<CreditState>()(
           if (!res.ok) {
             return { success: false, error: data.error ?? "Erreur" };
           }
-          set({ credits: data.balance });
-          get().fetch();
-          return { success: true, balance: data.balance };
+          await get().fetch();
+          return { success: true, balance: get().credits };
         } catch {
           return { success: false, error: "Erreur réseau" };
         }
@@ -118,7 +118,7 @@ export const useCredits = create<CreditState>()(
     }),
     {
       name: "sablin-credits",
-      partialize: (s) => ({ credits: s.credits, hasPass: s.hasPass, passStatus: s.passStatus }),
+      partialize: () => ({}),
     }
   )
 );

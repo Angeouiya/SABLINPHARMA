@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth/session";
 import { PASS_ORDONNANCE_PRICE } from "@/lib/restrictions";
+import { createPaymentIntent } from "@/lib/payment-security";
 
 export async function GET() {
   const user = await getSessionUser();
@@ -22,7 +23,7 @@ export async function GET() {
   });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) {
     return NextResponse.json(
@@ -31,8 +32,7 @@ export async function POST(req: Request) {
     );
   }
   try {
-    const body = await req.json();
-    const reference = body.reference ?? `SPL-${Date.now()}`;
+    const body = await req.json().catch(() => ({}));
 
     const existing = await db.passOrdonnance.findFirst({
       where: { userId: user.id, active: true, status: { in: ["active", "linked"] } },
@@ -44,48 +44,28 @@ export async function POST(req: Request) {
       );
     }
 
-    const pass = await db.passOrdonnance.create({
-      data: {
-        userId: user.id,
-        active: true,
-        status: "active",
-        price: PASS_ORDONNANCE_PRICE,
-      },
+    const result = await createPaymentIntent({
+      userId: user.id,
+      purchaseType: "pass_ordonnance",
+      amount: PASS_ORDONNANCE_PRICE,
+      provider: body.provider ?? "paydunya",
+      idempotencyKey: req.headers.get("x-idempotency-key") ?? body.idempotencyKey,
+      req,
+      metadata: body,
     });
 
-    await db.payment.create({
-      data: {
-        userId: user.id,
-        amount: PASS_ORDONNANCE_PRICE,
-        method: body.method ?? "mobile_money",
-        provider: body.provider ?? "orange",
-        reference,
-        status: "success",
-      },
+    return NextResponse.json({
+      subscription: null,
+      pending: true,
+      hasPass: false,
+      reference: result.payment.reference,
+      checkoutUrl: result.checkoutUrl,
+      status: result.payment.status,
+      message: "Paiement en cours de vérification. Le Pass sera activé uniquement après confirmation PayDunya.",
     });
-
-    const fullUser = await db.user.findUnique({
-      where: { id: user.id },
-      select: { credits: true },
-    });
-
-    await db.creditTransaction.create({
-      data: {
-        userId: user.id,
-        type: "pass",
-        amount: 0,
-        description: `Pass Ordonnance Unique — ${PASS_ORDONNANCE_PRICE} FCFA (${body.provider ?? "orange"})`,
-        fcfaEquivalent: PASS_ORDONNANCE_PRICE,
-        balanceBefore: fullUser?.credits ?? 0,
-        balanceAfter: fullUser?.credits ?? 0,
-        status: "réussi",
-      },
-    });
-
-    return NextResponse.json({ subscription: null, pass, hasPass: true });
   } catch {
     return NextResponse.json(
-      { error: "Erreur lors de l'activation du Pass Ordonnance Unique." },
+      { error: "Erreur lors de la création du paiement du Pass Ordonnance Unique." },
       { status: 500 }
     );
   }

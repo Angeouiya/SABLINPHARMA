@@ -706,9 +706,20 @@ function ImportInventory() {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
-  const uploadImport = async () => {
+  const [preview, setPreview] = useState<{
+    totalRows: number;
+    validRows: number;
+    incompleteRows: number;
+    invalidRows: number;
+    recognizedMedications: number;
+    unknownMedications: number;
+    duplicateRows: number;
+    missingPrices: number;
+    invalidStatuses: number;
+  } | null>(null);
+  const previewImport = async () => {
     if (!file) {
-      setMessage("Choisissez un fichier CSV, XLS ou XLSX avant l’import.");
+      setMessage("Choisissez un fichier CSV, Excel, Word ou PowerPoint avant l’aperçu.");
       return;
     }
     setUploading(true);
@@ -717,11 +728,35 @@ function ImportInventory() {
       const form = new FormData();
       form.set("pharmacySlug", PHARMACY_SESSION_SLUG);
       form.set("file", file);
-      const res = await fetch("/api/pharmacy-platform/imports", { method: "POST", headers: { "X-Sablin-Session-Kind": "pharmacy" }, body: form });
+      const res = await fetch("/api/imports/preview", { method: "POST", headers: { "X-Sablin-Session-Kind": "pharmacy" }, body: form });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Aperçu impossible.");
+      setPreview(data);
+      setMessage(`Aperçu prêt : ${data.totalRows} ligne(s), ${data.recognizedMedications} reconnue(s), ${data.unknownMedications} à valider.`);
+    } catch (error) {
+      setPreview(null);
+      setMessage(error instanceof Error ? error.message : "Aperçu impossible.");
+    } finally {
+      setUploading(false);
+    }
+  };
+  const uploadImport = async () => {
+    if (!file) {
+      setMessage("Choisissez un fichier CSV, Excel, Word ou PowerPoint avant l’import.");
+      return;
+    }
+    setUploading(true);
+    setMessage("");
+    try {
+      const form = new FormData();
+      form.set("pharmacySlug", PHARMACY_SESSION_SLUG);
+      form.set("file", file);
+      const res = await fetch("/api/imports/confirm", { method: "POST", headers: { "X-Sablin-Session-Kind": "pharmacy" }, body: form });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Import impossible.");
       setMessage(`Import ${data.import.status} : ${data.report.validRows} ligne(s) valide(s), ${data.report.invalidRows} ligne(s) à corriger, ${data.report.unknownMedications} médicament(s) non reconnu(s).`);
       setFile(null);
+      setPreview(data.report);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import impossible.");
     } finally {
@@ -731,33 +766,48 @@ function ImportInventory() {
   return (
     <Card className="border-border/70 p-5 shadow-card">
       <Heading level="h2">Import inventaire pharmacie</Heading>
-      <Muted>Vous importez uniquement l’inventaire de votre propre pharmacie.</Muted>
-      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-        <Input type="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading}>{uploading ? "Import..." : "Importer fichier"}</Button>
+      <Muted>Vous importez uniquement l’inventaire de votre propre pharmacie. Formats acceptés : CSV, XLSX, XLS lisible, Word DOCX et PowerPoint PPTX.</Muted>
+      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+        <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); }} />
+        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Aperçu avant validation"}</Button>
+        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading}>{uploading ? "Import..." : "Valider import"}</Button>
       </div>
       {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      {preview && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat label="Lignes détectées" value={preview.totalRows} badge="Aperçu" />
+          <Stat label="Lignes valides" value={preview.validRows} badge="Confirmé" />
+          <Stat label="À corriger" value={preview.incompleteRows + preview.invalidRows} badge="À vérifier" />
+          <Stat label="Médicaments non reconnus" value={preview.unknownMedications} badge="Admin" />
+          <Stat label="Doublons" value={preview.duplicateRows} badge="Conflit" />
+          <Stat label="Prix manquants" value={preview.missingPrices} badge="À compléter" />
+          <Stat label="Statuts invalides" value={preview.invalidStatuses} badge="Normalisé" />
+          <Stat label="Médicaments reconnus" value={preview.recognizedMedications} badge="Référentiel" />
+        </div>
+      )}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate()}>
           Télécharger modèle Excel
         </Button>
-        {[
-          ["Aperçu avant validation", "import-preview"],
-          ["Valider import", "import-validate"],
-        ].map(([label, action]) => (
-          <ProfessionalActionButton key={label} action={action} label={label} pharmacySlug={PHARMACY_SESSION_SLUG} variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light">
-            {label}
-          </ProfessionalActionButton>
-        ))}
+        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport}>Analyser maintenant</Button>
+        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={uploadImport}>Confirmer la publication contrôlée</Button>
       </div>
       <SectionBlock title="Colonnes du modèle d’import" description="La pharmacie peut corriger les lignes avant publication.">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {IMPORT_TEMPLATE_COLUMNS.map((column) => <div key={column} className="rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{column}</div>)}
         </div>
       </SectionBlock>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {["Lignes valides", "Lignes en erreur", "Médicaments reconnus", "Médicaments non reconnus", "Doublons", "Prix manquants", "Statuts invalides", "Corriger avant validation"].map((item) => <Stat key={item} label={item} value={item.includes("erreur") ? 7 : 42} badge={item.includes("erreur") || item.includes("invalides") ? "À vérifier" : "Confirmé"} />)}
-      </div>
+      {!preview && (
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {["Lignes valides", "Lignes en erreur", "Médicaments reconnus", "Médicaments non reconnus", "Doublons", "Prix manquants", "Statuts invalides", "Corrections avant validation"].map((item) => (
+            <Card key={item} className="border-border/70 p-4">
+              <StatusBadge label="Aperçu requis" />
+              <p className="mt-3 text-sm font-bold text-foreground">{item}</p>
+              <p className="text-xs font-medium text-muted-foreground">Disponible après analyse du fichier.</p>
+            </Card>
+          ))}
+        </div>
+      )}
       <p className="mt-4 rounded-xl border border-brand/20 bg-brand-light/50 p-4 text-sm font-semibold text-brand-dark">
         Statuts acceptés : Disponible, Stock faible, Rupture, À confirmer. La quantité interne aide la pharmacie, mais n’est jamais publiée.
       </p>

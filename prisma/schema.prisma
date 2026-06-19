@@ -32,6 +32,8 @@ model User {
   contactUnlocks ContactUnlock[]
   requestDisputes RequestDispute[]
   requestRefunds RequestRefund[]
+  payments     Payment[]
+  featureAccesses UserFeatureAccess[]
 }
 
 model Category {
@@ -691,6 +693,30 @@ model ContactUnlock {
   @@index([transactionId])
 }
 
+model UserFeatureAccess {
+  id             String   @id @default(cuid())
+  userId         String
+  featureKey     String
+  entityType     String
+  entityId       String
+  creditCost     Int
+  fcfaEquivalent Int      @default(0)
+  transactionId  String?
+  idempotencyKey String?  @unique
+  unlockedAt     DateTime @default(now())
+  expiresAt      DateTime
+  status         String   @default("Actif")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([featureKey])
+  @@index([entityType, entityId])
+  @@index([expiresAt])
+  @@index([transactionId])
+}
+
 model RequestStatusHistory {
   id             String   @id @default(cuid())
   requestId      String
@@ -925,12 +951,42 @@ model Subscription {
 model Payment {
   id           String   @id @default(cuid())
   userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   amount       Int
-  method       String // mobile_money, card
-  provider     String // orange, mtn, moov, visa, mastercard
+  currency     String   @default("XOF")
+  method       String   // mobile_money
+  provider     String   // wave, orange, mtn, moov
   reference    String   @unique
-  status       String   @default("success") // success, pending, failed
+  providerReference String?
+  productType  String   @default("legacy") // credit_pack | pass_ordonnance | legacy
+  expectedCredits Int   @default(0)
+  passOrdonnance Boolean @default(false)
+  status       String   @default("PENDING") // INITIATED, PENDING, PROCESSING, SUCCESS, FAILED, CANCELLED, EXPIRED, REJECTED, SUSPICIOUS, REFUNDED, CHARGEBACK, MANUAL_REVIEW
+  riskStatus   String   @default("Normal") // Normal, À surveiller, Suspect, Bloqué
+  riskScore    Int      @default(0)
+  riskReasons  String?
+  idempotencyKey String?
+  expiresAt    DateTime?
+  processedAt  DateTime?
+  verifiedAt   DateTime?
+  refundedAt   DateTime?
+  webhookEventId String?
+  webhookSignatureValid Boolean @default(false)
+  manualReviewReason String?
+  manualValidatedBy String?
+  manualValidatedAt DateTime?
+  ipAddress    String?
+  userAgent    String?
+  metadataJson String?
   createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@index([provider])
+  @@index([productType])
+  @@index([riskStatus])
+  @@index([idempotencyKey])
+  @@index([createdAt])
 }
 
 model Notification {
@@ -997,7 +1053,15 @@ model CreditTransaction {
   balanceBefore Int    @default(0)
   balanceAfter Int
   status      String   @default("réussi") // réussi, annulé, échoué
+  reference   String?
+  source      String?
+  paymentId   String?
   createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([reference])
+  @@index([paymentId])
+  @@index([createdAt])
 }
 
 model PassOrdonnance {
@@ -1008,7 +1072,13 @@ model PassOrdonnance {
   status    String   @default("active") // active, linked, used, expired
   ordonnanceId String?
   price     Int      @default(500)
+  paymentId String?
+  paymentReference String?
   usedAt    DateTime?
   createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@index([paymentReference])
 }
 

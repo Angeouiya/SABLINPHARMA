@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth/session";
-import { CREDIT_PACKS, FCFA_PER_CREDIT } from "@/lib/restrictions";
+import { CREDIT_PACKS } from "@/lib/restrictions";
+import { createPaymentIntent } from "@/lib/payment-security";
 
-// Recharge credits via Mobile Money (mock)
+// Recharge credits via PayDunya. Les moyens Mobile Money sont choisis sur PayDunya.
 const PACKS = Object.fromEntries(CREDIT_PACKS.map((pack) => [pack.amount, pack]));
 
 export async function POST(req: NextRequest) {
@@ -20,44 +20,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pack invalide" }, { status: 400 });
     }
 
-    const fullUser = await db.user.findUnique({
-      where: { id: user.id },
-      select: { credits: true },
-    });
-    const balanceBefore = fullUser?.credits ?? 0;
-    const balance = balanceBefore + pack.credits;
-
-    await db.user.update({
-      where: { id: user.id },
-      data: { credits: balance },
+    const result = await createPaymentIntent({
+      userId: user.id,
+      purchaseType: "credit_pack",
+      amount,
+      provider: body.provider ?? "paydunya",
+      idempotencyKey: req.headers.get("x-idempotency-key") ?? body.idempotencyKey,
+      req,
+      metadata: body,
     });
 
-    const tx = await db.creditTransaction.create({
-      data: {
-        userId: user.id,
-        type: "recharge",
-        amount: pack.credits,
-        description: `${pack.label} — ${amount} FCFA (${body.provider ?? "mobile_money"})`,
-        fcfaEquivalent: pack.credits * FCFA_PER_CREDIT,
-        balanceBefore,
-        balanceAfter: balance,
-        status: "réussi",
-      },
+    return NextResponse.json({
+      success: true,
+      pending: true,
+      credits: pack.credits,
+      reference: result.payment.reference,
+      checkoutUrl: result.checkoutUrl,
+      status: result.payment.status,
+      message: "Paiement en cours de vérification. Les crédits seront ajoutés après confirmation officielle.",
     });
-
-    // Create payment record
-    await db.payment.create({
-      data: {
-        userId: user.id,
-        amount,
-        method: "mobile_money",
-        provider: body.provider ?? "orange",
-        reference: `SPL-RECHARGE-${Date.now()}`,
-        status: "success",
-      },
-    });
-
-    return NextResponse.json({ success: true, balance, credits: pack.credits, transaction: tx });
   } catch {
     return NextResponse.json({ error: "Erreur" }, { status: 500 });
   }

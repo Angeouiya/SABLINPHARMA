@@ -204,10 +204,19 @@
     overflow-x: hidden;
     width: 100%;
   }
+  :where(main, section, article, aside, header, footer, nav, div, form) {
+    min-width: 0;
+  }
+  :where(button, a, input, select, textarea, [role="button"]) {
+    min-width: 0;
+  }
   /* Prevent horizontal scroll from any element */
   img, video, svg, table {
     max-width: 100%;
     height: auto;
+  }
+  p, span, label, button, a, input, textarea {
+    overflow-wrap: anywhere;
   }
   /* Headings use foreground (dark) for maximum readability on all backgrounds */
   h1, h2, h3, h4, h5, h6 {

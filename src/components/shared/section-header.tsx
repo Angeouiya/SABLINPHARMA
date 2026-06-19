@@ -13,19 +13,19 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ title, subtitle, action, className, icon }: SectionHeaderProps) {
   return (
-    <div className={cn("flex items-center justify-between gap-3", className)}>
-      <div className="flex min-w-0 items-center gap-2.5">
+    <div className={cn("flex min-w-0 items-center justify-between gap-3", className)}>
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
         {icon && (
           <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-brand-light text-brand">
             {icon}
           </span>
         )}
         <div className="min-w-0">
-          <h2 className="truncate text-base font-extrabold text-foreground sm:text-lg">
+          <h2 className="text-sm font-extrabold leading-tight text-foreground sm:text-lg">
             {title}
           </h2>
           {subtitle && (
-            <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{subtitle}</p>
+            <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">{subtitle}</p>
           )}
         </div>
       </div>

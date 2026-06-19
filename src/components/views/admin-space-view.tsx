@@ -27,7 +27,6 @@ import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
 import {
   ImportValidationPanel,
   safePublishLineNumbers,
-  selectedConfirmableRows,
   type ImportPreviewData,
 } from "@/components/shared/import-validation-panel";
 import { Badge } from "@/components/ui/badge";
@@ -509,7 +508,7 @@ function GlobalAdminImports() {
       setUploading(false);
     }
   };
-  const uploadImport = async () => {
+  const submitImport = async (mode: "publish_selected" | "draft") => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
       return;
@@ -518,9 +517,13 @@ function GlobalAdminImports() {
       setMessage("Analysez le fichier avant de valider. Vous pourrez retirer les lignes à ne pas publier.");
       return;
     }
-    const rowsToConfirm = selectedConfirmableRows(preview, selectedLineNumbers);
+    const rowsToConfirm = preview.confirmableRows ?? [];
     if (!rowsToConfirm.length) {
-      setMessage("Aucune ligne sélectionnée. Sélectionnez les lignes sûres ou réintégrez les produits à publier.");
+      setMessage("Aucune ligne analysée à enregistrer.");
+      return;
+    }
+    if (mode === "publish_selected" && !selectedLineNumbers.size) {
+      setMessage("Aucune ligne dans la liste à publier. Sélectionnez les lignes sûres ou enregistrez l’import en brouillon contrôlé.");
       return;
     }
     setUploading(true);
@@ -534,11 +537,17 @@ function GlobalAdminImports() {
           fileName: file.name,
           fileType: file.name.split(".").pop() ?? "CSV",
           rows: rowsToConfirm,
+          publishLineNumbers: mode === "draft" ? [] : Array.from(selectedLineNumbers),
+          mode,
         }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Import impossible.");
-      setMessage(`Publication contrôlée : ${data.report.syncPublishedProducts ?? 0} produit(s) publié(s), ${data.report.syncPendingValidation ?? 0} gardé(s) en validation, ${data.report.unknownMedications} non reconnu(s).`);
+      setMessage(
+        mode === "draft"
+          ? `Brouillon contrôlé enregistré : ${data.report.totalRows ?? 0} ligne(s), ${data.report.draftRows ?? 0} hors marketplace.`
+          : `Liste publiée avec contrôle : ${data.report.safePublishedRows ?? 0} ligne(s) sûre(s), ${data.report.selectedButNeedsValidation ?? 0} à valider, ${data.report.draftRows ?? 0} en brouillon contrôlé.`
+      );
       setFile(null);
       setSelectedLineNumbers(new Set());
       setPreview(data.report);
@@ -548,6 +557,8 @@ function GlobalAdminImports() {
       setUploading(false);
     }
   };
+  const uploadImport = async () => submitImport("publish_selected");
+  const saveDraftImport = async () => submitImport("draft");
   return (
     <div className="space-y-5">
       <Card className="border-border/70 p-5 shadow-card">
@@ -563,7 +574,8 @@ function GlobalAdminImports() {
           <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); }} />
           <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate(`modele-import-${pharmacySlug}.csv`)}>Télécharger modèle Excel</Button>
           <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Aperçu avant validation"}</Button>
-          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Import..." : "Valider la sélection"}</Button>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={saveDraftImport} disabled={uploading || !preview}>Brouillon contrôlé</Button>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier la liste"}</Button>
         </div>
         {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
         {preview && (

@@ -109,11 +109,17 @@ export async function confirmImportFromRequest(req: NextRequest) {
   if (!rows.length) {
     return { response: NextResponse.json({ error: "Aucune ligne importée à confirmer." }, { status: 400 }) };
   }
+  const publishLineNumbers = Array.isArray(body.publishLineNumbers)
+    ? body.publishLineNumbers.map(Number).filter(Number.isFinite)
+    : undefined;
+  const mode = body.mode === "draft" ? "draft" : "publish_selected";
   const result = await confirmMarketplaceImport({
     pharmacySlug: effectiveSlug ?? pharmacySlug,
     fileName: String(body.fileName ?? "inventaire-sablin.csv"),
     fileType: String(body.fileType ?? "CSV"),
     rows,
+    publishLineNumbers,
+    mode,
     role: hasPharmacyPermission(access.role, "view_all_pharmacies") ? "admin" : "pharmacy",
     actorName: access.session?.name ?? null,
     actorRole: access.role ?? null,

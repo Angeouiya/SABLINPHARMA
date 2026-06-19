@@ -246,7 +246,17 @@ function compareMedication(
   }
 
   const hardConflict = differentFields.includes("dosage") || differentFields.includes("forme");
-  const boundedScore = hardConflict ? Math.min(score, 79) : Math.min(score, 100);
+  const hasExactName = exactFields.includes("nom commercial") || exactFields.includes("alias");
+  const hasExactDci = exactFields.includes("DCI");
+  const hasExactDosage = exactFields.includes("dosage");
+  const hasExactForm = exactFields.includes("forme");
+  const hasExactBarcode = exactFields.includes("code-barres");
+  let adjustedScore = score;
+  if (!hardConflict && hasExactBarcode) adjustedScore = Math.max(adjustedScore, 98);
+  if (!hardConflict && hasExactName && hasExactDci && hasExactDosage && hasExactForm) adjustedScore = Math.max(adjustedScore, 97);
+  else if (!hardConflict && hasExactName && hasExactDosage && hasExactForm) adjustedScore = Math.max(adjustedScore, 92);
+  else if (!hardConflict && hasExactDci && hasExactDosage && hasExactForm) adjustedScore = Math.max(adjustedScore, 88);
+  const boundedScore = hardConflict ? Math.min(adjustedScore, 79) : Math.min(adjustedScore, 100);
   const level: MatchResult["level"] = hardConflict
     ? "Conflit de données"
     : boundedScore >= 95

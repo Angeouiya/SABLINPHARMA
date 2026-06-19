@@ -65,6 +65,8 @@ export type MarketplacePreviewRow = {
   packaging: string;
   manufacturer: string;
   barcode: string;
+  imageUrl: string;
+  imageBadge: string;
   price: string;
   normalizedPrice: number | null;
   quantity: string;
@@ -79,6 +81,8 @@ export type MarketplacePreviewRow = {
   medicationId?: string;
   medicationName?: string;
   confidenceLabel: string;
+  publicationDecision: "Prêt à publier" | "Validation admin requise" | "Référentiel requis" | "Bloqué";
+  publicationReason: string;
   correctionProposals: string[];
 };
 
@@ -107,6 +111,15 @@ export type MarketplacePreview = {
     priceNotice: string;
   };
 };
+
+function isPreviewRowSafeForPublication(row: Pick<MarketplacePreviewRow, "errors" | "normalizedPrice" | "matchScore" | "matchLevel">) {
+  return (
+    row.errors.length === 0 &&
+    row.normalizedPrice !== null &&
+    row.matchScore >= 95 &&
+    row.matchLevel === "Correspondance certaine"
+  );
+}
 
 function fileExtension(fileName: string) {
   return fileName.split(".").pop()?.trim().toLowerCase() ?? "";
@@ -488,11 +501,58 @@ export async function buildMarketplacePreview(input: {
     }
 
     const medication = isRecognized && best.medicationId
-      ? await db.medication.findUnique({ where: { id: best.medicationId }, select: { name: true } })
+      ? await db.medication.findUnique({
+          where: { id: best.medicationId },
+          select: {
+            name: true,
+            genericName: true,
+            dosage: true,
+            form: true,
+            images: {
+              where: { validationStatus: "Publiée" },
+              orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+              take: 1,
+            },
+          },
+        })
       : null;
+    const image = medication?.images[0];
+    const imageUrl = image?.url ?? buildMedicationPlaceholderUrl({
+      name: medication?.name ?? normalized.commercialName ?? row.name ?? "Médicament",
+      genericName: medication?.genericName ?? normalized.genericName,
+      dosage: medication?.dosage ?? normalized.dosage,
+      form: medication?.form ?? normalized.form,
+    });
+    const imageBadge = image
+      ? image.isPlaceholder
+        ? "Image illustrative"
+        : image.imageType === "pharmacy_photo"
+          ? "Photo pharmacie validée"
+          : "Image validée"
+      : "Image illustrative";
     if (errors.length) invalidRows += 1;
     else if (warnings.length) incompleteRows += 1;
     else validRows += 1;
+    const publicationDecision = errors.length
+      ? "Bloqué"
+      : isPreviewRowSafeForPublication({
+          errors,
+          normalizedPrice: price,
+          matchScore: best.score,
+          matchLevel: best.level,
+        })
+        ? "Prêt à publier"
+        : isRecognized
+          ? "Validation admin requise"
+          : "Référentiel requis";
+    const publicationReason =
+      publicationDecision === "Prêt à publier"
+        ? "Correspondance certaine, prix valide et aucune erreur bloquante."
+        : publicationDecision === "Référentiel requis"
+          ? "Médicament non reconnu : validation ou fusion dans le référentiel nécessaire."
+          : publicationDecision === "Bloqué"
+            ? "Ligne bloquée jusqu’à correction des erreurs."
+            : "La ligne reste contrôlée avant publication marketplace.";
 
     previewRows.push({
       lineNumber: row.lineNumber,
@@ -503,6 +563,8 @@ export async function buildMarketplacePreview(input: {
       packaging: normalized.packaging,
       manufacturer: normalized.manufacturer,
       barcode: normalized.barcode,
+      imageUrl,
+      imageBadge,
       price: row.price ?? "",
       normalizedPrice: price,
       quantity: row.quantity ?? "",
@@ -517,6 +579,8 @@ export async function buildMarketplacePreview(input: {
       medicationId: isRecognized ? best.medicationId : undefined,
       medicationName: medication?.name,
       confidenceLabel: confidenceLabel(best.score),
+      publicationDecision,
+      publicationReason,
       correctionProposals: normalized.correctionProposals,
     });
   }
@@ -553,6 +617,8 @@ export async function confirmMarketplaceImport(input: {
   fileName: string;
   fileType: string;
   rows: MarketplaceParsedRow[];
+  publishLineNumbers?: number[];
+  mode?: "publish_selected" | "draft";
   role: MarketplaceImportRole;
   actorName?: string | null;
   actorRole?: string | null;
@@ -560,8 +626,24 @@ export async function confirmMarketplaceImport(input: {
   const pharmacy = await db.pharmacy.findUnique({ where: { slug: input.pharmacySlug } });
   if (!pharmacy) throw new Error("Pharmacie introuvable.");
   const preview = await buildMarketplacePreview({ fileName: input.fileName, fileType: input.fileType, rows: input.rows });
+  const requestedPublishLines = input.publishLineNumbers
+    ? new Set(input.publishLineNumbers.map(Number).filter(Number.isFinite))
+    : new Set(preview.rows.map((row) => row.lineNumber));
+  const safePublishLines = new Set(
+    preview.rows
+      .filter((row) => requestedPublishLines.has(row.lineNumber) && isPreviewRowSafeForPublication(row))
+      .map((row) => row.lineNumber)
+  );
+  const selectedButNeedsValidation = preview.rows.filter(
+    (row) => requestedPublishLines.has(row.lineNumber) && !safePublishLines.has(row.lineNumber)
+  ).length;
+  const draftRows = preview.rows.filter((row) => !requestedPublishLines.has(row.lineNumber)).length;
   const source = input.role === "admin" ? "Import administrateur" : "Import pharmacie";
-  const status = preview.invalidRows > 0 || preview.incompleteRows > 0 ? "Terminé avec erreurs" : "Terminé";
+  const status = input.mode === "draft"
+    ? "Brouillon contrôlé"
+    : preview.invalidRows > 0 || preview.incompleteRows > 0 || selectedButNeedsValidation > 0 || draftRows > 0
+      ? "Terminé avec contrôles"
+      : "Terminé";
   const importLog = await db.pharmacyImport.create({
     data: {
       pharmacyId: pharmacy.id,
@@ -607,14 +689,50 @@ export async function confirmMarketplaceImport(input: {
     rows: rowsForCore,
     provider: "Moteur Marketplace & Enrichissement SABLIN",
   });
-  const syncReport = await syncInventory({
-    pharmacyId: pharmacy.id,
-    rows: rowsForCore,
-    triggerType: "import",
-    sourceSystem: source,
-    mode: "controlled_auto_publish",
-    actor: input.actorName ?? null,
-  });
+  await Promise.all(preview.rows.map((row) => {
+    const nextStatus = safePublishLines.has(row.lineNumber)
+      ? "Publié"
+      : requestedPublishLines.has(row.lineNumber)
+        ? "Validation requise"
+        : "Brouillon contrôlé";
+    return db.inventoryImportRow.updateMany({
+      where: {
+        importId: importLog.id,
+        lineNumber: row.lineNumber,
+      },
+      data: {
+        status: nextStatus,
+        warningsJson: JSON.stringify([
+          ...row.warnings,
+          ...(safePublishLines.has(row.lineNumber) ? [] : [row.publicationReason]),
+        ]),
+      },
+    });
+  }));
+  const rowsToPublish = rowsForCore.filter((row) => safePublishLines.has(row.lineNumber));
+  const syncReport = rowsToPublish.length
+    ? await syncInventory({
+        pharmacyId: pharmacy.id,
+        rows: rowsToPublish,
+        triggerType: "import",
+        sourceSystem: source,
+        mode: "controlled_auto_publish",
+        actor: input.actorName ?? null,
+      })
+    : {
+        jobId: null,
+        status: "Brouillon contrôlé",
+        totalRows: 0,
+        validRows: 0,
+        invalidRows: 0,
+        recognizedMedications: 0,
+        unknownMedications: 0,
+        updatedProducts: 0,
+        outOfStockProducts: 0,
+        priceChanges: 0,
+        conflicts: 0,
+        warnings: 0,
+      };
   await startMarketplaceEnrichment({
     medicationIds: preview.rows.map((row) => row.medicationId).filter(Boolean) as string[],
     actorName: input.actorName ?? null,
@@ -626,6 +744,10 @@ export async function confirmMarketplaceImport(input: {
     enrichmentRowsCreated: enrichmentRows.length,
     syncJobId: syncReport.jobId,
     syncStatus: syncReport.status,
+    selectedRows: requestedPublishLines.size,
+    safePublishedRows: safePublishLines.size,
+    draftRows,
+    selectedButNeedsValidation,
     syncPublishedProducts: syncReport.updatedProducts,
     syncOutOfStockProducts: syncReport.outOfStockProducts,
     syncPriceChanges: syncReport.priceChanges,
@@ -636,7 +758,7 @@ export async function confirmMarketplaceImport(input: {
     syncConflicts: syncReport.conflicts,
     syncWarnings: syncReport.warnings,
     syncPublicationRule:
-      "Publication contrôlée : seules les lignes reconnues avec une correspondance certaine, un prix valide et aucune erreur sont visibles côté utilisateur après déblocage par crédits. Les lignes ambiguës restent en validation admin.",
+      "Publication contrôlée : seules les lignes reconnues avec une correspondance certaine, un prix valide et aucune erreur sont visibles côté utilisateur après déblocage par crédits. Les lignes retirées restent en brouillon contrôlé et les lignes ambiguës restent en validation admin.",
   };
   await db.pharmacyImport.update({
     where: { id: importLog.id },

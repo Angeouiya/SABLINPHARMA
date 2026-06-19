@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, RotateCcw, ShieldCheck, XCircle } from "lucide-react";
+import { CheckCircle2, FileCheck2, ImageIcon, RotateCcw, ShieldCheck, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -32,6 +32,10 @@ export type ImportPreviewLine = {
   genericName: string;
   dosage: string;
   form: string;
+  packaging?: string;
+  manufacturer?: string;
+  imageUrl?: string;
+  imageBadge?: string;
   price: string;
   normalizedPrice: number | null;
   quantity: string;
@@ -41,8 +45,11 @@ export type ImportPreviewLine = {
   warnings: string[];
   matchScore: number;
   matchLevel: string;
+  medicationId?: string;
   medicationName?: string;
   confidenceLabel: string;
+  publicationDecision?: "Prêt à publier" | "Validation admin requise" | "Référentiel requis" | "Bloqué";
+  publicationReason?: string;
 };
 
 export type ImportPreviewData = {
@@ -57,6 +64,9 @@ export type ImportPreviewData = {
   invalidStatuses: number;
   rows?: ImportPreviewLine[];
   confirmableRows?: ConfirmableImportRow[];
+  safePublishedRows?: number;
+  draftRows?: number;
+  selectedButNeedsValidation?: number;
 };
 
 function isSafePublishRow(row: ImportPreviewLine) {
@@ -72,10 +82,6 @@ export function safePublishLineNumbers(preview: ImportPreviewData | null) {
   return new Set((preview?.rows ?? []).filter(isSafePublishRow).map((row) => row.lineNumber));
 }
 
-export function selectedConfirmableRows(preview: ImportPreviewData | null, selectedLineNumbers: Set<number>) {
-  return (preview?.confirmableRows ?? []).filter((row) => selectedLineNumbers.has(row.lineNumber));
-}
-
 export function ImportValidationPanel({
   preview,
   selectedLineNumbers,
@@ -88,6 +94,9 @@ export function ImportValidationPanel({
   const rows = preview.rows ?? [];
   const safeRows = rows.filter(isSafePublishRow);
   const selectedCount = selectedLineNumbers.size;
+  const draftCount = Math.max(0, rows.length - selectedCount);
+  const selectedSafeCount = rows.filter((row) => selectedLineNumbers.has(row.lineNumber) && isSafePublishRow(row)).length;
+  const selectedNeedsReview = rows.filter((row) => selectedLineNumbers.has(row.lineNumber) && !isSafePublishRow(row)).length;
 
   const selectAll = () => onSelectionChange(new Set(rows.map((row) => row.lineNumber)));
   const selectSafe = () => onSelectionChange(new Set(safeRows.map((row) => row.lineNumber)));
@@ -105,19 +114,20 @@ export function ImportValidationPanel({
         <div>
           <h3 className="text-base font-extrabold text-foreground">Validation avant publication marketplace</h3>
           <p className="mt-1 max-w-3xl text-sm font-medium leading-relaxed text-muted-foreground">
-            Sélectionnez uniquement les produits qui doivent alimenter la marketplace utilisateur. Les lignes retirées
-            ne seront pas publiées et resteront hors de la validation de cet import.
+            Sélectionnez uniquement les produits à publier. Chaque ligne affiche son image produit ou un placeholder
+            SABLIN PHARMA. Les lignes retirées restent en brouillon contrôlé et ne sont pas visibles côté utilisateur.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge className="border-0 bg-brand text-white">{selectedCount} sélectionnée(s)</Badge>
-          <Badge variant="outline" className="border-brand/30 bg-white text-brand-dark">{safeRows.length} sûre(s)</Badge>
+          <Badge className="border-0 bg-brand text-white">{selectedSafeCount} prête(s)</Badge>
+          <Badge variant="outline" className="border-amber-300 bg-white text-amber-700">{selectedNeedsReview} à valider</Badge>
+          <Badge variant="outline" className="border-border bg-white text-foreground">{draftCount} brouillon(s)</Badge>
         </div>
       </div>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <Button type="button" className="bg-brand text-white hover:bg-brand-dark" onClick={selectSafe}>
-          <ShieldCheck className="size-4" /> Publier lignes sûres
+          <ShieldCheck className="size-4" /> Préparer lignes sûres
         </Button>
         <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={selectAll}>
           <CheckCircle2 className="size-4" /> Tout sélectionner
@@ -130,38 +140,78 @@ export function ImportValidationPanel({
         </Button>
       </div>
 
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-xl border border-border bg-white p-3">
+          <p className="text-xs font-bold text-muted-foreground">Liste à publier</p>
+          <p className="mt-1 text-xl font-extrabold text-foreground">{selectedCount}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-3">
+          <p className="text-xs font-bold text-muted-foreground">Publication automatique sûre</p>
+          <p className="mt-1 text-xl font-extrabold text-brand-dark">{selectedSafeCount}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-3">
+          <p className="text-xs font-bold text-muted-foreground">Validation admin nécessaire</p>
+          <p className="mt-1 text-xl font-extrabold text-amber-700">{selectedNeedsReview}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-white p-3">
+          <p className="text-xs font-bold text-muted-foreground">Retirées de la publication</p>
+          <p className="mt-1 text-xl font-extrabold text-foreground">{draftCount}</p>
+        </div>
+      </div>
+
       <div className="mt-4 grid gap-3">
         {rows.slice(0, 80).map((row) => {
           const selected = selectedLineNumbers.has(row.lineNumber);
           const safe = isSafePublishRow(row);
+          const decision = row.publicationDecision ?? (safe ? "Prêt à publier" : "Validation admin requise");
+          const decisionClass =
+            decision === "Prêt à publier"
+              ? "bg-brand text-white"
+              : decision === "Bloqué"
+                ? "bg-red-600 text-white"
+                : "bg-amber-500 text-white";
           return (
             <div
               key={row.lineNumber}
               className={cn(
-                "grid gap-3 rounded-xl border bg-white p-3 sm:grid-cols-[minmax(0,1fr)_auto]",
+                "grid gap-3 rounded-xl border bg-white p-3 sm:grid-cols-[96px_minmax(0,1fr)_auto]",
                 selected ? "border-brand/40" : "border-border",
                 !safe && "bg-muted/20"
               )}
             >
+              <div className="h-24 w-full overflow-hidden rounded-lg border border-border bg-white sm:w-24">
+                {row.imageUrl ? (
+                  <img src={row.imageUrl} alt={row.name || "Image médicament"} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-muted/30 text-muted-foreground">
+                    <ImageIcon className="size-7" />
+                  </div>
+                )}
+              </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="border-border bg-white text-foreground">Ligne {row.lineNumber}</Badge>
-                  <Badge className={cn("border-0", safe ? "bg-brand text-white" : "bg-amber-500 text-white")}>
-                    {safe ? "Publication sûre" : "Validation requise"}
-                  </Badge>
+                  <Badge className={cn("border-0", decisionClass)}>{decision}</Badge>
+                  <Badge variant="outline" className="border-border bg-white text-foreground">{selected ? "Dans la liste à publier" : "Brouillon contrôlé"}</Badge>
                   <Badge variant="outline" className="border-brand/30 bg-white text-brand-dark">{row.confidenceLabel}</Badge>
+                  {row.imageBadge && <Badge variant="outline" className="border-border bg-white text-foreground">{row.imageBadge}</Badge>}
                 </div>
                 <p className="mt-2 break-words text-sm font-extrabold text-foreground">
-                  {row.name || "Médicament sans nom"}
+                  {row.medicationName || row.name || "Médicament sans nom"}
                 </p>
                 <p className="mt-1 break-words text-xs font-medium text-muted-foreground">
                   {row.genericName || "DCI à compléter"} · {row.dosage || "Dosage à compléter"} · {row.form || "Forme à compléter"}
+                  {row.packaging ? ` · ${row.packaging}` : ""}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold">
                   <span className="rounded-md bg-muted px-2 py-1 text-foreground">Prix : {row.normalizedPrice ? `${row.normalizedPrice.toLocaleString("fr-FR")} FCFA` : "à compléter"}</span>
                   <span className="rounded-md bg-muted px-2 py-1 text-foreground">Statut : {row.normalizedStatus}</span>
                   <span className="rounded-md bg-muted px-2 py-1 text-foreground">Score : {row.matchScore}</span>
                 </div>
+                <p className="mt-2 break-words text-xs font-semibold text-muted-foreground">
+                  <FileCheck2 className="mr-1 inline size-3.5" />
+                  {row.publicationReason ?? (safe ? "Cette ligne peut alimenter la marketplace après validation." : "Cette ligne reste à contrôler avant publication.")}
+                </p>
                 {(row.errors.length > 0 || row.warnings.length > 0) && (
                   <p className="mt-2 break-words text-xs font-semibold text-amber-800">
                     {[...row.errors, ...row.warnings].join(" · ")}
@@ -180,7 +230,7 @@ export function ImportValidationPanel({
                   )}
                   onClick={() => toggleLine(row.lineNumber)}
                 >
-                  {selected ? "Retirer de la publication" : "Réintégrer"}
+                  {selected ? "Retirer de la liste" : "Ajouter à la liste"}
                 </Button>
               </div>
             </div>

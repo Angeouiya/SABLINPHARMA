@@ -421,7 +421,9 @@ export function MedicationDetailView() {
               <Badge className="border-0 bg-brand-dark text-white">
                 {med.informationBadge ?? "Informations à confirmer"}
               </Badge>
-              <CreditCost cost={0} />
+              <Badge variant="outline" className="border-brand/30 bg-white text-brand-dark">
+                Information générale
+              </Badge>
             </div>
 
             <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
@@ -521,7 +523,11 @@ export function MedicationDetailView() {
                 }}
               >
                 <ClipboardList className="size-4" /> Ajouter à mon ordonnance
-                <CreditCost cost={hasPass ? 0 : 1} className="ml-1" />
+                {hasPass ? (
+                  <Badge className="ml-1 border-0 bg-amber-500 text-white">Pass actif</Badge>
+                ) : (
+                  <CreditCost cost={1} className="ml-1" />
+                )}
               </Button>
               <Button
                 variant="outline"

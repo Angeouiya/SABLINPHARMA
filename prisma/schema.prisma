@@ -34,6 +34,7 @@ model User {
   requestRefunds RequestRefund[]
   payments     Payment[]
   featureAccesses UserFeatureAccess[]
+  passwordResets UserPasswordResetToken[]
 }
 
 model Category {
@@ -899,6 +900,17 @@ model PasswordResetToken {
   usedAt          DateTime?
   createdAt       DateTime @default(now())
   account         ProfessionalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model UserPasswordResetToken {
+  id              String   @id @default(cuid())
+  userId          String
+  tokenHash       String   @unique
+  status          String   @default("ACTIVE") // ACTIVE, USED, EXPIRED, REVOKED
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model SecurityNotification {

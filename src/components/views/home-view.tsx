@@ -46,21 +46,29 @@ export function HomeView() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [popularMeds, setPopularMeds] = useState<Medication[]>([]);
   const [onDuty, setOnDuty] = useState<Pharmacy[]>([]);
+  const [stats, setStats] = useState({
+    medications: 0,
+    pharmacies: 0,
+    onDutyPharmacies: 0,
+    publishedInventory: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [cats, meds, pharma] = await Promise.all([
+        const [cats, meds, pharma, publicStats] = await Promise.all([
           fetch("/api/categories").then((r) => r.json()),
-          fetch("/api/medications?limit=8").then((r) => r.json()),
+          fetch("/api/medications?limit=6").then((r) => r.json()),
           fetch("/api/pharmacies?filter=on-duty").then((r) => r.json()),
+          fetch("/api/public-stats").then((r) => r.json()),
         ]);
         if (!active) return;
         setCategories(cats);
         setPopularMeds(meds);
-        setOnDuty(pharma.slice(0, 4));
+        setOnDuty(pharma);
+        setStats(publicStats);
       } catch {
         /* noop */
       } finally {
@@ -96,8 +104,8 @@ export function HomeView() {
                 </h1>
               </div>
               <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border bg-muted/50 text-center">
-                <Kpi value={`${popularMeds.length}+`} label="Médocs" />
-                <Kpi value={`${onDuty.length}`} label="Garde" />
+                <Kpi value={`${stats.medications}`} label="Médocs" />
+                <Kpi value={`${stats.onDutyPharmacies}`} label="Garde" />
                 <Kpi value="100 F" label="Crédit" />
               </div>
             </div>
@@ -256,7 +264,7 @@ export function HomeView() {
                     <Skeleton className="h-12 rounded-lg" />
                   </div>
                 ))
-              : popularMeds.slice(0, 6).map((m) => (
+              : popularMeds.map((m) => (
                   <MedicationAppRow key={m.id} med={m} />
                 ))}
           </div>
@@ -376,14 +384,13 @@ function MedicationAppRow({ med }: { med: Medication }) {
       onClick={() => navigate("medication-detail", { slug: med.slug })}
       className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent"
     >
-      <span
-        className="flex size-10 shrink-0 items-center justify-center rounded-md text-white"
-        style={{ backgroundColor: med.category?.color ?? "var(--brand)" }}
-      >
-        {med.category ? (
-          <CategoryIcon name={med.category.iconName} size={20} color="#fff" />
+      <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-brand-light">
+        {med.imageUrl ? (
+          <img src={med.imageUrl} alt={med.name} className="size-full object-cover" />
+        ) : med.category ? (
+          <CategoryIcon name={med.category.iconName} size={20} color={med.category.color} />
         ) : (
-          <Pill className="size-5" />
+          <Pill className="size-5 text-brand" />
         )}
       </span>
       <span className="min-w-0 flex-1">

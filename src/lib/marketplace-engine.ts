@@ -612,7 +612,7 @@ export async function confirmMarketplaceImport(input: {
     rows: rowsForCore,
     triggerType: "import",
     sourceSystem: source,
-    mode: "validate_before_publish",
+    mode: "controlled_auto_publish",
     actor: input.actorName ?? null,
   });
   await startMarketplaceEnrichment({
@@ -626,8 +626,17 @@ export async function confirmMarketplaceImport(input: {
     enrichmentRowsCreated: enrichmentRows.length,
     syncJobId: syncReport.jobId,
     syncStatus: syncReport.status,
+    syncPublishedProducts: syncReport.updatedProducts,
+    syncOutOfStockProducts: syncReport.outOfStockProducts,
+    syncPriceChanges: syncReport.priceChanges,
+    syncPendingValidation: Math.max(
+      0,
+      syncReport.totalRows - syncReport.updatedProducts
+    ),
     syncConflicts: syncReport.conflicts,
     syncWarnings: syncReport.warnings,
+    syncPublicationRule:
+      "Publication contrôlée : seules les lignes reconnues avec une correspondance certaine, un prix valide et aucune erreur sont visibles côté utilisateur après déblocage par crédits. Les lignes ambiguës restent en validation admin.",
   };
   await db.pharmacyImport.update({
     where: { id: importLog.id },

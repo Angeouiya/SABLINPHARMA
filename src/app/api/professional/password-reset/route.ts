@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { buildResetUrl, sendPasswordResetEmail } from "@/lib/email";
 import { generateToken, hashPassword, hashToken, passwordStrength } from "@/lib/security/passwords";
 import { revokeProfessionalSession, writeAudit } from "@/lib/professional-auth";
+import { emailIsValid, normalizeEmail } from "@/lib/user-contact";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const identifier = String(body.identifier ?? body.email ?? body.phone ?? "").trim().toLowerCase();
-  const account = identifier
-    ? await db.professionalAccount.findFirst({ where: { OR: [{ email: identifier }, { phone: identifier }] } })
-    : null;
+  const email = normalizeEmail(body.email ?? body.identifier);
+  if (!email || !emailIsValid(email)) {
+    return NextResponse.json({ error: "Veuillez saisir un e-mail professionnel valide." }, { status: 400 });
+  }
+
+  const account = await db.professionalAccount.findFirst({ where: { email } });
   if (account) {
+    await db.passwordResetToken.updateMany({
+      where: { accountId: account.id, status: "ACTIVE" },
+      data: { status: "REVOKED" },
+    });
     const token = generateToken();
     await db.passwordResetToken.create({
       data: {
@@ -17,6 +25,12 @@ export async function POST(req: NextRequest) {
         tokenHash: hashToken(token),
         expiresAt: new Date(Date.now() + 30 * 60 * 1000),
       },
+    });
+    await sendPasswordResetEmail({
+      to: email,
+      name: account.name,
+      platform: account.kind === "admin" ? "Admin" : "Pharmacie",
+      resetUrl: buildResetUrl(req.nextUrl.origin, token, "professional"),
     });
     await writeAudit({
       req,

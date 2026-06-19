@@ -6,5 +6,8 @@ export async function POST(req: NextRequest) {
   if (parsed.response) return parsed.response;
   const { response } = requireMarketplaceAccess(req, "import_inventory", parsed.pharmacySlug);
   if (response) return response;
-  return NextResponse.json(parsed.preview);
+  return NextResponse.json({
+    ...parsed.preview,
+    confirmableRows: parsed.rows,
+  });
 }

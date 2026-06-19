@@ -360,12 +360,9 @@ export function AuthView() {
                         <Label htmlFor="login-password">Mot de passe</Label>
                         <button
                           type="button"
-                          onClick={() =>
-                            toast.info(
-                              "Contactez le support pour réinitialiser votre mot de passe.",
-                              { description: "+225 07 00 00 00 00" }
-                            )
-                          }
+                          onClick={() => {
+                            window.location.href = "/reinitialiser-mot-de-passe";
+                          }}
                           className="text-xs font-medium text-brand transition-colors hover:text-brand-dark hover:underline"
                         >
                           Mot de passe oublié ?

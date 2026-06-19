@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
           : "Photo officielle"
       : "Image illustrative",
     imageAttribution: image?.attributionText ?? null,
-    informationBadge: description ? "Informations vérifiées" : "Informations à confirmer",
+    informationBadge: "Information générale",
     verificationStatus: m.verificationStatus,
     requiresRx: m.requiresRx,
     avgPrice: null,

@@ -215,9 +215,9 @@ export function ProfileView() {
 
         {/* Stats strip */}
         <div className="grid grid-cols-3 divide-x divide-border/50">
-          <ProfileStat icon={Pill} value={history.filter((h) => h.kind === "medication").length || 24} label="Médicaments consultés" />
-          <ProfileStat icon={ClipboardList} value={savedPrescriptions.length || 7} label="Ordonnances estimées" />
-          <ProfileStat icon={Heart} value={favCount || 3} label="Pharmacies favorites" />
+          <ProfileStat icon={Pill} value={history.filter((h) => h.kind === "medication").length} label="Médicaments consultés" />
+          <ProfileStat icon={ClipboardList} value={savedPrescriptions.length} label="Ordonnances estimées" />
+          <ProfileStat icon={Heart} value={favCount} label="Pharmacies favorites" />
         </div>
       </Card>
 

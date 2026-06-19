@@ -656,11 +656,12 @@ function MedicationRowSimple({ med }: { med: Medication }) {
       onClick={() => navigate("medication-detail", { slug: med.slug })}
       className="group flex w-full min-w-0 items-start gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 text-left transition-all hover:border-brand/30 hover:bg-accent/40 min-[420px]:items-center"
     >
-      <span
-        className="flex size-11 shrink-0 items-center justify-center rounded-lg text-white"
-        style={{ backgroundColor: med.category?.color ?? "var(--brand)" }}
-      >
-        <CategoryIcon name={med.category?.iconName ?? "Pill"} size={22} color="#fff" />
+      <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-brand-light">
+        {med.imageUrl ? (
+          <img src={med.imageUrl} alt={med.name} className="size-full object-cover" />
+        ) : (
+          <CategoryIcon name={med.category?.iconName ?? "Pill"} size={22} color={med.category?.color ?? "var(--brand)"} />
+        )}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block break-words text-sm font-bold leading-snug text-foreground">

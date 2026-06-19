@@ -419,10 +419,7 @@ export function MedicationDetailView() {
                 {med.imageBadge ?? "Image illustrative"}
               </Badge>
               <Badge className="border-0 bg-brand-dark text-white">
-                {med.informationBadge ?? "Informations à confirmer"}
-              </Badge>
-              <Badge variant="outline" className="border-brand/30 bg-white text-brand-dark">
-                Information générale
+                {med.informationBadge ?? "Information générale"}
               </Badge>
             </div>
 

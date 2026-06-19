@@ -13,6 +13,8 @@ import {
   LayoutDashboard,
   Lock,
   LogOut,
+  Loader2,
+  Mail,
   MessageCircle,
   Pill,
   Search,
@@ -26,6 +28,12 @@ import { InventorySyncPanel } from "@/components/views/inventory-sync-panels";
 import { ProfessionalRequestsPanel } from "@/components/views/professional-requests-panel";
 import { ProfessionalActionButton } from "@/components/shared/professional-action-button";
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
+import {
+  ImportValidationPanel,
+  safePublishLineNumbers,
+  selectedConfirmableRows,
+  type ImportPreviewData,
+} from "@/components/shared/import-validation-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -170,11 +178,29 @@ type PharmacyMediaItem = {
   createdAt: string;
 };
 
-function Field({ label, placeholder, type = "text" }: { label: string; placeholder?: string; type?: string }) {
+function Field({
+  label,
+  placeholder,
+  type = "text",
+  value,
+  onChange,
+}: {
+  label: string;
+  placeholder?: string;
+  type?: string;
+  value?: string;
+  onChange?: (value: string) => void;
+}) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-bold text-foreground">{label}</Label>
-      <Input type={type} placeholder={placeholder ?? label} className="bg-white text-foreground placeholder:text-muted-foreground" />
+      <Input
+        type={type}
+        placeholder={placeholder ?? label}
+        value={value}
+        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+        className="bg-white text-foreground placeholder:text-muted-foreground"
+      />
     </div>
   );
 }
@@ -536,6 +562,7 @@ function PharmacyLogin() {
               <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => pharmacyLogin("Employé pharmacie")}>Démo employé</Button>
               <Button variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-50" onClick={() => pharmacyLogin("Pharmacien responsable", "En attente de validation")}>Démo en attente</Button>
             </div>
+            <a href="/professionnel/reinitialiser-mot-de-passe" className="block text-center text-sm font-bold text-brand-dark">Mot de passe oublié ?</a>
             <a href="/pharmacie/inscription" className="block text-center text-sm font-bold text-brand-dark">Inscrire ma pharmacie</a>
           </div>
         </Card>
@@ -754,17 +781,8 @@ function ImportInventory() {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState<{
-    totalRows: number;
-    validRows: number;
-    incompleteRows: number;
-    invalidRows: number;
-    recognizedMedications: number;
-    unknownMedications: number;
-    duplicateRows: number;
-    missingPrices: number;
-    invalidStatuses: number;
-  } | null>(null);
+  const [preview, setPreview] = useState<ImportPreviewData | null>(null);
+  const [selectedLineNumbers, setSelectedLineNumbers] = useState<Set<number>>(new Set());
   const previewImport = async () => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, Excel, Word ou PowerPoint avant l’aperçu.");
@@ -780,9 +798,11 @@ function ImportInventory() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Aperçu impossible.");
       setPreview(data);
+      setSelectedLineNumbers(safePublishLineNumbers(data));
       setMessage(`Aperçu prêt : ${data.totalRows} ligne(s), ${data.recognizedMedications} reconnue(s), ${data.unknownMedications} à valider.`);
     } catch (error) {
       setPreview(null);
+      setSelectedLineNumbers(new Set());
       setMessage(error instanceof Error ? error.message : "Aperçu impossible.");
     } finally {
       setUploading(false);
@@ -793,17 +813,33 @@ function ImportInventory() {
       setMessage("Choisissez un fichier CSV, Excel, Word ou PowerPoint avant l’import.");
       return;
     }
+    if (!preview) {
+      setMessage("Analysez le fichier avant de valider. Vous pourrez retirer les produits à ne pas publier.");
+      return;
+    }
+    const rowsToConfirm = selectedConfirmableRows(preview, selectedLineNumbers);
+    if (!rowsToConfirm.length) {
+      setMessage("Aucune ligne sélectionnée. Sélectionnez les lignes sûres ou réintégrez les produits à publier.");
+      return;
+    }
     setUploading(true);
     setMessage("");
     try {
-      const form = new FormData();
-      form.set("pharmacySlug", PHARMACY_SESSION_SLUG);
-      form.set("file", file);
-      const res = await fetch("/api/imports/confirm", { method: "POST", headers: { "X-Sablin-Session-Kind": "pharmacy" }, body: form });
+      const res = await fetch("/api/imports/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({
+          pharmacySlug: PHARMACY_SESSION_SLUG,
+          fileName: file.name,
+          fileType: file.name.split(".").pop() ?? "CSV",
+          rows: rowsToConfirm,
+        }),
+      });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Import impossible.");
-      setMessage(`Import ${data.import.status} : ${data.report.validRows} ligne(s) valide(s), ${data.report.invalidRows} ligne(s) à corriger, ${data.report.unknownMedications} médicament(s) non reconnu(s).`);
+      setMessage(`Publication contrôlée : ${data.report.syncPublishedProducts ?? 0} produit(s) publié(s), ${data.report.syncPendingValidation ?? 0} gardé(s) en validation, ${data.report.unknownMedications} médicament(s) non reconnu(s).`);
       setFile(null);
+      setSelectedLineNumbers(new Set());
       setPreview(data.report);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import impossible.");
@@ -816,9 +852,9 @@ function ImportInventory() {
       <Heading level="h2">Import inventaire pharmacie</Heading>
       <Muted>Vous importez uniquement l’inventaire de votre propre pharmacie. Formats acceptés : CSV, XLSX, XLS lisible, Word DOCX et PowerPoint PPTX.</Muted>
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
-        <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); }} />
+        <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); }} />
         <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Aperçu avant validation"}</Button>
-        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading}>{uploading ? "Import..." : "Valider import"}</Button>
+        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Import..." : "Valider la sélection"}</Button>
       </div>
       {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
       {preview && (
@@ -833,12 +869,19 @@ function ImportInventory() {
           <Stat label="Médicaments reconnus" value={preview.recognizedMedications} badge="Référentiel" />
         </div>
       )}
+      {preview?.confirmableRows?.length ? (
+        <ImportValidationPanel
+          preview={preview}
+          selectedLineNumbers={selectedLineNumbers}
+          onSelectionChange={setSelectedLineNumbers}
+        />
+      ) : null}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate()}>
           Télécharger modèle Excel
         </Button>
         <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport}>Analyser maintenant</Button>
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={uploadImport}>Confirmer la publication contrôlée</Button>
+        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={uploadImport}>Publier la sélection</Button>
       </div>
       <SectionBlock title="Colonnes du modèle d’import" description="La pharmacie peut corriger les lignes avant publication.">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -1050,6 +1093,121 @@ function TeamManagement() {
   );
 }
 
+function ProfessionalAccountSettings() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [sendingReset, setSendingReset] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/professional/me", { headers: { "x-sablin-session-kind": "pharmacy" } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data?.account) return;
+        setName(data.account.name ?? "");
+        setEmail(data.account.email ?? "");
+        setPhone(data.account.phone ?? "");
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function saveIdentifiers() {
+    setMessage("");
+    setError("");
+    setSaving(true);
+    try {
+      const res = await fetch("/api/professional/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-sablin-session-kind": "pharmacy" },
+        body: JSON.stringify({ name, email, phone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Modification impossible.");
+      setMessage("Identifiants professionnels mis à jour.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Modification impossible.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function sendResetLink() {
+    setMessage("");
+    setError("");
+    setSendingReset(true);
+    try {
+      const res = await fetch("/api/professional/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Envoi impossible.");
+      setMessage(data?.message ?? "Si le compte existe, un lien a été envoyé.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Envoi impossible.");
+    } finally {
+      setSendingReset(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading level="h2">Paramètres pharmacie</Heading>
+            <Muted className="mt-1">
+              Modifiez les identifiants du compte pharmacie et réinitialisez le mot de passe uniquement par lien e-mail SABLIN PHARMA.
+            </Muted>
+          </div>
+          <StatusBadge label="Espace Pharmacie" />
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <Field label="Nom du compte" value={name} onChange={setName} />
+          <Field label="E-mail professionnel" value={email} onChange={setEmail} placeholder="pharmacie@sablin.ci" />
+          <Field label="Téléphone professionnel" value={phone} onChange={setPhone} placeholder="+225 07 00 00 00 00" />
+        </div>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={saveIdentifiers} disabled={saving}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+            Enregistrer les identifiants
+          </Button>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={sendResetLink} disabled={sendingReset || !email}>
+            {sendingReset ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+            Envoyer un lien de mot de passe
+          </Button>
+        </div>
+        {message && <p className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm font-bold text-green-800">{message}</p>}
+        {error && <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">{error}</p>}
+      </Card>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <Heading level="h3">Sécurité du compte</Heading>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {[
+            "Le mot de passe n’est jamais affiché en clair.",
+            "Le lien de réinitialisation expire après 30 minutes.",
+            "Après changement du mot de passe, les sessions professionnelles sont révoquées.",
+          ].map((item) => (
+            <Card key={item} className="border-border/70 p-4">
+              <KeyRound className="size-5 text-brand" />
+              <p className="mt-2 text-sm font-bold text-foreground">{item}</p>
+            </Card>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function AccountState({ kind }: { kind: "pending" | "suspended" }) {
   return (
     <div className="min-h-screen bg-background px-4 py-8">
@@ -1092,7 +1250,7 @@ export function PharmacySpaceView({ page }: { page: PharmacyPage }) {
       {page === "equipe" && <TeamManagement />}
       {page === "historique" && <SimpleCards title="Historique de ma pharmacie" items={["Modification disponibilité", "Import inventaire", "Changement horaires", "Confirmation traitée"]} />}
       {page === "notifications" && <SimpleCards title="Notifications pharmacie" items={["Nouvelle demande", "Données anciennes", "Import avec erreurs", "Compte validé"]} />}
-      {page === "parametres" && <SimpleCards title="Paramètres pharmacie" items={["Modifier mot de passe", "Notifications", "Sécurité", "Support"]} />}
+      {page === "parametres" && <ProfessionalAccountSettings />}
     </PharmacyShell>
   );
 }

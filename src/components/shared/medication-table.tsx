@@ -1,7 +1,8 @@
 "use client";
 
-import { ShieldAlert, ChevronRight, Lock } from "lucide-react";
+import { ShieldAlert, ChevronRight, Lock, Pill } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { CategoryIcon } from "@/components/category-icons";
 import { useNav } from "@/store/nav";
 import type { Medication } from "@/lib/types";
 
@@ -37,6 +38,15 @@ export function MedicationTable({ meds, loading = false }: MedicationTableProps)
               className="w-full rounded-xl border border-border/60 bg-background p-3 text-left transition-colors hover:border-brand/30 hover:bg-accent/40"
             >
               <div className="flex items-start justify-between gap-3">
+                <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-brand-light">
+                  {m.imageUrl ? (
+                    <img src={m.imageUrl} alt={m.name} className="size-full object-cover" />
+                  ) : m.category ? (
+                    <CategoryIcon name={m.category.iconName} size={22} color={m.category.color} />
+                  ) : (
+                    <Pill className="size-5 text-brand" />
+                  )}
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="break-words text-sm font-bold leading-snug text-foreground">
@@ -89,7 +99,16 @@ export function MedicationTable({ meds, loading = false }: MedicationTableProps)
                   className="cursor-pointer transition-colors hover:bg-accent/40"
                 >
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-brand-light">
+                        {m.imageUrl ? (
+                          <img src={m.imageUrl} alt={m.name} className="size-full object-cover" />
+                        ) : m.category ? (
+                          <CategoryIcon name={m.category.iconName} size={20} color={m.category.color} />
+                        ) : (
+                          <Pill className="size-4 text-brand" />
+                        )}
+                      </span>
                       <span className="font-bold text-foreground">{m.name}</span>
                       {m.requiresRx && (
                         <ShieldAlert className="size-3.5 text-amber-500" />

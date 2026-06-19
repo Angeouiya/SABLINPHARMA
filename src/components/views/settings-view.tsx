@@ -420,15 +420,12 @@ export function SettingsView() {
                 <Button
                   variant="outline"
                   className="justify-start gap-2 border-border/70"
-                  onClick={() =>
-                    toast.info("Bientôt disponible", {
-                      description:
-                        "La modification du mot de passe sera disponible prochainement.",
-                    })
-                  }
+                  onClick={() => {
+                    window.location.href = "/reinitialiser-mot-de-passe";
+                  }}
                 >
                   <Lock className="size-4 text-brand" />
-                  Modifier mon mot de passe
+                  Modifier mon mot de passe par e-mail
                 </Button>
                 <Button
                   variant="outline"

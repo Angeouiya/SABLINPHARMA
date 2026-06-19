@@ -170,7 +170,7 @@ export async function GET(
           ? "Photo fournie par une pharmacie"
           : "Photo officielle"
       : "Image illustrative",
-    informationBadge: validatedDescription ? "Informations vérifiées" : "Informations à confirmer",
+    informationBadge: "Information générale",
     sourceName: validatedDescription?.sourceName ?? primaryImage?.sourceName ?? "Référentiel médicaments SABLIN PHARMA",
     verifiedAt: med.verifiedAt,
     verificationStatus: med.verificationStatus,

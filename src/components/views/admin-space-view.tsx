@@ -24,6 +24,12 @@ import { InventorySyncPanel } from "@/components/views/inventory-sync-panels";
 import { ProfessionalRequestsPanel } from "@/components/views/professional-requests-panel";
 import { ProfessionalActionButton } from "@/components/shared/professional-action-button";
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
+import {
+  ImportValidationPanel,
+  safePublishLineNumbers,
+  selectedConfirmableRows,
+  type ImportPreviewData,
+} from "@/components/shared/import-validation-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -476,18 +482,8 @@ function GlobalAdminImports() {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState<{
-    totalRows: number;
-    validRows: number;
-    incompleteRows: number;
-    invalidRows: number;
-    recognizedMedications: number;
-    unknownMedications: number;
-    duplicateRows: number;
-    missingPrices: number;
-    invalidStatuses: number;
-    detectedColumns?: Record<string, string>;
-  } | null>(null);
+  const [preview, setPreview] = useState<ImportPreviewData | null>(null);
+  const [selectedLineNumbers, setSelectedLineNumbers] = useState<Set<number>>(new Set());
   const previewImport = async () => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
@@ -503,9 +499,11 @@ function GlobalAdminImports() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Aperçu impossible.");
       setPreview(data);
+      setSelectedLineNumbers(safePublishLineNumbers(data));
       setMessage(`Aperçu prêt : ${data.totalRows} ligne(s), ${data.recognizedMedications} reconnue(s), ${data.unknownMedications} à valider.`);
     } catch (error) {
       setPreview(null);
+      setSelectedLineNumbers(new Set());
       setMessage(error instanceof Error ? error.message : "Aperçu impossible.");
     } finally {
       setUploading(false);
@@ -516,17 +514,33 @@ function GlobalAdminImports() {
       setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
       return;
     }
+    if (!preview) {
+      setMessage("Analysez le fichier avant de valider. Vous pourrez retirer les lignes à ne pas publier.");
+      return;
+    }
+    const rowsToConfirm = selectedConfirmableRows(preview, selectedLineNumbers);
+    if (!rowsToConfirm.length) {
+      setMessage("Aucune ligne sélectionnée. Sélectionnez les lignes sûres ou réintégrez les produits à publier.");
+      return;
+    }
     setUploading(true);
     setMessage("");
     try {
-      const form = new FormData();
-      form.set("pharmacySlug", pharmacySlug);
-      form.set("file", file);
-      const res = await fetch("/api/imports/confirm", { method: "POST", headers: { "X-Sablin-Session-Kind": "admin" }, body: form });
+      const res = await fetch("/api/imports/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+        body: JSON.stringify({
+          pharmacySlug,
+          fileName: file.name,
+          fileType: file.name.split(".").pop() ?? "CSV",
+          rows: rowsToConfirm,
+        }),
+      });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Import impossible.");
-      setMessage(`Rapport généré : ${data.report.validRows} valide(s), ${data.report.invalidRows} à vérifier, ${data.report.unknownMedications} non reconnu(s).`);
+      setMessage(`Publication contrôlée : ${data.report.syncPublishedProducts ?? 0} produit(s) publié(s), ${data.report.syncPendingValidation ?? 0} gardé(s) en validation, ${data.report.unknownMedications} non reconnu(s).`);
       setFile(null);
+      setSelectedLineNumbers(new Set());
       setPreview(data.report);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import impossible.");
@@ -546,10 +560,10 @@ function GlobalAdminImports() {
           </select>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
-          <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); }} />
+          <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); }} />
           <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate(`modele-import-${pharmacySlug}.csv`)}>Télécharger modèle Excel</Button>
           <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Aperçu avant validation"}</Button>
-          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading}>{uploading ? "Import..." : "Valider import"}</Button>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Import..." : "Valider la sélection"}</Button>
         </div>
         {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
         {preview && (
@@ -564,6 +578,13 @@ function GlobalAdminImports() {
             <Stat label="Médicaments reconnus" value={preview.recognizedMedications} badge="Référentiel" />
           </div>
         )}
+        {preview?.confirmableRows?.length ? (
+          <ImportValidationPanel
+            preview={preview}
+            selectedLineNumbers={selectedLineNumbers}
+            onSelectionChange={setSelectedLineNumbers}
+          />
+        ) : null}
       </Card>
       <AdminMediaUploadPanel pharmacySlug={pharmacySlug} />
       <SimpleAdmin title="Imports inventaire et contrôles" items={["Import pharmacie Cocody", "Import admin Plateau", "Import avec erreurs", "Import corrigé", "Médicaments non reconnus", "Prix manquants", "Statuts invalides"]} />
@@ -702,6 +723,7 @@ function AdminLogin() {
           <div className="mt-3"><Field label="Mot de passe" placeholder="Mot de passe interne" /></div>
           <Button className="mt-4 h-11 w-full bg-brand text-white hover:bg-brand-dark" onClick={() => adminLogin()}>Se connecter</Button>
           <Button variant="outline" className="mt-3 w-full border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => adminLogin("Super administrateur")}>Démo super administrateur</Button>
+          <a href="/professionnel/reinitialiser-mot-de-passe" className="mt-3 block text-center text-sm font-bold text-brand-dark">Mot de passe oublié ?</a>
         </Card>
       </div>
     </div>

@@ -146,7 +146,7 @@ export function PharmaciesView() {
 
   // On-duty pharmacies (for the special section)
   const onDutyPharmacies = useMemo(
-    () => enriched.filter((p) => p.isOnDuty).slice(0, 3),
+    () => enriched.filter((p) => p.isOnDuty),
     [enriched]
   );
 
@@ -359,10 +359,10 @@ export function PharmaciesView() {
               </span>
               <div className="flex-1">
                 <h2 className="text-base font-extrabold text-foreground">
-                  Pharmacies de garde proches
+                  Pharmacies de garde
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Actuellement de garde à Abidjan — pour vos urgences
+                  {onDutyPharmacies.length} pharmacie{onDutyPharmacies.length > 1 ? "s" : ""} de garde publiée{onDutyPharmacies.length > 1 ? "s" : ""} à Abidjan
                 </p>
               </div>
               <Button
@@ -375,7 +375,7 @@ export function PharmaciesView() {
               </Button>
             </div>
             <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
-              {onDutyPharmacies.map((p) => (
+              {onDutyPharmacies.slice(0, 6).map((p) => (
                 <OnDutyMiniCard key={p.id} pharma={p} />
               ))}
             </div>

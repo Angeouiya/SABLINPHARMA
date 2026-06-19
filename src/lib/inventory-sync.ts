@@ -72,6 +72,9 @@ export type SyncInventoryResult = {
   invalidRows: number;
   recognizedMedications: number;
   unknownMedications: number;
+  updatedProducts: number;
+  outOfStockProducts: number;
+  priceChanges: number;
   conflicts: number;
   warnings: number;
 };

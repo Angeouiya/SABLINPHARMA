@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
       coverImageUrl: cover?.url ?? null,
       publicMedia: publicMedia.map(safeMedia),
       inventoryLocked: true,
-      inventoryLabel: "Voir médicaments disponibles — 1 crédit",
+      inventoryLabel: "Voir la liste des médicaments — 1 crédit",
       inventoryAccess: lockedFeaturePayload({
         featureKey: "seePharmacyInventory",
         isAuthenticated: false,

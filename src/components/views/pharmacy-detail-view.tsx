@@ -381,7 +381,7 @@ export function PharmacyDetailView() {
 
             {/* Badges row */}
             <div className="mt-4 flex flex-wrap gap-1.5">
-              <StatusChip icon={Lock} label="Inventaire verrouillé par crédits" tone="neutral" />
+              <StatusChip icon={Lock} label="Liste des médicaments verrouillée" tone="neutral" />
               {dist <= 5 && (
                 <StatusChip icon={Navigation} label="À proximité" tone="info" />
               )}
@@ -550,7 +550,7 @@ export function PharmacyDetailView() {
               />
               <InfoCard
                 icon={Pill}
-                label="Inventaire pharmacie"
+                label="Liste des médicaments"
                 value={availabilityUnlocked ? `${inStockCount} / ${pharmacy.medications.length}` : "Verrouillé"}
                 sub={availabilityUnlocked ? "Débloqué avec crédits" : "Voir médicaments disponibles — 1 crédit"}
               />
@@ -729,9 +729,9 @@ export function PharmacyDetailView() {
       <section id="medicaments" className="mt-10 scroll-mt-20">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <Eyebrow>Inventaire pharmacie</Eyebrow>
+            <Eyebrow>Liste des médicaments</Eyebrow>
             <Heading level="h2">
-              {availabilityUnlocked ? "Médicaments disponibles" : "Inventaire pharmacie verrouillé"}
+              {availabilityUnlocked ? "Médicaments disponibles" : "Liste des médicaments de cette pharmacie verrouillée"}
             </Heading>
             <Muted className="mt-0.5">
               {availabilityUnlocked
@@ -747,11 +747,10 @@ export function PharmacyDetailView() {
               <Lock className="size-7" />
             </span>
             <h3 className="mt-4 text-lg font-extrabold text-foreground">
-              Inventaire pharmacie verrouillé
+              Liste des médicaments de cette pharmacie verrouillée
             </h3>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-              {pharmacy.inventoryAccess?.message ??
-                "Connectez-vous et utilisez vos crédits SABLIN pour accéder à cette information."}
+              Utilisez 1 crédit SABLIN pour voir les médicaments disponibles dans cette pharmacie.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               Coût : <span className="font-bold text-foreground">1 crédit</span>

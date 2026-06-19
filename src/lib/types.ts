@@ -64,7 +64,9 @@ export interface Medication {
   manufacturer?: string | null;
   packaging?: string | null;
   requiresRx: boolean;
-  avgPrice: number;
+  avgPrice: number | null;
+  priceLocked?: boolean;
+  priceLabel?: string;
   createdAt: string;
   pharmacyCount?: number;
 }

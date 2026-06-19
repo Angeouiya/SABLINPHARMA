@@ -2,7 +2,6 @@
 
 import { ShieldAlert, ChevronRight, Lock } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import type { Medication } from "@/lib/types";
 
@@ -52,7 +51,10 @@ export function MedicationTable({ meds, loading = false }: MedicationTableProps)
                 <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
-                <Price amount={m.avgPrice} size="sm" variant="brand" />
+                <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-bold text-foreground">
+                  <Lock className="size-3 text-brand" />
+                  Prix verrouillé — 1 crédit
+                </span>
                 <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground">
                   <Lock className="size-3.5 text-brand" />
                   Voir pharmacies — 1 crédit
@@ -73,7 +75,7 @@ export function MedicationTable({ meds, loading = false }: MedicationTableProps)
               <th className="px-5 py-3.5 font-semibold">DCI</th>
               <th className="px-5 py-3.5 font-semibold">Forme</th>
               <th className="px-5 py-3.5 font-semibold">Dosage</th>
-              <th className="px-5 py-3.5 font-semibold">Prix indicatif</th>
+              <th className="px-5 py-3.5 font-semibold">Prix</th>
               <th className="px-5 py-3.5 font-semibold">Pharmacies</th>
               <th className="px-5 py-3.5 font-semibold">Disponibilité</th>
               <th className="px-5 py-3.5 text-right font-semibold">Action</th>
@@ -98,7 +100,10 @@ export function MedicationTable({ meds, loading = false }: MedicationTableProps)
                   <td className="px-5 py-3.5 text-muted-foreground">{m.form}</td>
                   <td className="px-5 py-3.5 text-muted-foreground">{m.dosage}</td>
                   <td className="px-5 py-3.5">
-                    <Price amount={m.avgPrice} size="sm" variant="brand" />
+                    <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-bold text-foreground">
+                      <Lock className="size-3 text-brand" />
+                      Verrouillé — 1 crédit
+                    </span>
                   </td>
                   <td className="px-5 py-3.5">
                     <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground">

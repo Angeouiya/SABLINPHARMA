@@ -27,20 +27,61 @@ function assertNoApparentPhone(value, label) {
   assert(digits.length < 6, `${label} appears to expose a phone number: ${value}`);
 }
 
+function assertNoNumericPriceFields(value, label) {
+  const sensitivePriceKeys = new Set([
+    "avgPrice",
+    "price",
+    "unitMin",
+    "unitMax",
+    "lineMin",
+    "lineMax",
+    "totalMin",
+    "totalMax",
+    "detailedPrice",
+    "priceByPharmacy",
+  ]);
+
+  function visit(node, path) {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => visit(item, `${path}[${index}]`));
+      return;
+    }
+    for (const [key, nested] of Object.entries(node)) {
+      const nextPath = `${path}.${key}`;
+      if (sensitivePriceKeys.has(key)) {
+        assert(
+          nested === null || nested === undefined,
+          `${label} exposes numeric price field ${nextPath}: ${nested}`
+        );
+      }
+      visit(nested, nextPath);
+    }
+  }
+
+  visit(value, label);
+}
+
 async function run() {
   const medsResult = await json("/api/medications?limit=1");
   assert(medsResult.response.ok, "/api/medications failed");
   const med = medsResult.data?.[0];
   assert(med, "No medication returned for gate verification");
   assert(!hasProp(med, "pharmacyCount"), "/api/medications exposes pharmacyCount");
+  assert(med.avgPrice === null, "/api/medications exposes avgPrice before unlock");
+  assert(med.priceLocked === true, "/api/medications does not mark price as locked");
   assert(med.availabilityLocked === true, "/api/medications does not mark availability as locked");
+  assertNoNumericPriceFields(medsResult.data, "/api/medications");
 
   const medDetailResult = await json(`/api/medications/${med.slug}`);
   assert(medDetailResult.response.ok, "/api/medications/[slug] failed");
   const medDetail = medDetailResult.data;
+  assert(medDetail.avgPrice === null, "/api/medications/[slug] exposes avgPrice before unlock");
+  assert(medDetail.priceLocked === true, "/api/medications/[slug] does not mark price as locked");
   assert(Array.isArray(medDetail.pharmacies), "Medication detail pharmacies is not an array");
   assert(medDetail.pharmacies.length === 0, "Medication detail exposes pharmacies before unlock");
   assert(medDetail.pharmaciesAccess?.locked === true, "Medication detail missing locked pharmacies access");
+  assertNoNumericPriceFields(medDetail, "/api/medications/[slug]");
 
   const pharmaciesResult = await json("/api/pharmacies");
   assert(pharmaciesResult.response.ok, "/api/pharmacies failed");
@@ -56,6 +97,7 @@ async function run() {
   assert(pharmacyDetail.medications.length === 0, "Pharmacy detail exposes inventory before unlock");
   assert(pharmacyDetail.inventoryAccess?.locked === true, "Pharmacy detail missing locked inventory access");
   assertNoApparentPhone(pharmacyDetail.phone, "/api/pharmacies/[slug] phone");
+  assertNoNumericPriceFields(pharmacyDetail, "/api/pharmacies/[slug]");
 
   const contactResult = await json(`/api/pharmacies/${pharmacy.slug}/contact`, {
     method: "POST",

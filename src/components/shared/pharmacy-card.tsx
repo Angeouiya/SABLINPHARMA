@@ -19,7 +19,7 @@ function RatingPill({ rating }: { rating: number }) {
   );
 }
 
-export function PharmacyCard({ pharma, showPrice }: { pharma: Pharmacy; showPrice?: number }) {
+export function PharmacyCard({ pharma }: { pharma: Pharmacy }) {
   const { navigate } = useNav();
 
   return (
@@ -86,11 +86,10 @@ export function PharmacyCard({ pharma, showPrice }: { pharma: Pharmacy; showPric
               <span className={cn("size-1.5 rounded-full", pharma.openNow ? "bg-brand animate-pulse" : "bg-muted-foreground/50")} />
               {pharma.openNow ? "Ouvert maintenant" : "Fermé"}
             </span>
-            {showPrice !== undefined && (
-              <span className="text-[11px] font-semibold text-brand-dark">
-                {showPrice.toLocaleString("fr-FR")} F
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">
+              <Lock className="size-3 text-brand" />
+              Prix verrouillé
+            </span>
           </div>
           {/* Contact verrouillé — aucune info téléphone affichée */}
           <div className="flex flex-col gap-1.5 rounded-lg bg-muted/60 px-2 py-1.5 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between">

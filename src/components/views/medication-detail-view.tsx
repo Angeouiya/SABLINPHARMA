@@ -34,7 +34,7 @@ import { AlertMessage } from "@/components/shared/alert-message";
 import { GoogleMap } from "@/components/shared/google-map";
 import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
 import { CreditCost } from "@/components/shared/credit-cost";
-import { Heading, Eyebrow, Price, Muted } from "@/components/ui/typography";
+import { Heading, Eyebrow, Muted } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { useCredits, CREDIT_COSTS } from "@/store/credits";
 import { useAuth } from "@/store/auth";
@@ -92,7 +92,9 @@ interface MedDetail {
   description: string;
   longDescription?: string | null;
   requiresRx: boolean;
-  avgPrice: number;
+  avgPrice: number | null;
+  priceLocked?: boolean;
+  priceLabel?: string;
   imageUrl?: string | null;
   imageBadge?: string | null;
   informationBadge?: string | null;
@@ -441,12 +443,27 @@ export function MedicationDetailView() {
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-brand/20 bg-brand-light/40 p-3.5">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-brand">
-                  Prix indicatif
+                  Prix
                 </p>
-                <Price amount={med.avgPrice} size="lg" variant="brand" className="mt-1" />
-                <p className="mt-1 text-[11px] font-medium leading-snug text-brand-dark/80">
-                  Prix indicatif général, à confirmer auprès de la pharmacie.
-                </p>
+                {pricesUnlocked && med.avgPrice !== null ? (
+                  <>
+                    <p className="mt-1 text-2xl font-extrabold text-brand-dark">
+                      {med.avgPrice.toLocaleString("fr-FR")} F
+                    </p>
+                    <p className="mt-1 text-[11px] font-medium leading-snug text-brand-dark/80">
+                      Prix indicatif, à confirmer auprès de la pharmacie.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs font-bold text-brand-dark">
+                      <Lock className="size-3.5" /> Prix verrouillé — 1 crédit
+                    </p>
+                    <p className="mt-1 text-[11px] font-medium leading-snug text-brand-dark/80">
+                      Utilisez vos crédits SABLIN pour afficher le prix.
+                    </p>
+                  </>
+                )}
               </div>
               <div className="rounded-xl border border-border/60 bg-background p-3.5">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -775,7 +792,9 @@ export function MedicationDetailView() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between border-t border-border/50 px-3.5 py-2.5">
-                    <Price amount={alt.avgPrice} size="sm" variant="brand" />
+                    <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[10px] font-bold text-foreground">
+                      <Lock className="size-3 text-brand" /> Prix verrouillé
+                    </span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-foreground">
                       <Lock className="size-3" /> Verrouillé
                     </span>

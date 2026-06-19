@@ -41,7 +41,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CategoryIcon } from "@/components/category-icons";
 import { AlertMessage } from "@/components/shared/alert-message";
 import { EmptyState } from "@/components/shared/empty-state";
-import { Heading, Eyebrow, Muted, Price, PriceRange } from "@/components/ui/typography";
+import { Heading, Eyebrow, Muted, PriceRange } from "@/components/ui/typography";
 import { CreditConfirmDialog } from "@/components/shared/credit-confirm-dialog";
 import { CreditCost } from "@/components/shared/credit-cost";
 import { LockedView } from "@/components/shared/locked-view";
@@ -75,7 +75,7 @@ interface CartItem {
   quantity: number;
   duration: string;
   note: string;
-  avgPrice: number;
+  avgPrice: number | null;
   pharmacyCount: number;
   requiresRx: boolean;
   category?: { iconName: string; color: string; name: string } | null;
@@ -221,7 +221,7 @@ export function PrescriptionView() {
       quantity: qty,
       duration: formDuration.trim(),
       note: formNote.trim(),
-      avgPrice: matched?.avgPrice ?? 0,
+      avgPrice: null,
       pharmacyCount: matched?.pharmacyCount ?? 0,
       requiresRx: matched?.requiresRx ?? false,
       category: matched?.category
@@ -296,8 +296,7 @@ export function PrescriptionView() {
   const stats = useMemo(() => {
     const total = items.length;
     const totalUnits = items.reduce((s, it) => s + it.quantity, 0);
-    const totalCost = items.reduce((s, it) => s + it.avgPrice * it.quantity, 0);
-    return { total, totalUnits, totalCost };
+    return { total, totalUnits };
   }, [items]);
 
   const canUsePrescription = !!user && (credits > 0 || hasPass);
@@ -361,7 +360,7 @@ export function PrescriptionView() {
           quantity: it.quantity,
           duration: it.duration,
         })),
-        totalCost: stats.totalCost,
+        totalCost: estimate?.totalMin ?? null,
       });
       localStorage.setItem("sablin-prescriptions", JSON.stringify(saved));
       toast.success("Ordonnance enregistrée dans votre profil.", {
@@ -526,7 +525,7 @@ export function PrescriptionView() {
                                   {s.name}
                                 </span>
                                 <span className="block truncate text-xs text-muted-foreground">
-                                  {s.form} {s.dosage} · {formatFCFA(s.avgPrice)}
+                                  {s.form} {s.dosage} · prix verrouillé
                                 </span>
                               </span>
                             </button>
@@ -788,20 +787,13 @@ export function PrescriptionView() {
 
                         {/* Price */}
                         <div className="shrink-0 text-right">
-                          {item.avgPrice > 0 ? (
-                            <Price
-                              amount={item.avgPrice * item.quantity}
-                              size="md"
-                              variant="brand"
-                            />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">Prix à confirmer</span>
-                          )}
-                          {item.avgPrice > 0 && (
-                            <p className="text-[10px] text-muted-foreground">
-                              Comparaison verrouillée
-                            </p>
-                          )}
+                          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-bold text-foreground">
+                            <Lock className="size-3 text-brand" />
+                            Prix verrouillé
+                          </span>
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            Comparaison — 2 crédits
+                          </p>
                         </div>
 
                         {/* Actions */}
@@ -866,15 +858,14 @@ export function PrescriptionView() {
                   variant="brand"
                   className="mt-1 block"
                 />
-              ) : stats.totalCost > 0 ? (
-                <p className="mt-1 text-3xl font-extrabold text-brand-dark">
-                  {formatFCFA(stats.totalCost)}
-                </p>
               ) : (
-                <p className="mt-1 text-2xl font-extrabold text-muted-foreground">— FCFA</p>
+                <p className="mt-1 inline-flex items-center justify-center gap-1 rounded-md bg-white px-3 py-2 text-sm font-extrabold text-brand-dark">
+                  <Lock className="size-4" />
+                  Prix verrouillé
+                </p>
               )}
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Basé sur les prix indicatifs moyens
+                Les montants s’affichent uniquement après comparaison payante.
               </p>
             </div>
 

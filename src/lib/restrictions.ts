@@ -106,7 +106,7 @@ export const FEATURE_RESTRICTIONS: Record<FeatureKey, FeatureRestriction> = {
   createAccount: freeFeature("createAccount", "Créer un compte", "Créer un compte utilisateur SABLIN PHARMA."),
   login: freeFeature("login", "Se connecter", "Accéder à son compte."),
   searchMedication: freeFeature("searchMedication", "Rechercher un médicament", "Recherche simple par nom, DCI ou dosage."),
-  viewMedicationInfo: freeFeature("viewMedicationInfo", "Voir les informations générales d’un médicament", "Nom, DCI, dosage, forme, catégorie et prix indicatif général."),
+  viewMedicationInfo: freeFeature("viewMedicationInfo", "Voir les informations générales d’un médicament", "Nom, DCI, dosage, forme, catégorie et description générale."),
   viewMedicationCategories: freeFeature("viewMedicationCategories", "Consulter les catégories de médicaments", "Parcourir les catégories disponibles."),
   searchPharmacy: freeFeature("searchPharmacy", "Rechercher une pharmacie", "Recherche simple par nom, commune ou quartier."),
   viewPharmacyName: freeFeature("viewPharmacyName", "Voir le nom d’une pharmacie", "Nom public de la pharmacie."),

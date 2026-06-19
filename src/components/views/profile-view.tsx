@@ -39,7 +39,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Heading, Eyebrow, Muted, Price } from "@/components/ui/typography";
+import { Heading, Eyebrow, Muted } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
 import { useCredits, FREE_FEATURES, PAID_FEATURES } from "@/store/credits";
@@ -681,7 +681,7 @@ export function ProfileView() {
                           </p>
                         </div>
                       </div>
-                      <Price amount={rx.totalCost} size="sm" variant="brand" />
+                      <LockedPrescriptionPrice />
                     </div>
                     <Button
                       size="sm"
@@ -839,8 +839,8 @@ function HistoryRow({ item }: { item: HistoryItem }) {
           {item.meta ? `${item.meta} · ` : ""}{formatDate(item.createdAt)}
         </p>
       </div>
-      <Badge className="border-0 bg-success-light text-success">
-        <CheckCircle2 className="size-2.5" /> Disponible
+      <Badge className="border-0 bg-muted text-foreground">
+        <Lock className="size-2.5 text-brand" /> Verrouillé
       </Badge>
       <Button
         size="sm"
@@ -898,10 +898,10 @@ function FavPharmacyCard({ fav }: { fav: FavoriteItem }) {
 function FictiveHistory() {
   const { navigate } = useNav();
   const items = [
-    { name: "Paracétamol", dosage: "500 mg", date: "Aujourd'hui", available: true },
-    { name: "Amoxicilline", dosage: "500 mg", date: "Hier", available: true },
-    { name: "Vitamine C", dosage: "1000 mg", date: "12 juin 2026", available: true },
-    { name: "Smecta", dosage: "3 g", date: "10 juin 2026", available: false },
+    { name: "Paracétamol", dosage: "500 mg", date: "Aujourd'hui" },
+    { name: "Amoxicilline", dosage: "500 mg", date: "Hier" },
+    { name: "Vitamine C", dosage: "1000 mg", date: "12 juin 2026" },
+    { name: "Smecta", dosage: "3 g", date: "10 juin 2026" },
   ];
   return (
     <Card className="divide-y divide-border/50 border-border/70 py-0">
@@ -916,8 +916,8 @@ function FictiveHistory() {
             </p>
             <p className="text-xs text-muted-foreground">{it.date}</p>
           </div>
-          <Badge className={cn("border-0", it.available ? "bg-success-light text-success" : "bg-danger-light text-danger")}>
-            {it.available ? "Disponible" : "Rupture"}
+          <Badge className="border-0 bg-muted text-foreground">
+            <Lock className="size-2.5 text-brand" /> Verrouillé
           </Badge>
           <Button
             size="sm"
@@ -955,7 +955,7 @@ function FictivePrescriptions() {
                 </p>
               </div>
             </div>
-            <Price amount={rx.totalCost} size="sm" variant="brand" />
+            <LockedPrescriptionPrice />
           </div>
           <Button
             size="sm"
@@ -968,6 +968,15 @@ function FictivePrescriptions() {
         </Card>
       ))}
     </div>
+  );
+}
+
+function LockedPrescriptionPrice() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-muted px-2 py-1 text-[10px] font-extrabold text-foreground">
+      <Lock className="size-3 text-brand" />
+      Prix verrouillé
+    </span>
   );
 }
 

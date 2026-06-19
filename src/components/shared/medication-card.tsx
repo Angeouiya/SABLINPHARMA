@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CategoryIcon } from "@/components/category-icons";
-import { Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { cn } from "@/lib/utils";
 import type { Medication } from "@/lib/types";
@@ -86,7 +85,10 @@ export function MedicationCard({ med }: { med: Medication }) {
         </Badge>
 
         <div className="flex flex-col items-start gap-2 border-t border-border/50 pt-2.5 min-[380px]:flex-row min-[380px]:items-end min-[380px]:justify-between">
-          <Price amount={med.avgPrice} size="md" variant="brand" from />
+          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs font-extrabold text-foreground">
+            <Lock className="size-3.5 text-brand" />
+            Prix verrouillé — 1 crédit
+          </span>
           <span className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
             <Lock className="size-3.5 text-brand" />
             Voir pharmacies — 1 crédit
@@ -128,7 +130,7 @@ export function MedicationCard({ med }: { med: Medication }) {
           </Button>
         </div>
         <p className="text-[11px] font-medium leading-snug text-muted-foreground">
-          Prix indicatif, à confirmer auprès de la pharmacie.
+          Connectez-vous et utilisez vos crédits SABLIN pour voir les prix.
         </p>
       </div>
     </Card>
@@ -187,8 +189,9 @@ export function MedicationRow({ med }: { med: Medication }) {
         </span>
       </span>
       <span className="flex shrink-0 flex-col items-end">
-        <span className="text-sm font-extrabold text-brand-dark">
-          {med.avgPrice.toLocaleString("fr-FR")} F
+        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[11px] font-extrabold text-foreground">
+          <Lock className="size-3 text-brand" />
+          Prix verrouillé
         </span>
         <span className="flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
           <Lock className="size-3 text-brand" />

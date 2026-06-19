@@ -43,7 +43,6 @@ interface Filters {
   category: string | null;
   form: string;
   commune: string;
-  maxPrice: string;
   nearMe: boolean;
 }
 
@@ -51,7 +50,6 @@ const DEFAULT_FILTERS: Filters = {
   category: null,
   form: "all",
   commune: "all",
-  maxPrice: "all",
   nearMe: false,
 };
 
@@ -165,12 +163,6 @@ export function MedicationsView() {
       result = result.filter((m) => m.form === filters.form);
     }
 
-    // Price filter
-    if (filters.maxPrice !== "all") {
-      const max = parseInt(filters.maxPrice, 10);
-      result = result.filter((m) => m.avgPrice <= max);
-    }
-
     return result;
   }, [allMeds, query, filters]);
 
@@ -178,7 +170,6 @@ export function MedicationsView() {
     (filters.category ? 1 : 0) +
     (filters.form !== "all" ? 1 : 0) +
     (filters.commune !== "all" ? 1 : 0) +
-    (filters.maxPrice !== "all" ? 1 : 0) +
     (filters.nearMe ? 1 : 0);
 
   const resetFilters = () => {
@@ -434,12 +425,6 @@ export function MedicationsView() {
                   onRemove={() => setFilters((f) => ({ ...f, commune: "all" }))}
                 />
               )}
-              {filters.maxPrice !== "all" && (
-                <FilterChip
-                  label={`≤ ${parseInt(filters.maxPrice, 10).toLocaleString("fr-FR")} F`}
-                  onRemove={() => setFilters((f) => ({ ...f, maxPrice: "all" }))}
-                />
-              )}
               {filters.nearMe && (
                 <FilterChip
                   label="Pharmacie proche"
@@ -604,25 +589,6 @@ function FiltersPanel({
         </Select>
       </FilterGroup>
 
-      {/* Max price */}
-      <FilterGroup label="Prix indicatif max.">
-        <Select
-          value={filters.maxPrice}
-          onValueChange={(v) => setFilters((f) => ({ ...f, maxPrice: v }))}
-        >
-          <SelectTrigger className="h-10 w-full min-w-0">
-            <SelectValue placeholder="Tous les prix" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous les prix</SelectItem>
-            <SelectItem value="500">≤ 500 FCFA</SelectItem>
-            <SelectItem value="1000">≤ 1 000 FCFA</SelectItem>
-            <SelectItem value="2000">≤ 2 000 FCFA</SelectItem>
-            <SelectItem value="5000">≤ 5 000 FCFA</SelectItem>
-          </SelectContent>
-        </Select>
-      </FilterGroup>
-
       {/* Near me toggle */}
       <FilterGroup label="Localisation">
         <button
@@ -705,11 +671,11 @@ function MedicationRowSimple({ med }: { med: Medication }) {
         </span>
       </span>
       <span className="flex shrink-0 flex-col items-end">
-        <span className="text-sm font-extrabold text-brand-dark">
-          {med.avgPrice.toLocaleString("fr-FR")} F
+        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[11px] font-extrabold text-foreground">
+          <Lock className="size-3 text-brand" />
+          Prix verrouillé
         </span>
         <span className="flex items-center gap-0.5 text-[10px] font-semibold text-muted-foreground">
-          <Lock className="size-3 text-brand" />
           1 crédit
         </span>
       </span>

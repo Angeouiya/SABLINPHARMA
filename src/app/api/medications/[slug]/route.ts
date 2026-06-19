@@ -177,7 +177,11 @@ export async function GET(
     safetyNotice:
       "L’apparence de l’emballage peut varier selon le fabricant, le conditionnement ou la date de production. Vérifiez toujours le nom, la DCI, le dosage et la forme avec votre pharmacien.",
     requiresRx: med.requiresRx,
-    avgPrice: med.avgPrice,
+    avgPrice: pricesAccess.isUnlocked ? med.avgPrice : null,
+    priceLocked: !pricesAccess.isUnlocked,
+    priceLabel: pricesAccess.isUnlocked
+      ? "Prix débloqué"
+      : "Prix verrouillé — 1 crédit",
     createdAt: med.createdAt,
     pharmaciesAccess: pharmacyAccess.locked,
     pricesAccess: pricesAccess.locked,

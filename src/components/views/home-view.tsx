@@ -24,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Price } from "@/components/ui/typography";
 import { useNav } from "@/store/nav";
 import { distanceKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -402,9 +401,11 @@ function MedicationAppRow({ med }: { med: Medication }) {
         </span>
       </span>
       <span className="shrink-0 text-right">
-        <Price amount={med.avgPrice} size="sm" variant="brand" />
-        <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-semibold text-muted-foreground">
+        <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-[10px] font-extrabold text-foreground">
           <Lock className="size-3 text-brand" />
+          Prix verrouillé
+        </span>
+        <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] font-semibold text-muted-foreground">
           1 crédit
         </span>
       </span>

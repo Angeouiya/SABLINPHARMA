@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUserCreditAccess } from "@/lib/credit-gates";
 import { isOpenNow } from "@/lib/format";
 import { isPublicPharmacyMedia, publicAvailabilityStatus } from "@/lib/pharmacy-platform";
+import { pharmacyRatingLabel } from "@/lib/pharmacy-ratings";
 import { buildMedicationPlaceholderUrl } from "@/lib/medication-enrichment";
 
 function safePharmacyMedia(media: {
@@ -99,6 +100,8 @@ export async function GET(
       latitude: pm.pharmacy.latitude,
       longitude: pm.pharmacy.longitude,
       rating: pm.pharmacy.rating,
+      ratingCount: pm.pharmacy.ratingCount,
+      ratingLabel: pharmacyRatingLabel(pm.pharmacy.ratingCount),
       imageUrl: cover?.url ?? facade?.url ?? logo?.url ?? pm.pharmacy.imageUrl,
       logoUrl: logo?.url ?? null,
       facadeUrl: facade?.url ?? null,

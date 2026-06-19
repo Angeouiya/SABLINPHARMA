@@ -69,6 +69,39 @@ type QuickFilter = "all" | "open" | "on-duty" | "near";
 
 const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
 
+function pharmacyPhotoUrl(pharma: Pharmacy) {
+  return pharma.logoUrl ?? pharma.facadeUrl ?? pharma.imageUrl ?? pharma.coverImageUrl ?? null;
+}
+
+function PharmacyThumbnail({
+  pharma,
+  className,
+  onDutyBadge = false,
+}: {
+  pharma: Pharmacy;
+  className?: string;
+  onDutyBadge?: boolean;
+}) {
+  const photoUrl = pharmacyPhotoUrl(pharma);
+  return (
+    <span
+      className={cn(
+        "relative flex shrink-0 items-center justify-center overflow-hidden border border-white/30 bg-brand-light text-brand-dark",
+        className
+      )}
+    >
+      {photoUrl ? (
+        <img src={photoUrl} alt={`Photo ${pharma.name}`} className="size-full object-cover" />
+      ) : (
+        <Cross className="size-5" strokeWidth={2.5} />
+      )}
+      {onDutyBadge && (
+        <span className="absolute -right-1 -top-1 flex size-3.5 items-center justify-center rounded-full bg-amber-400 ring-2 ring-background" />
+      )}
+    </span>
+  );
+}
+
 interface Filters {
   commune: string;
   quartier: string;
@@ -671,10 +704,7 @@ function OnDutyMiniCard({ pharma }: { pharma: Pharmacy & { distance?: number } }
       onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
       className="group flex min-w-0 items-start gap-3 rounded-xl border border-border/60 bg-background p-3 text-left transition-all hover:border-brand/30 hover:shadow-avance min-[420px]:items-center"
     >
-      <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
-        <Plus className="size-5" strokeWidth={3} />
-        <span className="absolute -right-1 -top-1 flex size-3.5 items-center justify-center rounded-full bg-amber-400 ring-2 ring-background" />
-      </span>
+      <PharmacyThumbnail pharma={pharma} className="size-11 rounded-xl" onDutyBadge />
       <div className="min-w-0 flex-1">
         <h3 className="break-words text-sm font-bold leading-snug text-foreground">
           {pharma.name}
@@ -726,9 +756,7 @@ function PharmacyResultCard({ pharma }: { pharma: Pharmacy & { distance?: number
         )}
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
-            <Plus className="size-5 text-white" strokeWidth={3} />
-          </span>
+          <PharmacyThumbnail pharma={pharma} className="size-9 rounded-xl" />
           <span className="inline-flex items-center gap-1 rounded-full bg-brand-dark px-1.5 py-0.5 text-[10px] font-bold text-white">
             <span className="size-1.5 rounded-full bg-amber-300" />
             {pharma.rating.toFixed(1)}

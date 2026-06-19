@@ -93,6 +93,8 @@ export interface Pharmacy {
   latitude: number;
   longitude: number;
   rating: number;
+  ratingCount?: number;
+  ratingLabel?: string;
   imageUrl: string | null;
   logoUrl?: string | null;
   facadeUrl?: string | null;

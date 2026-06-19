@@ -12,7 +12,7 @@ import {
   Clock,
   Timer,
   Navigation,
-  Plus,
+  Cross,
   Share2,
   ClipboardList,
   Search,
@@ -56,6 +56,12 @@ interface PharmacyWithMed {
   latitude: number;
   longitude: number;
   rating: number;
+  ratingCount?: number;
+  ratingLabel?: string;
+  imageUrl?: string | null;
+  logoUrl?: string | null;
+  facadeUrl?: string | null;
+  coverImageUrl?: string | null;
   price: number | null;
   priceLocked?: boolean;
   inStock: boolean;
@@ -109,6 +115,10 @@ interface MedDetail {
 
 // Abidjan reference center
 const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
+
+function pharmacyPhotoUrl(pharma: PharmacyWithMed) {
+  return pharma.logoUrl ?? pharma.facadeUrl ?? pharma.imageUrl ?? pharma.coverImageUrl ?? null;
+}
 
 export function MedicationDetailView() {
   const { params, navigate } = useNav();
@@ -867,8 +877,16 @@ function PharmacyMedCard({
     >
       {/* Header */}
       <div className="flex items-start gap-3 border-b border-border/50 p-4">
-        <span className="relative flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-dark text-white">
-          <Plus className="size-6" strokeWidth={3} />
+        <span className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-brand-light text-brand-dark">
+          {pharmacyPhotoUrl(pharma) ? (
+            <img
+              src={pharmacyPhotoUrl(pharma) ?? ""}
+              alt={`Photo ${pharma.name}`}
+              className="size-full object-cover"
+            />
+          ) : (
+            <Cross className="size-6" strokeWidth={2.5} />
+          )}
           {pharma.isOnDuty && (
             <span className="absolute -right-1 -top-1 flex size-3.5 items-center justify-center rounded-full bg-amber-400 ring-2 ring-background" />
           )}

@@ -14,6 +14,7 @@ import {
   Timer,
   Wallet,
   Lock,
+  Cross,
 } from "lucide-react";
 import { SearchBar } from "@/components/shared/search-bar";
 import { SectionHeader } from "@/components/shared/section-header";
@@ -30,6 +31,10 @@ import { cn } from "@/lib/utils";
 import type { Category, Medication, Pharmacy } from "@/lib/types";
 
 const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
+
+function pharmacyPhotoUrl(pharma: Pharmacy) {
+  return pharma.logoUrl ?? pharma.facadeUrl ?? pharma.imageUrl ?? pharma.coverImageUrl ?? null;
+}
 
 const HOME_CATEGORIES: { slug: string; fallbackName: string }[] = [
   { slug: "douleur-fievre", fallbackName: "Douleur" },
@@ -344,8 +349,16 @@ function DutyPharmacyRow({ pharma }: { pharma: Pharmacy }) {
       onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
       className="grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-lg border border-border bg-background p-3 text-left transition-colors hover:border-brand/40 hover:bg-accent sm:flex sm:items-center"
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-brand text-white">
-        <Plus className="size-5" strokeWidth={3} />
+      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-brand-light text-brand-dark">
+        {pharmacyPhotoUrl(pharma) ? (
+          <img
+            src={pharmacyPhotoUrl(pharma) ?? ""}
+            alt={`Photo ${pharma.name}`}
+            className="size-full object-cover"
+          />
+        ) : (
+          <Cross className="size-5" strokeWidth={2.5} />
+        )}
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">

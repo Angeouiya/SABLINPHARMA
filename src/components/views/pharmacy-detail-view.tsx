@@ -30,6 +30,8 @@ import {
   Lock,
   MessageCircle,
   Lightbulb,
+  Star,
+  Cross,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +53,7 @@ import { useAuth } from "@/store/auth";
 import { distanceKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { Pharmacy, MedicationStatus } from "@/lib/types";
+import type { Pharmacy, MedicationStatus, User } from "@/lib/types";
 
 interface PharmacyMedicationItem {
   id: string;
@@ -86,6 +88,26 @@ interface PharmacyDetail extends Pharmacy {
   inventoryAccess?: LockedAccess;
   pricesAccess?: LockedAccess;
   medications: PharmacyMedicationItem[];
+}
+
+interface PharmacyRatingSummary {
+  rating: number;
+  ratingCount: number;
+  ratingLabel: string;
+  currentUserRating: number | null;
+  currentUserComment: string;
+  canRate: boolean;
+  recentRatings: {
+    id: string;
+    rating: number;
+    comment: string | null;
+    author: string;
+    createdAt: string;
+  }[];
+}
+
+function pharmacyPhotoUrl(pharmacy: Pharmacy) {
+  return pharmacy.logoUrl ?? pharmacy.facadeUrl ?? pharmacy.imageUrl ?? pharmacy.coverImageUrl ?? null;
 }
 
 const ABIDJAN_CENTER = { lat: 5.34, lon: -4.008 };
@@ -322,8 +344,16 @@ export function PharmacyDetailView() {
           <div className="relative p-5 sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-start gap-4">
-                <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
-                  <Plus className="size-9 text-white" strokeWidth={3} />
+                <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/30 bg-white/15 text-white backdrop-blur-sm">
+                  {pharmacyPhotoUrl(pharmacy) ? (
+                    <img
+                      src={pharmacyPhotoUrl(pharmacy) ?? ""}
+                      alt={`Photo ${pharmacy.name}`}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <Cross className="size-9" strokeWidth={2.5} />
+                  )}
                 </span>
                 <div className="text-white">
                   <h1 className="text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl">
@@ -343,6 +373,7 @@ export function PharmacyDetailView() {
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 font-bold backdrop-blur-sm">
                       <span className="size-1.5 rounded-full bg-amber-300" />
                       {pharmacy.rating.toFixed(1)}
+                      <span className="text-white/75">· {pharmacy.ratingLabel ?? "Note initiale"}</span>
                     </span>
                   </div>
                 </div>
@@ -421,6 +452,23 @@ export function PharmacyDetailView() {
           <Muted>Une photo publique validée par SABLIN PHARMA sera affichée dès qu’elle sera disponible.</Muted>
         </Card>
       )}
+
+      <PharmacyRatingPanel
+        pharmacy={pharmacy}
+        user={user}
+        onUpdated={(summary) => {
+          setPharmacy((current) =>
+            current
+              ? {
+                  ...current,
+                  rating: summary.rating,
+                  ratingCount: summary.ratingCount,
+                  ratingLabel: summary.ratingLabel,
+                }
+              : current
+          );
+        }}
+      />
 
       {/* ============ LAYOUT: infos left + actions/map right ============ */}
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -1107,6 +1155,230 @@ export function PharmacyDetailView() {
         }}
       />
     </div>
+  );
+}
+
+/* ============================================================
+   PharmacyRatingPanel — avis utilisateurs vérifiés
+   ============================================================ */
+function PharmacyRatingPanel({
+  pharmacy,
+  user,
+  onUpdated,
+}: {
+  pharmacy: PharmacyDetail;
+  user: User | null;
+  onUpdated: (summary: Pick<PharmacyRatingSummary, "rating" | "ratingCount" | "ratingLabel">) => void;
+}) {
+  const { navigate } = useNav();
+  const [summary, setSummary] = useState<PharmacyRatingSummary>({
+    rating: pharmacy.rating,
+    ratingCount: pharmacy.ratingCount ?? 0,
+    ratingLabel: pharmacy.ratingLabel ?? "Note initiale",
+    currentUserRating: null,
+    currentUserComment: "",
+    canRate: Boolean(user),
+    recentRatings: [],
+  });
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    (async () => {
+      try {
+        const response = await fetch(`/api/pharmacies/${pharmacy.slug}/ratings`, {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Impossible de charger les avis.");
+        const data = (await response.json()) as PharmacyRatingSummary;
+        if (!active) return;
+        setSummary(data);
+        setSelectedRating(data.currentUserRating ?? 0);
+        setComment(data.currentUserComment ?? "");
+      } catch {
+        if (!active) return;
+        setSummary((current) => ({
+          ...current,
+          canRate: Boolean(user),
+        }));
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [pharmacy.slug, user]);
+
+  const submitRating = async () => {
+    if (!user) {
+      navigate("auth", { authMode: "login" });
+      return;
+    }
+    if (selectedRating < 1) {
+      toast.error("Choisissez une note entre 1 et 5.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/pharmacies/${pharmacy.slug}/ratings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rating: selectedRating, comment }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Impossible d'enregistrer la note.");
+      }
+
+      const nextSummary: PharmacyRatingSummary = {
+        ...summary,
+        rating: data.rating,
+        ratingCount: data.ratingCount,
+        ratingLabel: data.ratingLabel,
+        currentUserRating: data.currentUserRating,
+        currentUserComment: data.currentUserComment ?? "",
+        canRate: true,
+      };
+      setSummary(nextSummary);
+      onUpdated(nextSummary);
+      toast.success(data.message ?? "Votre note a été enregistrée.");
+
+      const refreshed = await fetch(`/api/pharmacies/${pharmacy.slug}/ratings`, {
+        cache: "no-store",
+      });
+      if (refreshed.ok) {
+        const refreshedData = (await refreshed.json()) as PharmacyRatingSummary;
+        setSummary(refreshedData);
+        setSelectedRating(refreshedData.currentUserRating ?? selectedRating);
+        setComment(refreshedData.currentUserComment ?? "");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Notation impossible.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Card className="mt-4 border-border/70 p-4 shadow-card">
+      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="rounded-xl border border-border bg-muted/30 p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            Avis utilisateurs
+          </p>
+          <div className="mt-2 flex items-end gap-2">
+            <span className="text-4xl font-extrabold leading-none text-foreground">
+              {summary.rating.toFixed(1)}
+            </span>
+            <span className="pb-1 text-sm font-bold text-muted-foreground">/ 5</span>
+          </div>
+          <div className="mt-2 flex items-center gap-1">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Star
+                key={index}
+                className={cn(
+                  "size-4",
+                  index < Math.round(summary.rating)
+                    ? "fill-amber-400 text-amber-400"
+                    : "text-border"
+                )}
+              />
+            ))}
+          </div>
+          <p className="mt-2 text-xs font-semibold text-muted-foreground">
+            {loading ? "Chargement des avis..." : summary.ratingLabel}
+          </p>
+        </div>
+
+        <div className="min-w-0 space-y-4">
+          <div>
+            <Heading level="h2" className="text-lg">Noter cette pharmacie</Heading>
+            <Muted>
+              Votre avis aide les utilisateurs à choisir une pharmacie fiable. Une seule note est
+              conservée par compte et peut être mise à jour.
+            </Muted>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 5 }).map((_, index) => {
+              const value = index + 1;
+              const active = selectedRating >= value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setSelectedRating(value)}
+                  className={cn(
+                    "flex size-10 items-center justify-center rounded-lg border text-sm font-bold transition-colors",
+                    active
+                      ? "border-amber-400 bg-amber-400 text-amber-950"
+                      : "border-border bg-white text-muted-foreground hover:border-brand/40"
+                  )}
+                  aria-label={`Noter ${value} sur 5`}
+                >
+                  <Star className={cn("size-5", active && "fill-amber-950")} />
+                </button>
+              );
+            })}
+          </div>
+
+          <textarea
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            rows={3}
+            maxLength={500}
+            placeholder="Commentaire optionnel : accueil, clarté, rapidité, expérience générale..."
+            className="min-h-24 w-full resize-none rounded-xl border border-border bg-white px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-brand focus:ring-2 focus:ring-brand/15"
+          />
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button
+              className="bg-brand text-white hover:bg-brand-dark"
+              onClick={submitRating}
+              disabled={submitting}
+            >
+              <Star className="size-4" />
+              {user ? "Enregistrer mon avis" : "Se connecter pour noter"}
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Les avis abusifs peuvent être masqués par l'équipe SABLIN PHARMA.
+            </span>
+          </div>
+
+          {summary.recentRatings.length > 0 && (
+            <div className="space-y-2 border-t border-border pt-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Derniers avis
+              </p>
+              {summary.recentRatings.map((rating) => (
+                <div key={rating.id} className="rounded-lg border border-border bg-white p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-bold text-foreground">{rating.author}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                      <Star className="size-3 fill-amber-400 text-amber-400" />
+                      {rating.rating}/5
+                    </span>
+                    <span className="text-[10px] font-semibold text-muted-foreground">
+                      {new Date(rating.createdAt).toLocaleDateString("fr-CI")}
+                    </span>
+                  </div>
+                  {rating.comment && (
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      {rating.comment}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }
 

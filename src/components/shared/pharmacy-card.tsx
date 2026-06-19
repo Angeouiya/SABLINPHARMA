@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Clock, ChevronRight, Plus, Timer, Lock, Phone } from "lucide-react";
+import { MapPin, Clock, ChevronRight, Cross, Timer, Lock, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { CreditCost } from "@/components/shared/credit-cost";
@@ -15,6 +15,28 @@ function RatingPill({ rating }: { rating: number }) {
         <span className="block size-1.5 rounded-full bg-amber-300" />
       </span>
       {rating.toFixed(1)}
+    </span>
+  );
+}
+
+function pharmacyPhotoUrl(pharma: Pharmacy) {
+  return pharma.logoUrl ?? pharma.facadeUrl ?? pharma.imageUrl ?? pharma.coverImageUrl ?? null;
+}
+
+function PharmacyThumb({ pharma, className }: { pharma: Pharmacy; className: string }) {
+  const photoUrl = pharmacyPhotoUrl(pharma);
+  return (
+    <span
+      className={cn(
+        "relative flex shrink-0 items-center justify-center overflow-hidden border border-white/30 bg-brand-light text-brand-dark",
+        className
+      )}
+    >
+      {photoUrl ? (
+        <img src={photoUrl} alt={`Photo ${pharma.name}`} className="size-full object-cover" />
+      ) : (
+        <Cross className="size-5" strokeWidth={2.5} />
+      )}
     </span>
   );
 }
@@ -43,9 +65,7 @@ export function PharmacyCard({ pharma }: { pharma: Pharmacy }) {
           )}
           <div className="absolute inset-0 bg-black/30" />
           <div className="relative flex items-center gap-3">
-            <span className="flex size-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
-              <Plus className="size-7 text-white" strokeWidth={3} />
-            </span>
+            <PharmacyThumb pharma={pharma} className="size-12 rounded-2xl" />
             <div className="text-white">
               <RatingPill rating={pharma.rating} />
             </div>
@@ -113,8 +133,8 @@ export function PharmacyRow({ pharma }: { pharma: Pharmacy }) {
       onClick={() => navigate("pharmacy-detail", { slug: pharma.slug })}
       className="group flex w-full min-w-0 items-start gap-3 rounded-xl border border-border/60 bg-background px-3 py-3 text-left transition-all hover:border-brand/30 hover:bg-accent/40 min-[420px]:items-center"
     >
-      <span className="relative flex size-11 shrink-0 items-center justify-center rounded-lg bg-brand-dark text-white">
-        <Plus className="size-6" strokeWidth={3} />
+      <span className="relative shrink-0">
+        <PharmacyThumb pharma={pharma} className="size-11 rounded-lg" />
         {pharma.isOnDuty && (
           <span className="absolute -right-1 -top-1 flex size-3.5 items-center justify-center rounded-full bg-amber-400 ring-2 ring-background" />
         )}

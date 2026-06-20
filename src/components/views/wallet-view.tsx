@@ -47,7 +47,7 @@ import {
 } from "@/store/credits";
 import { formatDate, formatFCFA } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { FCFA_PER_CREDIT } from "@/lib/restrictions";
+import { FCFA_PER_CREDIT, MIN_RECHARGE_AMOUNT } from "@/lib/restrictions";
 
 export function WalletView() {
   const { navigate } = useNav();
@@ -250,7 +250,8 @@ export function WalletView() {
       <section ref={packsRef} className="mt-10 scroll-mt-6">
         <SectionTitle icon={Plus} title="Packs de recharge" />
         <Muted className="mb-4">
-          Choisissez un pack adapté à vos besoins. Les crédits n&apos;expirent pas.
+          Choisissez un pack avec bonus ou saisissez un montant personnalisé.
+          Les crédits n&apos;expirent pas.
         </Muted>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {CREDIT_PACKS.map((pack) => (
@@ -295,6 +296,27 @@ export function WalletView() {
             </Card>
           ))}
         </div>
+
+        <Card className="mt-4 border-brand/20 bg-brand-light/30 p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold text-foreground">
+                Montant personnalisé
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Vous pouvez saisir un montant à partir de {formatFCFA(MIN_RECHARGE_AMOUNT)}.
+                Le choix Wave CI, Orange Money, MTN Money ou Moov Money se fait ensuite
+                sur PayDunya.
+              </p>
+            </div>
+            <Button
+              onClick={() => navigate("payment", { packAmount: MIN_RECHARGE_AMOUNT })}
+              className="w-full bg-brand text-white hover:bg-brand-dark sm:w-auto"
+            >
+              Saisir un montant <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </Card>
       </section>
 
       {/* ============ À QUOI SERVENT MES CRÉDITS ? ============ */}

@@ -1,7 +1,13 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { CREDIT_PACKS, FCFA_PER_CREDIT, PASS_ORDONNANCE_PRICE } from "@/lib/restrictions";
+import {
+  CREDIT_PACKS,
+  FCFA_PER_CREDIT,
+  PASS_ORDONNANCE_PRICE,
+  getRechargeCreditsForAmount,
+  getRechargeLabelForAmount,
+} from "@/lib/restrictions";
 import {
   ADMIN_SESSION_COOKIE,
   decodeProfessionalSession,
@@ -79,7 +85,17 @@ export function productFromPurchase(purchaseType: PurchaseType, amount: number):
         }
       : null;
   }
-  return CREDIT_PACK_BY_AMOUNT.get(amount) ?? null;
+  const credits = getRechargeCreditsForAmount(amount);
+  if (!credits) return null;
+  return (
+    CREDIT_PACK_BY_AMOUNT.get(amount) ?? {
+      purchaseType,
+      amount,
+      credits,
+      passOrdonnance: false,
+      label: getRechargeLabelForAmount(amount) ?? `Recharge personnalisée (${credits} crédits)`,
+    }
+  );
 }
 
 function safeProvider(provider: unknown): PaymentProviderId | null {
@@ -184,9 +200,10 @@ export async function createPaymentIntent(input: {
   if (!product) {
     throw new Error("Montant ou produit non autorisé.");
   }
-  const provider = safeProvider(input.provider);
-  if (!provider) {
-    throw new Error("Moyen de paiement non autorisé.");
+  const requestedProvider = safeProvider(input.provider);
+  const provider: PaymentProviderId = "paydunya";
+  if (requestedProvider && requestedProvider !== "paydunya") {
+    throw new Error("Le moyen de paiement se choisit sur PayDunya, pas sur SABLIN PHARMA.");
   }
 
   const idempotencyKey = generateIdempotencyKey(input.userId, input.idempotencyKey);
@@ -449,8 +466,8 @@ export async function processProviderConfirmation(input: {
           userId: payment.userId,
           type: "recharge",
           amount: payment.expectedCredits,
-          description: `Recharge confirmée — ${payment.expectedCredits} crédits (${payment.provider})`,
-          fcfaEquivalent: payment.expectedCredits * FCFA_PER_CREDIT,
+          description: `Recharge confirmée — ${payment.expectedCredits} crédits via PayDunya`,
+          fcfaEquivalent: payment.amount,
           balanceBefore,
           balanceAfter,
           status: "réussi",

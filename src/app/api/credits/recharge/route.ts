@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { CREDIT_PACKS } from "@/lib/restrictions";
+import { getRechargeCreditsForAmount } from "@/lib/restrictions";
 import { createPaymentIntent } from "@/lib/payment-security";
 
 // Recharge credits via PayDunya. Les moyens Mobile Money sont choisis sur PayDunya.
-const PACKS = Object.fromEntries(CREDIT_PACKS.map((pack) => [pack.amount, pack]));
-
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) {
@@ -13,11 +11,12 @@ export async function POST(req: NextRequest) {
   }
   try {
     const body = await req.json();
-    const amount = parseInt(body.amount, 10);
-    const pack = PACKS[amount];
+    const amount =
+      typeof body.amount === "number" ? body.amount : Number(String(body.amount ?? "").trim());
+    const credits = getRechargeCreditsForAmount(amount);
 
-    if (!pack) {
-      return NextResponse.json({ error: "Pack invalide" }, { status: 400 });
+    if (!credits) {
+      return NextResponse.json({ error: "Montant de recharge invalide" }, { status: 400 });
     }
 
     const result = await createPaymentIntent({
@@ -33,7 +32,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       pending: true,
-      credits: pack.credits,
+      credits,
       reference: result.payment.reference,
       checkoutUrl: result.checkoutUrl,
       status: result.payment.status,

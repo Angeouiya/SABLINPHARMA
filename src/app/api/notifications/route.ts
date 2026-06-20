@@ -74,7 +74,7 @@ export async function GET() {
           type: "success",
           title: "Recharge réussie",
           message:
-            "Paiement de 500 FCFA confirmé via Wave. 6 crédits ajoutés à votre solde.",
+            "Paiement de 500 FCFA confirmé via PayDunya. 6 crédits ajoutés à votre solde.",
           icon: "CheckCircle2",
           link: "wallet",
           createdAt: hoursAgo(8),

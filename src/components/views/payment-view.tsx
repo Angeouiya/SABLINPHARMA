@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   ChevronLeft,
   CreditCard,
@@ -37,7 +37,13 @@ import { useAuth } from "@/store/auth";
 import { useCredits, CREDIT_PACKS } from "@/store/credits";
 import { formatFCFA, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { FCFA_PER_CREDIT } from "@/lib/restrictions";
+import {
+  FCFA_PER_CREDIT,
+  MAX_RECHARGE_AMOUNT,
+  MIN_RECHARGE_AMOUNT,
+  getRechargeCreditsForAmount,
+  getRechargeLabelForAmount,
+} from "@/lib/restrictions";
 
 type Provider = "wave" | "orange" | "mtn" | "moov";
 type PaymentState = "idle" | "pending" | "processing" | "success" | "failed" | "cancelled" | "expired" | "suspicious";
@@ -98,7 +104,7 @@ const PAYMENT_HISTORY = [
     date: "2026-06-16",
     formule: "Pack Standard (6 crédits)",
     montant: 500,
-    moyen: "Orange Money",
+    moyen: "Choisi sur PayDunya",
     statut: "success" as const,
     reference: "SPL-RECHARGE-202606161435",
   },
@@ -106,7 +112,7 @@ const PAYMENT_HISTORY = [
     date: "2026-05-28",
     formule: "Pass Ordonnance Unique",
     montant: 500,
-    moyen: "Wave",
+    moyen: "Choisi sur PayDunya",
     statut: "success" as const,
     reference: "SPL-PASS-202605280912",
   },
@@ -114,7 +120,7 @@ const PAYMENT_HISTORY = [
     date: "2026-05-16",
     formule: "Pack Découverte (2 crédits)",
     montant: 200,
-    moyen: "MTN Money",
+    moyen: "Choisi sur PayDunya",
     statut: "success" as const,
     reference: "SPL-RECHARGE-202605161820",
   },
@@ -122,7 +128,7 @@ const PAYMENT_HISTORY = [
     date: "2026-04-30",
     formule: "Pack Plus (13 crédits)",
     montant: 1000,
-    moyen: "Moov Money",
+    moyen: "Choisi sur PayDunya",
     statut: "failed" as const,
     reference: "SPL-RECHARGE-202604301104",
   },
@@ -137,8 +143,9 @@ export function PaymentView() {
   const [mode, setMode] = useState<PaymentMode>(
     params.passOrdonnance ? "pass" : "recharge"
   );
-  const [selectedPackAmount, setSelectedPackAmount] = useState<number>(
-    params.packAmount ?? 500
+  const initialRechargeAmount = params.packAmount ?? 500;
+  const [rechargeAmountInput, setRechargeAmountInput] = useState(
+    String(initialRechargeAmount)
   );
 
   const [holderName, setHolderName] = useState(user?.name ?? "");
@@ -147,19 +154,57 @@ export function PaymentView() {
   const [transactionRef, setTransactionRef] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
 
+  useEffect(() => {
+    if (params.passOrdonnance) {
+      setMode("pass");
+      return;
+    }
+    if (typeof params.packAmount === "number") {
+      setMode("recharge");
+      setRechargeAmountInput(String(params.packAmount));
+    }
+  }, [params.packAmount, params.passOrdonnance]);
+
   // Montant et libellé dynamiques selon le mode
   const currentAmount = useMemo(() => {
-    if (mode === "recharge") return selectedPackAmount;
+    if (mode === "recharge") {
+      const parsed = Number(rechargeAmountInput);
+      return Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
+    }
     return PASS_PRICE;
-  }, [mode, selectedPackAmount]);
+  }, [mode, rechargeAmountInput]);
+
+  const currentCredits = useMemo(() => {
+    if (mode !== "recharge") return 0;
+    return getRechargeCreditsForAmount(currentAmount) ?? 0;
+  }, [currentAmount, mode]);
+
+  const selectedOfficialPack = useMemo(
+    () => CREDIT_PACKS.find((p) => p.amount === currentAmount),
+    [currentAmount]
+  );
+
+  const rechargeAmountError = useMemo(() => {
+    if (mode !== "recharge") return null;
+    if (!rechargeAmountInput.trim()) return "Saisissez un montant de recharge.";
+    if (currentAmount < MIN_RECHARGE_AMOUNT) {
+      return `Le montant minimum est ${formatFCFA(MIN_RECHARGE_AMOUNT)}.`;
+    }
+    if (currentAmount > MAX_RECHARGE_AMOUNT) {
+      return `Le montant maximum est ${formatFCFA(MAX_RECHARGE_AMOUNT)}.`;
+    }
+    if (currentAmount % FCFA_PER_CREDIT !== 0) {
+      return `Saisissez un montant par tranche de ${formatFCFA(FCFA_PER_CREDIT)}.`;
+    }
+    return null;
+  }, [currentAmount, mode, rechargeAmountInput]);
 
   const currentLabel = useMemo(() => {
     if (mode === "recharge") {
-      const pack = CREDIT_PACKS.find((p) => p.amount === selectedPackAmount);
-      return pack ? `${pack.label} (${pack.credits} crédits)` : "Recharge de crédits";
+      return getRechargeLabelForAmount(currentAmount) ?? "Recharge de crédits";
     }
     return "Pass Ordonnance Unique";
-  }, [mode, selectedPackAmount]);
+  }, [currentAmount, mode]);
 
   const currentShortLabel = useMemo(() => {
     if (mode === "recharge") return "Recharge de crédits";
@@ -193,6 +238,12 @@ export function PaymentView() {
   }
 
   const handlePay = async () => {
+    if (mode === "recharge" && rechargeAmountError) {
+      toast.error("Montant de recharge invalide", {
+        description: rechargeAmountError,
+      });
+      return;
+    }
     setState("processing");
     try {
       const idempotencyKey = `sablin-${mode}-${currentAmount}-paydunya-${Date.now()}`;
@@ -421,12 +472,14 @@ export function PaymentView() {
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {CREDIT_PACKS.map((pack) => {
-                  const active = selectedPackAmount === pack.amount;
+                  const active = currentAmount === pack.amount;
                   return (
                     <button
                       key={pack.amount}
                       type="button"
-                      onClick={() => setSelectedPackAmount(pack.amount)}
+                      onClick={() => {
+                        setRechargeAmountInput(String(pack.amount));
+                      }}
                       className={cn(
                         "relative flex flex-col items-center gap-1 rounded-xl border p-3 text-center transition-all",
                         active
@@ -458,6 +511,51 @@ export function PaymentView() {
                     </button>
                   );
                 })}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-brand/20 bg-brand-light/30 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Label htmlFor="custom-recharge-amount">Montant personnalisé</Label>
+                    <div className="relative">
+                      <Input
+                        id="custom-recharge-amount"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={rechargeAmountInput}
+                        onChange={(e) => {
+                          const clean = e.target.value.replace(/\D/g, "");
+                          setRechargeAmountInput(clean);
+                        }}
+                        placeholder="Ex : 3000"
+                        className="h-11 pr-16 text-base"
+                        disabled={state === "processing" || state === "pending"}
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+                        FCFA
+                      </span>
+                    </div>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Minimum {formatFCFA(MIN_RECHARGE_AMOUNT)}. Le montant doit respecter
+                      la règle 1 crédit = {FCFA_PER_CREDIT} FCFA. Les packs officiels gardent
+                      leurs bonus.
+                    </p>
+                    {rechargeAmountError ? (
+                      <p className="text-xs font-semibold text-danger">{rechargeAmountError}</p>
+                    ) : (
+                      <p className="text-xs font-semibold text-brand-dark">
+                        Vous recevrez {currentCredits} crédit{currentCredits > 1 ? "s" : ""}
+                        {selectedOfficialPack ? " avec le bonus du pack officiel." : "."}
+                      </p>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground">
+                      Crédits attendus
+                    </p>
+                    <p className="text-lg font-extrabold text-brand-dark">{currentCredits}</p>
+                  </div>
+                </div>
               </div>
             </Card>
           </section>
@@ -634,20 +732,28 @@ export function PaymentView() {
                   </p>
                 </div>
 
-                {/* Montant (read-only) */}
+                {/* Montant transmis à PayDunya */}
                 <div className="space-y-1.5">
                   <Label>Montant à payer</Label>
-                  <div className="flex items-center justify-between rounded-lg border border-brand/20 bg-brand-light/30 px-3 py-2.5">
+                  <div className="flex flex-col gap-2 rounded-lg border border-brand/20 bg-brand-light/30 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-sm text-muted-foreground">{currentLabel}</span>
                     <Price amount={currentAmount} size="md" variant="brand" />
                   </div>
+                  {mode === "recharge" && rechargeAmountError && (
+                    <p className="text-xs font-semibold text-danger">{rechargeAmountError}</p>
+                  )}
                 </div>
 
                 {/* Bouton Payer maintenant */}
                 <Button
                   className="min-h-12 w-full whitespace-normal bg-brand px-3 py-3 text-sm font-semibold text-white shadow-avance hover:bg-brand-dark sm:text-base"
                   onClick={handlePay}
-                  disabled={state === "processing" || state === "pending" || (mode === "pass" && hasPass)}
+                  disabled={
+                    state === "processing" ||
+                    state === "pending" ||
+                    (mode === "pass" && hasPass) ||
+                    (mode === "recharge" && Boolean(rechargeAmountError))
+                  }
                 >
                   {state === "processing" ? (
                     <>
@@ -721,7 +827,7 @@ export function PaymentView() {
                   <p className="text-xs text-muted-foreground">
                     {mode === "pass"
                       ? "Une seule ordonnance · Activation après confirmation"
-                      : `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits · Ajout après confirmation`}
+                      : `${currentCredits} crédits · Ajout après confirmation`}
                   </p>
                 </div>
                 <Badge className="border-0 bg-success text-white">
@@ -773,7 +879,12 @@ export function PaymentView() {
                 className="mt-4 min-h-11 w-full whitespace-normal bg-brand px-3 py-2.5 text-sm text-white hover:bg-brand-dark"
                 size="lg"
                 onClick={handlePay}
-                disabled={state === "processing" || state === "pending" || (mode === "pass" && hasPass)}
+                disabled={
+                  state === "processing" ||
+                  state === "pending" ||
+                  (mode === "pass" && hasPass) ||
+                  (mode === "recharge" && Boolean(rechargeAmountError))
+                }
               >
                 {state === "processing" ? (
                   <>
@@ -919,7 +1030,7 @@ export function PaymentView() {
                   label={mode === "recharge" ? (state === "success" ? "Crédits obtenus" : "Crédits attendus") : "Validité du pass"}
                   value={
                     mode === "recharge"
-                      ? `${CREDIT_PACKS.find((p) => p.amount === selectedPackAmount)?.credits ?? 0} crédits`
+                      ? `${currentCredits} crédits`
                       : "Une seule ordonnance"
                   }
                 />

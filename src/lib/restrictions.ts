@@ -1,5 +1,7 @@
 export const FCFA_PER_CREDIT = 100;
 export const PASS_ORDONNANCE_PRICE = 500;
+export const MIN_RECHARGE_AMOUNT = 200;
+export const MAX_RECHARGE_AMOUNT = 200_000;
 
 export const CREDIT_PACKS = [
   { amount: 200, credits: 2, label: "Pack Découverte", popular: false },
@@ -7,6 +9,21 @@ export const CREDIT_PACKS = [
   { amount: 1000, credits: 13, label: "Pack Plus", popular: false },
   { amount: 2000, credits: 28, label: "Pack Famille", popular: false },
 ] as const;
+
+export function getRechargeCreditsForAmount(amount: number) {
+  if (!Number.isInteger(amount)) return null;
+  if (amount < MIN_RECHARGE_AMOUNT || amount > MAX_RECHARGE_AMOUNT) return null;
+  if (amount % FCFA_PER_CREDIT !== 0) return null;
+  const pack = CREDIT_PACKS.find((item) => item.amount === amount);
+  return pack?.credits ?? amount / FCFA_PER_CREDIT;
+}
+
+export function getRechargeLabelForAmount(amount: number) {
+  const credits = getRechargeCreditsForAmount(amount);
+  if (!credits) return null;
+  const pack = CREDIT_PACKS.find((item) => item.amount === amount);
+  return pack ? `${pack.label} (${pack.credits} crédits)` : `Recharge personnalisée (${credits} crédits)`;
+}
 
 export const PASS_ORDONNANCE_RULE =
   "Valable pour une seule ordonnance. Après estimation et comparaison des pharmacies, le pass expire automatiquement.";

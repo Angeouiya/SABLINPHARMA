@@ -260,6 +260,103 @@
   button {
     white-space: normal;
   }
+
+  .sablin-user-ui {
+    overflow-x: clip;
+  }
+
+  .sablin-user-ui :where(h1, h2, h3, h4, h5, h6, p, span, a, button, label, li, td, th) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    hyphens: auto;
+  }
+
+  .sablin-user-ui :where(input, textarea, select) {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .sablin-user-ui :where(button, [role="button"]) {
+    min-height: 2.75rem;
+  }
+
+  .sablin-user-ui :where(.whitespace-nowrap) {
+    white-space: normal;
+  }
+
+  .sablin-user-ui :where(.overflow-x-auto) {
+    max-width: 100vw;
+  }
+
+  @media (max-width: 480px) {
+    .sablin-user-ui {
+      font-size: 0.9375rem;
+    }
+
+    .sablin-user-ui :where(.px-8) {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .sablin-user-ui :where(.py-8) {
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+    }
+
+    .sablin-user-ui :where(.p-8) {
+      padding: 1rem;
+    }
+
+    .sablin-user-ui :where(.gap-8) {
+      gap: 1rem;
+    }
+
+    .sablin-user-ui :where(.text-4xl) {
+      font-size: 2rem;
+      line-height: 2.35rem;
+    }
+
+    .sablin-user-ui :where(.text-3xl) {
+      font-size: 1.75rem;
+      line-height: 2.1rem;
+    }
+
+    .sablin-user-ui :where(.text-2xl) {
+      font-size: 1.35rem;
+      line-height: 1.8rem;
+    }
+  }
+
+  @media (max-width: 374px) {
+    .sablin-user-ui {
+      font-size: 0.875rem;
+    }
+
+    .sablin-user-ui h1 {
+      font-size: 1.65rem;
+      line-height: 2rem;
+    }
+
+    .sablin-user-ui h2 {
+      font-size: 1.25rem;
+      line-height: 1.65rem;
+    }
+
+    .sablin-user-ui h3 {
+      font-size: 1.05rem;
+      line-height: 1.45rem;
+    }
+
+    .sablin-user-ui :where(.px-6, .px-5) {
+      padding-left: 0.875rem;
+      padding-right: 0.875rem;
+    }
+
+    .sablin-user-ui :where(.p-6, .p-5) {
+      padding: 0.875rem;
+    }
+  }
 }
 
 @layer utilities {

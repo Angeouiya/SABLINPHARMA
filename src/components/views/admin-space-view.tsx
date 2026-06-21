@@ -2,20 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Activity,
+  AlertTriangle,
   Bell,
   Building2,
   CalendarClock,
+  CheckCircle2,
   ClipboardList,
   Database,
+  FileCheck2,
   FileSpreadsheet,
   History,
+  ImageIcon,
   LayoutDashboard,
   Loader2,
+  LockKeyhole,
   LogOut,
   Pill,
+  RefreshCw,
   Search,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
+  UserCog,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -135,6 +144,56 @@ const adminUsers = [
   { id: "demo-sablin", name: "Demo SABLIN", phone: "+225 07 00 00 00 01", email: "demo@sablinpharma.ci", commune: "Cocody", credits: 10, transactions: 8, prescriptions: 2, status: "Actif", activity: "Aujourd’hui" },
   { id: "utilisateur-yopougon", name: "Awa Koné", phone: "+225 05 12 44 90 10", email: "awa.kone@example.ci", commune: "Yopougon", credits: 0, transactions: 3, prescriptions: 1, status: "Solde insuffisant", activity: "Hier" },
   { id: "utilisateur-marcory", name: "Moussa Traoré", phone: "+225 01 45 88 20 15", email: "moussa.traore@example.ci", commune: "Marcory", credits: 6, transactions: 12, prescriptions: 4, status: "Actif", activity: "17/06/2026" },
+];
+
+const adminOperationalWorkflows = [
+  { title: "Validation pharmacie", status: "En attente", owner: "Données", detail: "Vérifier identité, photos publiques, documents internes et horaires." },
+  { title: "Import inventaire", status: "À vérifier", owner: "Marketplace", detail: "Publier les lignes sûres, retirer les interdits, isoler les ambiguës." },
+  { title: "Paiement suspect", status: "Vérification manuelle", owner: "Finance", detail: "Contrôler référence, montant, webhook et idempotence avant toute action." },
+  { title: "Images médicaments", status: "Licence à confirmer", owner: "Enrichissement", detail: "Aucune image web non validée ne doit être visible côté utilisateur." },
+];
+
+const adminRiskControls = [
+  "Routes /admin réservées aux rôles Administrateur SABLIN et Super administrateur",
+  "Actions sensibles journalisées dans l’historique professionnel",
+  "Pharmacies non validées non publiées côté utilisateur par défaut",
+  "Contacts, stocks, prix détaillés et ordonnances verrouillés par crédits côté utilisateur",
+  "Paiements non SUCCESS bloqués avant crédit ou Pass Ordonnance Unique",
+  "Images web publiées uniquement après validation source/licence",
+];
+
+const professionalAccountRows = [
+  { name: "Pharmacie Sainte Marie Cocody", role: "PHARMACY_OWNER", scope: "pharmacie-sainte-marie-cocody", status: "Actif", permissions: "Profil, horaires, inventaire, demandes", lastLogin: "Aujourd’hui 09:40", risk: "Normal" },
+  { name: "Koffi Yao", role: "PHARMACY_STOCK_MANAGER", scope: "pharmacie-sainte-marie-cocody", status: "Actif", permissions: "Inventaire, import, confirmations", lastLogin: "Hier 18:12", risk: "À surveiller" },
+  { name: "Pharmacie Les Palmiers", role: "PHARMACIST_MANAGER", scope: "pharmacie-les-palmiers-yopougon", status: "En attente", permissions: "Accès bloqué avant validation", lastLogin: "Invitation envoyée", risk: "En attente" },
+  { name: "Assistant Plateau", role: "PHARMACY_EMPLOYEE", scope: "pharmacie-centrale-plateau", status: "Suspendu", permissions: "Disponibilités uniquement", lastLogin: "Il y a 11 jours", risk: "Suspendu" },
+];
+
+const adminPermissionMatrix = [
+  ["Super administrateur", "Toutes pharmacies", "Utilisateurs", "Paiements", "Paramètres sensibles"],
+  ["Administrateur SABLIN", "Pharmacies, imports, qualité", "Support utilisateur", "Transactions consultables", "Paramètres limités"],
+  ["Data admin", "Référentiel, images, imports", "Aucun mot de passe", "Aucun remboursement", "Qualité données"],
+  ["Support admin", "Demandes utilisateurs", "Assistance", "Lecture transactions", "Pas de publication directe"],
+];
+
+const medicationRequestRows = [
+  { medication: "Efferalgan 500 mg", pharmacy: "Pharmacie Sainte Marie Cocody", status: "En attente", confidence: "78%", action: "Fusion proposée" },
+  { medication: "Azithromycine 250 mg", pharmacy: "Pharmacie Les Palmiers Yopougon", status: "À vérifier", confidence: "64%", action: "Validation individuelle" },
+  { medication: "Paracétamol 500 mg", pharmacy: "Pharmacie Centrale Plateau", status: "Fusionné", confidence: "96%", action: "Alias ajouté" },
+];
+
+const adminHistoryRows = [
+  { date: "Aujourd’hui 10:42", actor: "Super administrateur", role: "SUPER_ADMIN", action: "Validation pharmacie", entity: "Pharmacie Sainte Marie Cocody", status: "Réussi" },
+  { date: "Aujourd’hui 10:18", actor: "Moteur import", role: "Système", action: "Publication lignes sûres", entity: "Import inventaire Cocody", status: "Réussi" },
+  { date: "Hier 17:50", actor: "Contrôle données", role: "DATA_ADMIN", action: "Refus image web", entity: "Doliprane 500 mg", status: "Licence inconnue" },
+  { date: "Hier 15:22", actor: "Finance", role: "FINANCE_ADMIN", action: "Paiement suspect", entity: "SP-PAY-2026-000128", status: "Vérification manuelle" },
+];
+
+const adminNotificationRows = [
+  { title: "Pharmacie en attente", detail: "Une inscription pharmacie attend validation avant publication.", status: "En attente" },
+  { title: "Import avec erreurs", detail: "Des statuts invalides ont été isolés avant publication marketplace.", status: "À vérifier" },
+  { title: "Données anciennes", detail: "Trois pharmacies doivent mettre à jour horaires ou disponibilités.", status: "Données anciennes" },
+  { title: "Paiement suspect", detail: "Un montant reçu ne correspond pas à un pack officiel.", status: "Suspect" },
 ];
 
 function slugify(value: string) {
@@ -279,6 +338,178 @@ function PillList({ items }: { items: readonly string[] }) {
   return (
     <div className="flex flex-wrap gap-2">
       {items.map((item) => <StatusBadge key={item} label={item} />)}
+    </div>
+  );
+}
+
+function AdminHero({
+  badge,
+  title,
+  description,
+  icon: Icon = ShieldCheck,
+  children,
+  actions,
+}: {
+  badge: string;
+  title: string;
+  description: string;
+  icon?: typeof ShieldCheck;
+  children?: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <Card className="border-border/70 bg-white p-5 shadow-card">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="grid size-10 place-items-center rounded-lg bg-brand text-white">
+              <Icon className="size-5" />
+            </span>
+            <Badge className="border-0 bg-brand-light text-brand-dark">{badge}</Badge>
+          </div>
+          <Heading level="h2" className="mt-3">{title}</Heading>
+          <Muted className="mt-2 max-w-3xl">{description}</Muted>
+        </div>
+        {actions && <div className="flex flex-wrap gap-2 lg:justify-end">{actions}</div>}
+      </div>
+      {children && <div className="mt-5">{children}</div>}
+    </Card>
+  );
+}
+
+function MiniMetric({ label, value, status, icon: Icon = Activity }: { label: string; value: string | number; status: string; icon?: typeof Activity }) {
+  return (
+    <Card className="border-border/70 bg-white p-4 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-extrabold uppercase text-muted-foreground">{label}</p>
+          <p className="mt-2 break-words text-2xl font-extrabold text-foreground">{value}</p>
+        </div>
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-light text-brand-dark">
+          <Icon className="size-4" />
+        </span>
+      </div>
+      <div className="mt-3"><StatusBadge label={status} /></div>
+    </Card>
+  );
+}
+
+function MetricsGrid({ metrics }: { metrics: Array<{ label: string; value: string | number; status: string; icon?: typeof Activity }> }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {metrics.map((metric) => <MiniMetric key={metric.label} {...metric} />)}
+    </div>
+  );
+}
+
+function AdminFilterPanel({ filters, actionLabel = "Appliquer les filtres" }: { filters: string[]; actionLabel?: string }) {
+  return (
+    <Card className="border-border/70 bg-white p-4 shadow-card">
+      <div className="flex flex-wrap items-center gap-2">
+        <SlidersHorizontal className="size-4 text-brand-dark" />
+        <p className="text-sm font-extrabold text-foreground">Filtres dynamiques</p>
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {filters.map((filter) => <Input key={filter} placeholder={filter} className="bg-white" />)}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button className="bg-brand text-white hover:bg-brand-dark">{actionLabel}</Button>
+        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light">Réinitialiser</Button>
+      </div>
+    </Card>
+  );
+}
+
+function WorkflowBoard({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description: string;
+  items: Array<{ title: string; status: string; owner: string; detail: string }>;
+}) {
+  return (
+    <SectionBlock title={title} description={description}>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {items.map((item) => (
+          <Card key={item.title} className="border-border/70 bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <StatusBadge label={item.status} />
+              <Badge className="border border-border bg-white text-foreground">{item.owner}</Badge>
+            </div>
+            <p className="mt-3 font-extrabold text-foreground">{item.title}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{item.detail}</p>
+          </Card>
+        ))}
+      </div>
+    </SectionBlock>
+  );
+}
+
+function ControlChecklist({ title, items }: { title: string; items: string[] }) {
+  return (
+    <SectionBlock title={title} description="Contrôles critiques à vérifier avant toute publication ou action sensible.">
+      <div className="grid gap-2 md:grid-cols-2">
+        {items.map((item) => (
+          <div key={item} className="flex gap-3 rounded-lg border border-border bg-white p-3 text-sm font-semibold text-foreground">
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </SectionBlock>
+  );
+}
+
+function ActionQueue({
+  title,
+  items,
+  action = "process-admin-card",
+}: {
+  title: string;
+  items: Array<{ title: string; detail: string; status: string; entityId?: string }>;
+  action?: string;
+}) {
+  return (
+    <SectionBlock title={title} description="Chaque action est confirmée côté API puis journalisée dans l’historique professionnel.">
+      <div className="grid gap-3 md:grid-cols-2">
+        {items.map((item) => (
+          <Card key={item.title} className="border-border/70 bg-white p-4">
+            <StatusBadge label={item.status} />
+            <p className="mt-3 font-extrabold text-foreground">{item.title}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{item.detail}</p>
+            <ProfessionalActionButton
+              action={action}
+              label="Traiter"
+              entityId={item.entityId ?? item.title}
+              payload={{ details: item }}
+              className="mt-3 bg-brand text-white hover:bg-brand-dark"
+            >
+              Traiter
+            </ProfessionalActionButton>
+          </Card>
+        ))}
+      </div>
+    </SectionBlock>
+  );
+}
+
+function ResponsiveTable({ headers, rows }: { headers: string[]; rows: Array<Array<React.ReactNode>> }) {
+  return (
+    <div className="overflow-x-auto rounded-xl border border-border bg-white">
+      <table className="w-full min-w-[900px] text-sm">
+        <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+          <tr>{headers.map((header) => <th key={header} className="px-4 py-3">{header}</th>)}</tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {row.map((cell, cellIndex) => <td key={cellIndex} className="px-4 py-3 align-top">{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -616,7 +847,16 @@ function GlobalAdminImports() {
         ) : null}
       </Card>
       <AdminMediaUploadPanel pharmacySlug={pharmacySlug} />
-      <SimpleAdmin title="Imports inventaire et contrôles" items={["Import pharmacie Cocody", "Import admin Plateau", "Import avec erreurs", "Import corrigé", "Médicaments non reconnus", "Prix manquants", "Statuts invalides"]} />
+      <WorkflowBoard
+        title="Chaîne import → publication"
+        description="Les lignes sûres peuvent être publiées automatiquement, les interdits sont retirés et les ambiguës restent en validation admin."
+        items={[
+          { title: "Import pharmacie", status: "Analyse", owner: "Moteur", detail: "Extraction multi-format, normalisation, doublons et statuts invalides." },
+          { title: "Publication contrôlée", status: "Lignes sûres", owner: "Admin", detail: "Validation groupée avec retrait individuel des produits à masquer." },
+          { title: "Référentiel", status: "À valider", owner: "Data", detail: "Les médicaments non reconnus créent une demande, pas un doublon automatique." },
+          { title: "Marketplace", status: "Synchronisée", owner: "Utilisateur", detail: "Les produits publiés restent protégés par crédits côté utilisateur." },
+        ]}
+      />
     </div>
   );
 }
@@ -814,40 +1054,70 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-border/70 p-5 shadow-card">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Heading level="h2">Centre de contrôle SABLIN PHARMA</Heading>
-            <Muted>Plateforme maître : plusieurs pharmacies, plusieurs utilisateurs, une seule base de données contrôlée.</Muted>
+      <AdminHero
+        badge="Administration centrale"
+        title="Centre de contrôle SABLIN PHARMA"
+        description="Plateforme maître : plusieurs pharmacies, plusieurs utilisateurs, crédits, paiements, marketplace, qualité des données et publication utilisateur depuis une seule base contrôlée."
+        icon={LayoutDashboard}
+        actions={
+          <>
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => window.location.reload()}>
+              <RefreshCw className="size-4" /> Actualiser
+            </Button>
+            <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = "/admin/pharmacies/nouveau")}>Créer une pharmacie</Button>
+          </>
+        }
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-xs font-extrabold uppercase text-muted-foreground">Priorité du jour</p>
+            <p className="mt-1 font-bold text-foreground">Valider les pharmacies en attente et publier les lignes sûres des imports.</p>
           </div>
-          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = "/admin/pharmacies/nouveau")}>Créer une pharmacie</Button>
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-xs font-extrabold uppercase text-muted-foreground">Règle sécurité</p>
+            <p className="mt-1 font-bold text-foreground">Aucun crédit, pass ou stock visible sans droit confirmé côté serveur.</p>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-xs font-extrabold uppercase text-muted-foreground">Marketplace</p>
+            <p className="mt-1 font-bold text-foreground">Images web et descriptions restent bloquées avant validation admin.</p>
+          </div>
         </div>
-      </Card>
+      </AdminHero>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map(([label, value, badge]) => (
           <Stat key={String(label)} label={String(label)} value={loadingSummary ? "..." : value} badge={String(badge)} />
         ))}
       </div>
+      <WorkflowBoard
+        title="Pilotage opérationnel"
+        description="Vue rapide des chantiers qui impactent directement l’espace utilisateur, pharmacie et marketplace."
+        items={adminOperationalWorkflows}
+      />
+      <ControlChecklist title="Garde-fous de production" items={adminRiskControls} />
     </div>
   );
 }
 
 function PharmaciesList() {
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <Heading level="h2">Pharmacies</Heading>
-          <Muted>Liste globale, validation, suspension, qualité et accès au mode gestion pharmacie.</Muted>
-        </div>
-        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = "/admin/pharmacies/nouveau")}>Créer une pharmacie</Button>
-      </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-5">
-        <div className="relative md:col-span-2"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Recherche nom, commune, responsable..." className="pl-9" /></div>
-        <Input placeholder="Commune" />
-        <Input placeholder="Validation" />
-        <Input placeholder="Qualité / mise à jour" />
-      </div>
+    <div className="space-y-5">
+      <AdminHero
+        badge="Multi-pharmacies"
+        title="Pharmacies"
+        description="Liste globale, validation, suspension, publication, qualité des données et accès au mode gestion pharmacie sans créer de session pharmacie."
+        icon={Building2}
+        actions={<Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = "/admin/pharmacies/nouveau")}>Créer une pharmacie</Button>}
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "Pharmacies", value: adminPharmacies.length, status: "Toutes pharmacies", icon: Building2 },
+          { label: "Validées", value: adminPharmacies.filter((p) => p.status === "Validée").length, status: "Publication possible", icon: CheckCircle2 },
+          { label: "En attente", value: adminPharmacies.filter((p) => p.status !== "Validée").length, status: "Contrôle requis", icon: AlertTriangle },
+          { label: "Données anciennes", value: adminPharmacies.filter((p) => p.quality.includes("ancienne") || p.updatedAt.includes("jours")).length, status: "À mettre à jour", icon: CalendarClock },
+        ]}
+      />
+      <AdminFilterPanel filters={["Recherche nom, commune, responsable", "Commune", "Validation", "Ouvert / garde", "Qualité / mise à jour"]} />
+      <Card className="border-border/70 p-5 shadow-card">
       <div className="mt-4 overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[1180px] text-sm">
           <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
@@ -884,7 +1154,18 @@ function PharmaciesList() {
           </tbody>
         </table>
       </div>
-    </Card>
+      </Card>
+      <WorkflowBoard
+        title="Cycle de contrôle pharmacie"
+        description="Une pharmacie ne devient visible côté utilisateur qu’après validation et publication contrôlée."
+        items={[
+          { title: "Inscription ou création admin", status: "En attente", owner: "Admin", detail: "Vérifier identité, responsable, téléphone, commune, quartier et adresse." },
+          { title: "Photos et documents", status: "À vérifier", owner: "Qualité", detail: "Publier uniquement logo/façade/couverture validés, garder les documents internes côté admin." },
+          { title: "Horaires et garde", status: "Synchronisation", owner: "Pharmacie", detail: "Alimente pharmacies ouvertes et pharmacies de garde côté utilisateur." },
+          { title: "Publication utilisateur", status: "Validée", owner: "Admin", detail: "Seules les pharmacies validées et non suspendues sont publiées." },
+        ]}
+      />
+    </div>
   );
 }
 
@@ -1334,15 +1615,46 @@ function ScheduleAdmin({ pharmacySlug }: { pharmacySlug: string }) {
 
 function Reference() {
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Référentiel médicaments</Heading>
-      <Muted>Seul l’Admin peut ajouter, modifier ou désactiver un médicament référentiel.</Muted>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+    <div className="space-y-5">
+      <AdminHero
+        badge="Référentiel central"
+        title="Référentiel médicaments"
+        description="Base officielle utilisée par les imports, le moteur marketplace, les ordonnances et les recherches utilisateur. Les pharmacies ne modifient jamais ce référentiel directement."
+        icon={Pill}
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "Médicaments actifs", value: PHARMACY_PORTAL_MEDICATIONS.length, status: "Référentiel", icon: Pill },
+          { label: "Demandes à traiter", value: medicationRequestRows.filter((row) => row.status !== "Fusionné").length, status: "Validation admin", icon: ClipboardList },
+          { label: "Aliases contrôlés", value: 18, status: "Anti-doublon", icon: FileCheck2 },
+          { label: "Désactivations", value: 2, status: "Contrôle", icon: LockKeyhole },
+        ]}
+      />
+      <AdminFilterPanel filters={["Nom commercial ou DCI", "Dosage", "Forme", "Catégorie", "Statut référentiel"]} />
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <Field label="Nom commercial" />
+          <Field label="DCI" />
+          <Field label="Dosage" />
+          <Field label="Forme" />
+          <Field label="Catégorie" />
+        </div>
+        <ProfessionalActionButton action="reference-update" label="Ajouter au référentiel" entityType="medication-reference" className="mt-4 bg-brand text-white hover:bg-brand-dark">
+          Ajouter au référentiel
+        </ProfessionalActionButton>
+      </Card>
+      <div className="grid gap-3 md:grid-cols-2">
         {PHARMACY_PORTAL_MEDICATIONS.map((m) => (
-          <Card key={m.name} className="border-border/70 p-4">
-            <p className="font-bold text-foreground">{m.name}</p>
-            <p className="text-sm text-muted-foreground">{m.dci} · {m.dosage} · {m.form} · {m.category}</p>
-            <div className="mt-3 flex gap-2">
+          <Card key={m.name} className="border-border/70 p-4 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <StatusBadge label="Actif" />
+                <p className="mt-3 font-bold text-foreground">{m.name}</p>
+                <p className="text-sm text-muted-foreground">{m.dci} · {m.dosage} · {m.form} · {m.category}</p>
+              </div>
+              <Badge className="border border-border bg-white text-foreground">Marketplace</Badge>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
               <ProfessionalActionButton action="reference-update" label="Modifier" entityType="medication-reference" entityId={m.name} size="sm" variant="outline">
                 Modifier
               </ProfessionalActionButton>
@@ -1353,7 +1665,7 @@ function Reference() {
           </Card>
         ))}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -2090,14 +2402,24 @@ function MarketplaceEngineAdmin() {
 
 function UsersList() {
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Utilisateurs</Heading>
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <div className="relative md:col-span-2"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Recherche utilisateur, téléphone, commune..." className="pl-9" /></div>
-        <Input placeholder="Filtre crédits" />
-        <Input placeholder="Filtre activité" />
-      </div>
-      <div className="mt-4 overflow-x-auto rounded-xl border border-border">
+    <div className="space-y-5">
+      <AdminHero
+        badge="Grand public"
+        title="Utilisateurs"
+        description="Suivi des comptes clients, crédits SABLIN, ordonnances, contacts débloqués, Pass Ordonnance Unique et actions support sans jamais exposer de mot de passe."
+        icon={Users}
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "Utilisateurs suivis", value: adminUsers.length, status: "Actifs et support", icon: Users },
+          { label: "Avec crédits", value: adminUsers.filter((u) => u.credits > 0).length, status: "Crédits SABLIN", icon: WalletCards },
+          { label: "Solde insuffisant", value: adminUsers.filter((u) => u.credits === 0).length, status: "À accompagner", icon: AlertTriangle },
+          { label: "Ordonnances", value: adminUsers.reduce((sum, user) => sum + user.prescriptions, 0), status: "Pass / crédits", icon: ClipboardList },
+        ]}
+      />
+      <AdminFilterPanel filters={["Recherche utilisateur, téléphone, e-mail", "Commune", "Solde crédits", "Activité", "Statut compte"]} />
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[980px] text-sm">
           <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
             <tr>{["Nom", "Téléphone", "Email", "Commune", "Solde", "Transactions", "Ordonnances", "Statut", "Dernière activité", "Action"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
@@ -2119,8 +2441,63 @@ function UsersList() {
             ))}
           </tbody>
         </table>
-      </div>
-    </Card>
+        </div>
+      </Card>
+      <ActionQueue
+        title="File support utilisateurs"
+        items={[
+          { title: "Solde insuffisant", detail: "Aider l’utilisateur à recharger ou comprendre les crédits SABLIN.", status: "Support" },
+          { title: "Paiement en vérification", detail: "Vérifier le statut serveur avant tout crédit ou Pass.", status: "Paiement" },
+          { title: "Contact pharmacie débloqué", detail: "Contrôler la transaction et l’accès temporaire si besoin.", status: "Crédits" },
+          { title: "Ordonnance bloquée", detail: "Confirmer crédit suffisant ou Pass Ordonnance Unique actif.", status: "Restriction" },
+        ]}
+      />
+    </div>
+  );
+}
+
+function Transactions() {
+  const rows = [
+    { action: "Recharge crédits", user: "Demo SABLIN", amount: "500 FCFA", credits: "+6", before: "4", after: "10", status: "Réussi", ref: "SP-PAY-2026-000101" },
+    { action: "Achat Pass Ordonnance Unique", user: "Awa Koné", amount: "500 FCFA", credits: "Pass", before: "0", after: "0", status: "Confirmé", ref: "SP-PAY-2026-000102" },
+    { action: "Contact débloqué", user: "Moussa Traoré", amount: "100 FCFA", credits: "-1", before: "7", after: "6", status: "Réussi", ref: "SP-CRD-2026-000103" },
+    { action: "Paiement échoué", user: "Awa Koné", amount: "1 000 FCFA", credits: "0", before: "0", after: "0", status: "Échoué", ref: "SP-PAY-2026-000104" },
+    { action: "Remboursement support", user: "Demo SABLIN", amount: "200 FCFA", credits: "-2", before: "12", after: "10", status: "Vérification manuelle", ref: "SP-RFD-2026-000105" },
+  ];
+  return (
+    <div className="space-y-5">
+      <AdminHero
+        badge="Comptabilité crédits"
+        title="Crédits & transactions"
+        description="Lecture globale des recharges, crédits utilisés, Pass Ordonnance Unique, contacts débloqués et corrections support. Le solde reste calculé côté serveur."
+        icon={WalletCards}
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "Crédits vendus", value: "47", status: "Confirmé", icon: WalletCards },
+          { label: "Recharges", value: "12", status: "SUCCESS", icon: CheckCircle2 },
+          { label: "Pass achetés", value: "4", status: "500 FCFA", icon: FileCheck2 },
+          { label: "Anomalies", value: "1", status: "À vérifier", icon: AlertTriangle },
+        ]}
+      />
+      <AdminFilterPanel filters={["Référence", "Utilisateur", "Type d’action", "Statut", "Date"]} />
+      <Card className="border-border/70 p-5 shadow-card">
+        <ResponsiveTable
+          headers={["Action", "Utilisateur", "Montant", "Crédits", "Solde avant", "Solde après", "Statut", "Référence", "Actions"]}
+          rows={rows.map((row) => [
+            <span key="action" className="font-bold text-foreground">{row.action}</span>,
+            row.user,
+            row.amount,
+            row.credits,
+            row.before,
+            row.after,
+            <StatusBadge key="status" label={row.status} />,
+            <span key="ref" className="font-mono text-xs font-bold">{row.ref}</span>,
+            <ProfessionalActionButton key="btn" action="refund-transaction" label="Analyser" entityType="transaction" entityId={row.ref} size="sm" variant="outline">Analyser</ProfessionalActionButton>,
+          ])}
+        />
+      </Card>
+    </div>
   );
 }
 
@@ -2128,38 +2505,34 @@ function UserDetail({ userId }: { userId?: string }) {
   const user = adminUsers.find((item) => item.id === userId) ?? adminUsers[0];
   return (
     <div className="space-y-5">
-      <Card className="border-border/70 p-5 shadow-card">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <StatusBadge label={user.status} />
-            <Heading level="h2" className="mt-3">{user.name}</Heading>
-            <Muted>{user.phone} · {user.email} · {user.commune}</Muted>
-          </div>
+      <AdminHero
+        badge={user.status}
+        title={user.name}
+        description={`${user.phone} · ${user.email} · ${user.commune}. Actions support sans mot de passe en clair.`}
+        icon={Users}
+        actions={
           <ProfessionalActionButton action="user-block-toggle" label="Bloquer ou débloquer" entityType="user" entityId={user.id} variant="outline" className="border-red-300 text-red-700">
             Bloquer ou débloquer
           </ProfessionalActionButton>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat label="Solde crédits" value={`${user.credits} crédits`} badge="Crédits SABLIN" />
-          <Stat label="Transactions" value={user.transactions} badge="Historique" />
-          <Stat label="Ordonnances" value={user.prescriptions} badge="Pass Ordonnance Unique" />
-          <Stat label="Dernière activité" value={user.activity} badge="Actif" />
-        </div>
-      </Card>
-      <SimpleAdmin title="Détail utilisateur" items={["Historique transactions", "Ordonnances", "Pharmacies consultées", "Contacts débloqués", "Pass acheté/utilisé/expiré", "Notifications", "Actions support", "Note interne"]} />
+        }
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "Solde crédits", value: `${user.credits} crédits`, status: "Crédits SABLIN", icon: WalletCards },
+          { label: "Transactions", value: user.transactions, status: "Historique", icon: History },
+          { label: "Ordonnances", value: user.prescriptions, status: "Pass Ordonnance Unique", icon: ClipboardList },
+          { label: "Dernière activité", value: user.activity, status: "Actif", icon: Activity },
+        ]}
+      />
+      <ActionQueue
+        title="Dossier utilisateur"
+        items={["Historique transactions", "Ordonnances", "Pharmacies consultées", "Contacts débloqués", "Pass acheté/utilisé/expiré", "Notifications", "Actions support", "Note interne"].map((item) => ({
+          title: item,
+          detail: "Consultation ou action support journalisée côté administration.",
+          status: item.includes("Pass") ? "Pass Ordonnance Unique" : "Support",
+        }))}
+      />
     </div>
-  );
-}
-
-function Transactions() {
-  const rows = ["Recharge crédits", "Achat Pass Ordonnance Unique", "Contact débloqué", "Confirmation disponibilité", "Paiement échoué", "Remboursement support"];
-  return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Crédits & transactions</Heading>
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {rows.map((row, index) => <Card key={row} className="border-border/70 p-4"><StatusBadge label={index === 4 ? "Échoué" : "Réussi"} /><p className="mt-3 font-bold text-foreground">{row}</p><p className="text-sm text-muted-foreground">Utilisateur · {index + 1} crédit(s) · 100 FCFA · Solde avant/après · Référence SB-{index + 101}</p></Card>)}
-      </div>
-    </Card>
   );
 }
 
@@ -2322,30 +2695,34 @@ function PaymentsFraud() {
 }
 
 function ProfessionalAccounts() {
-  const rows = [
-    { name: "Pharmacie Sainte Marie Cocody", role: "PHARMACY_OWNER", scope: "pharmacie-sainte-marie-cocody", status: "Actif" },
-    { name: "Koffi Yao", role: "PHARMACY_STOCK_MANAGER", scope: "pharmacie-sainte-marie-cocody", status: "Actif" },
-    { name: "Pharmacie Les Palmiers", role: "PHARMACIST_MANAGER", scope: "pharmacie-les-palmiers-yopougon", status: "En attente" },
-  ];
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Comptes professionnels</Heading>
-      <Muted>Gestion centralisée des comptes pharmacie, rôles, rattachements et sessions. Une pharmacie ne voit jamais les comptes d’une autre pharmacie.</Muted>
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <Input placeholder="Recherche nom, email, téléphone" />
-        <Input placeholder="Rôle" />
-        <Input placeholder="Statut" />
-        <Input placeholder="Pharmacie rattachée" />
-      </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {rows.map((row) => (
-          <Card key={`${row.name}-${row.role}`} className="border-border/70 p-4">
+    <div className="space-y-5">
+      <AdminHero
+        badge="Accès professionnels"
+        title="Comptes professionnels"
+        description="Gestion centralisée des comptes pharmacie, rôles, rattachements, permissions et sessions. Une pharmacie ne voit jamais les comptes d’une autre pharmacie."
+        icon={UserCog}
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "Comptes pro", value: professionalAccountRows.length, status: "Tous espaces", icon: UserCog },
+          { label: "Actifs", value: professionalAccountRows.filter((row) => row.status === "Actif").length, status: "Session autorisée", icon: CheckCircle2 },
+          { label: "En attente", value: professionalAccountRows.filter((row) => row.status === "En attente").length, status: "Invitation", icon: Bell },
+          { label: "Suspendus", value: professionalAccountRows.filter((row) => row.status === "Suspendu").length, status: "Bloqué", icon: LockKeyhole },
+        ]}
+      />
+      <AdminFilterPanel filters={["Recherche nom, e-mail, téléphone", "Rôle", "Statut", "Pharmacie rattachée", "Risque"]} />
+      <div className="grid gap-3 md:grid-cols-2">
+        {professionalAccountRows.map((row) => (
+          <Card key={`${row.name}-${row.role}`} className="border-border/70 p-4 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-extrabold text-foreground">{row.name}</p>
                 <p className="text-sm font-medium text-muted-foreground">{row.role} · {row.scope}</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">Permissions : {row.permissions}</p>
+                <p className="text-xs font-semibold text-muted-foreground">Dernière connexion : {row.lastLogin}</p>
               </div>
-              <StatusBadge label={row.status} />
+              <div className="flex flex-wrap gap-2"><StatusBadge label={row.status} /><StatusBadge label={row.risk} /></div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <ProfessionalActionButton action="professional-role-update" label="Modifier rôle" entityType="professional-account" entityId={row.name} size="sm" variant="outline">Modifier rôle</ProfessionalActionButton>
@@ -2355,7 +2732,13 @@ function ProfessionalAccounts() {
           </Card>
         ))}
       </div>
-    </Card>
+      <SectionBlock title="Matrice des permissions" description="Séparation stricte entre espace pharmacie, administration globale, données, support et finance.">
+        <ResponsiveTable
+          headers={["Rôle", "Pharmacies", "Utilisateurs", "Paiements", "Portée"]}
+          rows={adminPermissionMatrix.map((row) => row.map((cell) => <span key={cell} className="font-semibold text-foreground">{cell}</span>))}
+        />
+      </SectionBlock>
+    </div>
   );
 }
 
@@ -2366,21 +2749,32 @@ function Administrators() {
     { name: "Support SABLIN", role: "SUPPORT_ADMIN", status: "En attente", activity: "Invitation envoyée" },
   ];
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Administrateurs</Heading>
-      <Muted>Création interne uniquement. Aucun administrateur ne peut s’inscrire publiquement.</Muted>
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <Field label="Nom administrateur" />
-        <Field label="Email professionnel" />
-        <Field label="Rôle" placeholder="DATA_ADMIN, SUPPORT_ADMIN..." />
-        <Field label="Permissions" placeholder="admin.pharmacies.read" />
-      </div>
-      <ProfessionalActionButton action="admin-create" label="Créer administrateur" entityType="admin-account" className="mt-4 bg-brand text-white hover:bg-brand-dark">
-        Créer administrateur
-      </ProfessionalActionButton>
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
+    <div className="space-y-5">
+      <AdminHero
+        badge="Équipe interne"
+        title="Administrateurs"
+        description="Création interne uniquement. Aucun administrateur ne peut s’inscrire publiquement, et les mots de passe ne sont jamais affichés en clair."
+        icon={ShieldCheck}
+      />
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="grid gap-3 md:grid-cols-4">
+          <Field label="Nom administrateur" />
+          <Field label="Email professionnel" />
+          <Field label="Rôle" placeholder="DATA_ADMIN, SUPPORT_ADMIN..." />
+          <Field label="Permissions" placeholder="admin.pharmacies.read" />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <ProfessionalActionButton action="admin-create" label="Créer administrateur" entityType="admin-account" className="bg-brand text-white hover:bg-brand-dark">
+            Créer administrateur
+          </ProfessionalActionButton>
+          <ProfessionalActionButton action="admin-force-password-reset" label="Forcer réinitialisation" entityType="admin-account" variant="outline" className="border-brand/30 text-brand-dark">
+            Forcer réinitialisation
+          </ProfessionalActionButton>
+        </div>
+      </Card>
+      <div className="grid gap-3 md:grid-cols-2">
         {rows.map((row) => (
-          <Card key={row.name} className="border-border/70 p-4">
+          <Card key={row.name} className="border-border/70 p-4 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-extrabold text-foreground">{row.name}</p>
@@ -2395,25 +2789,274 @@ function Administrators() {
           </Card>
         ))}
       </div>
-    </Card>
+      <ControlChecklist title="Sécurité administrateur" items={["Accès réservé à l’équipe interne", "Pas de section publique d’inscription admin", "Révocation de session journalisée", "Permissions sensibles séparées par rôle"]} />
+    </div>
   );
 }
 
 function Quality() {
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Qualité des données</Heading>
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <Input placeholder="Pharmacie" />
-        <Input placeholder="Commune" />
-        <Input placeholder="Source de donnée" />
-        <Input placeholder="Fiabilité" />
-      </div>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-5">
+      <AdminHero
+        badge="Fiabilité"
+        title="Qualité des données"
+        description="Surveillance des disponibilités, prix indicatifs, horaires, GPS, sources, fiabilité et publication. Les données anciennes ou incomplètes deviennent À confirmer côté utilisateur."
+        icon={Database}
+      />
+      <AdminFilterPanel filters={["Pharmacie", "Commune", "Source de donnée", "Fiabilité", "Dernière mise à jour"]} />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {["Pharmacies avec données anciennes", "Médicaments à confirmer", "Prix manquants", "Disponibilités non mises à jour", "Pharmacies sans horaires", "Pharmacies sans GPS", "Pharmacies non validées", "Demandes en attente"].map((item, index) => <Stat key={item} label={item} value={index + 3} badge={index % 2 ? "À vérifier" : "Données anciennes"} />)}
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">{RELIABILITY_LEVELS.map((item) => <StatusBadge key={item} label={item} />)}{DATA_SOURCES.map((item) => <StatusBadge key={item} label={item} />)}</div>
-    </Card>
+      <SectionBlock title="Sources et fiabilité" description="Ces valeurs contrôlent ce qui peut être publié côté utilisateur.">
+        <div className="flex flex-wrap gap-2">{RELIABILITY_LEVELS.map((item) => <StatusBadge key={item} label={item} />)}{DATA_SOURCES.map((item) => <StatusBadge key={item} label={item} />)}</div>
+      </SectionBlock>
+      <ActionQueue
+        title="Actions qualité prioritaires"
+        action="mark-data-quality"
+        items={adminPharmacies.slice(0, 4).map((pharmacy) => ({
+          title: pharmacy.name,
+          detail: `${pharmacy.commune} · ${pharmacy.updatedAt} · ${pharmacy.quality}`,
+          status: pharmacy.quality,
+          entityId: pharmacy.slug,
+        }))}
+      />
+    </div>
+  );
+}
+
+function PharmacyValidationsAdmin() {
+  const pending = adminPharmacies.filter((pharmacy) => pharmacy.status !== "Validée");
+  return (
+    <div className="space-y-5">
+      <AdminHero
+        badge="Publication contrôlée"
+        title="Validations pharmacies"
+        description="Contrôlez les inscriptions, documents, images publiques, horaires, garde et qualité avant publication côté utilisateur."
+        icon={ShieldCheck}
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "À valider", value: pending.length, status: "En attente", icon: AlertTriangle },
+          { label: "Photos à vérifier", value: 6, status: "Images publiques", icon: ImageIcon },
+          { label: "Documents internes", value: 4, status: "Admin uniquement", icon: FileCheck2 },
+          { label: "Prêtes à publier", value: Math.max(0, pending.length - 1), status: "Contrôle OK", icon: CheckCircle2 },
+        ]}
+      />
+      <div className="grid gap-3 md:grid-cols-2">
+        {pending.map((pharmacy) => (
+          <Card key={pharmacy.slug} className="border-border/70 p-4 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <StatusBadge label={pharmacy.status} />
+                <p className="mt-3 font-extrabold text-foreground">{pharmacy.name}</p>
+                <p className="text-sm font-medium text-muted-foreground">{pharmacy.commune} · {pharmacy.district} · {pharmacy.manager}</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">Source : {pharmacy.source} · qualité : {pharmacy.quality}</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => (window.location.href = `/admin/pharmacies/${pharmacy.slug}`)}>Dossier</Button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <ProfessionalActionButton action="validate-pharmacy" label="Valider" pharmacySlug={pharmacy.slug} size="sm" className="bg-brand text-white hover:bg-brand-dark">Valider</ProfessionalActionButton>
+              <ProfessionalActionButton action="refuse-pharmacy" label="Refuser" pharmacySlug={pharmacy.slug} size="sm" variant="outline" className="border-red-300 text-red-700">Refuser</ProfessionalActionButton>
+              <ProfessionalActionButton action="review-documents" label="Demander correction" pharmacySlug={pharmacy.slug} size="sm" variant="outline">Demander correction</ProfessionalActionButton>
+            </div>
+          </Card>
+        ))}
+        {!pending.length && <Card className="border-border/70 p-6 text-sm font-bold text-muted-foreground">Aucune pharmacie en attente.</Card>}
+      </div>
+      <ControlChecklist title="Checklist validation" items={["Identité et responsable vérifiés", "Photos publiques sans données sensibles", "Documents administratifs gardés admin uniquement", "Horaires et garde renseignés", "Publication bloquée si compte suspendu ou refusé"]} />
+    </div>
+  );
+}
+
+function MedicationRequestsAdmin() {
+  return (
+    <div className="space-y-5">
+      <AdminHero
+        badge="Référentiel"
+        title="Demandes d’ajout médicament"
+        description="Les pharmacies proposent, l’administration valide, fusionne ou refuse. Aucun doublon n’est créé automatiquement."
+        icon={Pill}
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "Demandes", value: medicationRequestRows.length, status: "Référentiel", icon: ClipboardList },
+          { label: "En attente", value: medicationRequestRows.filter((row) => row.status === "En attente").length, status: "À traiter", icon: AlertTriangle },
+          { label: "À vérifier", value: medicationRequestRows.filter((row) => row.status === "À vérifier").length, status: "Ambigu", icon: Search },
+          { label: "Fusionnées", value: medicationRequestRows.filter((row) => row.status === "Fusionné").length, status: "Alias", icon: CheckCircle2 },
+        ]}
+      />
+      <AdminFilterPanel filters={["Nom proposé", "Pharmacie demandeuse", "DCI", "Dosage", "Statut"]} />
+      <div className="grid gap-3 md:grid-cols-2">
+        {medicationRequestRows.map((row) => (
+          <Card key={`${row.medication}-${row.pharmacy}`} className="border-border/70 p-4 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <StatusBadge label={row.status} />
+                <p className="mt-3 font-extrabold text-foreground">{row.medication}</p>
+                <p className="text-sm font-medium text-muted-foreground">{row.pharmacy} · confiance {row.confidence}</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">{row.action}</p>
+              </div>
+              <Badge className="border border-border bg-white text-foreground">{row.confidence}</Badge>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <ProfessionalActionButton action="reference-update" label="Valider" entityType="medication-request" entityId={row.medication} size="sm" className="bg-brand text-white hover:bg-brand-dark">Valider</ProfessionalActionButton>
+              <ProfessionalActionButton action="merge-medication-request" label="Fusionner" entityType="medication-request" entityId={row.medication} size="sm" variant="outline">Fusionner</ProfessionalActionButton>
+              <ProfessionalActionButton action="reference-disable" label="Refuser" entityType="medication-request" entityId={row.medication} size="sm" variant="outline" className="border-red-300 text-red-700">Refuser</ProfessionalActionButton>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminSynchronizations() {
+  return (
+    <div className="space-y-5">
+      <AdminHero
+        badge="Base commune"
+        title="Synchronisations"
+        description="Contrôle des flux Admin → Pharmacie → Utilisateur : pharmacies validées, horaires, garde, inventaires, marketplace, prix indicatifs et demandes."
+        icon={Database}
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "Flux actifs", value: 7, status: "Connectés", icon: Database },
+          { label: "Dernière synchro", value: "10:18", status: "Aujourd’hui", icon: RefreshCw },
+          { label: "Conflits", value: 2, status: "À résoudre", icon: AlertTriangle },
+          { label: "Webhooks", value: 4, status: "Sécurisés", icon: ShieldCheck },
+        ]}
+      />
+      <InventorySyncPanel kind="admin" />
+      <WorkflowBoard
+        title="Flux synchronisés"
+        description="Les données visibles côté utilisateur passent par ces règles de publication."
+        items={[
+          { title: "Pharmacies validées", status: "Publiées", owner: "Admin", detail: "Seules les fiches validées et non suspendues sont visibles." },
+          { title: "Horaires & garde", status: "Temps réel", owner: "Pharmacie", detail: "Alimente pharmacies ouvertes et de garde." },
+          { title: "Inventaires", status: "Contrôlé", owner: "Moteur", detail: "Les statuts sensibles restent verrouillés par crédits côté utilisateur." },
+          { title: "Images", status: "Licence", owner: "Admin", detail: "Images web publiées seulement après validation source et licence." },
+        ]}
+      />
+    </div>
+  );
+}
+
+function AdminUserRequests() {
+  return (
+    <div className="space-y-5">
+      <AdminHero
+        badge="Demandes globales"
+        title="Demandes utilisateurs"
+        description="Supervision des contacts débloqués, appels, WhatsApp, conseils, confirmations, prix et demandes liées aux ordonnances."
+        icon={ClipboardList}
+      />
+      <MetricsGrid
+        metrics={[
+          { label: "Demandes ouvertes", value: 14, status: "Nouvelle", icon: ClipboardList },
+          { label: "Confirmations", value: 6, status: "En cours", icon: CheckCircle2 },
+          { label: "Conseils", value: 3, status: "Pharmacie", icon: Users },
+          { label: "Ordonnances", value: 5, status: "Pass / crédits", icon: FileCheck2 },
+        ]}
+      />
+      <ProfessionalRequestsPanel kind="admin" />
+    </div>
+  );
+}
+
+function AdminHistory() {
+  return (
+    <div className="space-y-5">
+      <AdminHero
+        badge="Audit global"
+        title="Historique"
+        description="Journal des actions utilisateurs, pharmacies, admins, imports, validations, suspensions, transactions, confirmations et publications."
+        icon={History}
+      />
+      <AdminFilterPanel filters={["Date", "Auteur", "Rôle", "Action", "Entité", "Statut"]} />
+      <Card className="border-border/70 p-5 shadow-card">
+        <ResponsiveTable
+          headers={["Date", "Auteur", "Rôle", "Action", "Entité", "Statut", "Détail"]}
+          rows={adminHistoryRows.map((row) => [
+            row.date,
+            <span key="actor" className="font-bold text-foreground">{row.actor}</span>,
+            row.role,
+            row.action,
+            row.entity,
+            <StatusBadge key="status" label={row.status} />,
+            <ProfessionalActionButton key="btn" action="process-admin-card" label="Consulter" entityType="audit-log" entityId={row.entity} size="sm" variant="outline">Consulter</ProfessionalActionButton>,
+          ])}
+        />
+      </Card>
+    </div>
+  );
+}
+
+function AdminNotifications() {
+  return (
+    <div className="space-y-5">
+      <AdminHero
+        badge="Centre d’alertes"
+        title="Notifications admin"
+        description="Alertes opérationnelles liées aux validations, imports, données anciennes, paiements suspects et publications."
+        icon={Bell}
+      />
+      <div className="grid gap-3 md:grid-cols-2">
+        {adminNotificationRows.map((item) => (
+          <Card key={item.title} className="border-border/70 p-4 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <StatusBadge label={item.status} />
+                <p className="mt-3 font-extrabold text-foreground">{item.title}</p>
+                <p className="text-sm font-medium text-muted-foreground">{item.detail}</p>
+              </div>
+              <Bell className="size-5 text-brand-dark" />
+            </div>
+            <ProfessionalActionButton action="process-admin-card" label="Marquer traité" payload={{ details: item }} size="sm" className="mt-3 bg-brand text-white hover:bg-brand-dark">Marquer traité</ProfessionalActionButton>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminSettings() {
+  return (
+    <div className="space-y-5">
+      <AdminHero
+        badge="Paramètres globaux"
+        title="Paramètres"
+        description="Configuration des règles de sécurité, publication, enrichissement, paiements, crédits, sessions et support interne. La modification de mot de passe admin n’est pas exposée ici."
+        icon={Settings}
+      />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SectionBlock title="Règles plateforme" description="Paramètres appliqués aux trois espaces sans les mélanger dans la navigation.">
+          <div className="grid gap-3">
+            {[
+              ["Crédits SABLIN", "1 crédit = 100 FCFA, solde serveur uniquement."],
+              ["Pass Ordonnance Unique", "500 FCFA, une seule ordonnance, expiration après comparaison."],
+              ["Contacts pharmacie", "Verrouillés par crédits côté API et interface."],
+              ["Marketplace", "Information et orientation, aucune vente directe."],
+            ].map(([title, detail]) => (
+              <div key={title} className="rounded-lg border border-border bg-white p-3">
+                <p className="font-extrabold text-foreground">{title}</p>
+                <p className="text-sm font-medium text-muted-foreground">{detail}</p>
+              </div>
+            ))}
+          </div>
+        </SectionBlock>
+        <SectionBlock title="Actions sensibles" description="Chaque action doit être auditée et réservée au bon rôle.">
+          <div className="grid gap-2">
+            {["Révoquer toutes les sessions admin", "Relancer contrôle enrichissement", "Forcer fallback images", "Exporter audit sécurité"].map((item) => (
+              <ProfessionalActionButton key={item} action="process-admin-card" label={item} payload={{ details: { item } }} variant="outline" className="justify-start border-brand/30 text-brand-dark hover:bg-brand-light">
+                {item}
+              </ProfessionalActionButton>
+            ))}
+          </div>
+        </SectionBlock>
+      </div>
+      <ControlChecklist title="Sécurité globale" items={adminRiskControls} />
+    </div>
   );
 }
 
@@ -2459,7 +3102,7 @@ export function AdminSpaceView({ page, pharmacyId, userId }: { page: AdminPage; 
       {page === "pharmacies-nouveau" && <CreatePharmacy />}
       {page === "pharmacie-detail" && <PharmacyDetail pharmacyId={pharmacyId} />}
       {page.startsWith("pharmacy-") && <PharmacySpecificPage page={page} pharmacyId={pharmacyId} />}
-      {page === "validations-pharmacies" && <SimpleAdmin title="Validations pharmacies" items={["Pharmacie Les Palmiers Yopougon", "Pharmacie Marcory Résidentiel", "Pharmacie Koumassi Nouveau Marché"]} />}
+      {page === "validations-pharmacies" && <PharmacyValidationsAdmin />}
       {page === "comptes-professionnels" && <ProfessionalAccounts />}
       {page === "referentiel-medicaments" && <Reference />}
       {page === "medicaments-interdits" && <ProhibitedMedicationsAdmin />}
@@ -2467,18 +3110,18 @@ export function AdminSpaceView({ page, pharmacyId, userId }: { page: AdminPage; 
       {page === "moteur-marketplace" && <MarketplaceEngineAdmin />}
       {page === "sources-licences-images" && <EnrichmentAdmin licenseOnly />}
       {page === "imports" && <GlobalAdminImports />}
-      {page === "synchronisations" && <InventorySyncPanel kind="admin" />}
-      {page === "demandes-ajout-medicaments" && <SimpleAdmin title="Demandes d’ajout médicament" items={["Proposition Efferalgan", "Proposition Azithromycine", "Fusion avec Paracétamol"]} />}
+      {page === "synchronisations" && <AdminSynchronizations />}
+      {page === "demandes-ajout-medicaments" && <MedicationRequestsAdmin />}
       {page === "utilisateurs" && <UsersList />}
       {page === "utilisateur-detail" && <UserDetail userId={userId} />}
       {page === "credits-transactions" && <Transactions />}
       {page === "payments-fraud" && <PaymentsFraud />}
-      {page === "demandes-utilisateurs" && <ProfessionalRequestsPanel kind="admin" />}
+      {page === "demandes-utilisateurs" && <AdminUserRequests />}
       {page === "qualite-donnees" && <Quality />}
-      {page === "historique" && <SimpleAdmin title="Historique global" items={["Action utilisateur", "Action pharmacie", "Action admin", "Import", "Validation", "Suspension", "Transaction"]} />}
-      {page === "notifications" && <SimpleAdmin title="Notifications admin" items={["Pharmacie en attente", "Import avec erreurs", "Données anciennes"]} />}
+      {page === "historique" && <AdminHistory />}
+      {page === "notifications" && <AdminNotifications />}
       {page === "administrateurs" && <Administrators />}
-      {page === "parametres" && <SimpleAdmin title="Paramètres admin" items={["Sécurité", "Rôles administrateurs", "Paramètres globaux", "Support interne"]} />}
+      {page === "parametres" && <AdminSettings />}
     </AdminShell>
   );
 }

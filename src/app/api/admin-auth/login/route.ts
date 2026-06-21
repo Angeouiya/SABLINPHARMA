@@ -8,7 +8,8 @@ const professionalLoginSchema = z.object({
   identifier: textField(160).optional(),
   email: textField(160).optional(),
   phone: textField(40).optional(),
-  password: z.preprocess((value) => String(value ?? ""), z.string().min(1).max(256)),
+  password: z.preprocess((value) => (value == null ? undefined : String(value)), z.string().max(256).optional()),
+  demo: z.boolean().optional(),
   role: textField(80).optional(),
 });
 
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest) {
     kind: "admin",
     identifier: body.data.identifier ?? body.data.email ?? body.data.phone,
     password: body.data.password,
+    demo: body.data.demo,
     fallbackRole: body.data.role,
   });
   if (!auth.ok) {

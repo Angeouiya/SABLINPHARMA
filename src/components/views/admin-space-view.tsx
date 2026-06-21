@@ -729,7 +729,7 @@ async function adminLogin(role = "Administrateur SABLIN") {
   await fetch("/api/admin-auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role }),
+    body: JSON.stringify({ role, demo: true }),
   });
   window.location.href = "/admin/dashboard";
 }

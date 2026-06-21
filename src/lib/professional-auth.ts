@@ -170,12 +170,19 @@ export async function authenticateProfessionalAccount(input: {
   kind: ProfessionalSessionKind;
   identifier?: string;
   password?: string;
+  demo?: boolean;
   fallbackRole?: string;
 }) {
   await ensureDefaultProfessionalAccounts();
   const identifier = String(input.identifier ?? "").trim().toLowerCase();
   const password = String(input.password ?? "");
+  const isDemoLogin = input.demo === true && !identifier;
   const fallbackEmail = input.kind === "admin" ? DEMO_ADMIN_EMAIL : DEMO_PHARMACY_EMAIL;
+
+  if (!identifier && !isDemoLogin) {
+    return { ok: false as const, status: 400, error: "Identifiant requis." };
+  }
+
   const account = await db.professionalAccount.findFirst({
     where: {
       kind: input.kind,
@@ -214,7 +221,7 @@ export async function authenticateProfessionalAccount(input: {
   }
 
   const demoPassword = input.kind === "admin" ? DEMO_ADMIN_PASSWORD : DEMO_PHARMACY_PASSWORD;
-  const passwordToCheck = password || demoPassword;
+  const passwordToCheck = isDemoLogin ? demoPassword : password;
   if (!verifyPassword(passwordToCheck, account.passwordHash)) {
     await writeAudit({
       req: input.req,

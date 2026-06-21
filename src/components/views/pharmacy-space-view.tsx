@@ -706,7 +706,7 @@ async function pharmacyLogin(role = "Pharmacien responsable", status = "Validée
   await fetch("/api/pharmacy-auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, status }),
+    body: JSON.stringify({ role, status, demo: true }),
   });
   window.location.href = "/pharmacie/dashboard";
 }

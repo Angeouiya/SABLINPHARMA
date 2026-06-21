@@ -127,6 +127,29 @@ const pharmacyDashboardFallback: PharmacyDashboardSummary = {
   priceToCheck: 0,
 };
 
+const pharmacyDailyActions = [
+  { title: "Mettre à jour les disponibilités", status: "Priorité", detail: "Vérifiez les médicaments anciens ou à confirmer avant la publication utilisateur.", href: "/pharmacie/medicaments" },
+  { title: "Traiter les confirmations", status: "En attente", detail: "Répondez aux demandes de disponibilité, prix ou confirmation complète.", href: "/pharmacie/confirmations" },
+  { title: "Contrôler les horaires et la garde", status: "Aujourd’hui", detail: "Assurez-vous que les horaires et le statut de garde sont exacts.", href: "/pharmacie/horaires-garde" },
+  { title: "Importer un inventaire", status: "Synchronisation", detail: "Chargez un fichier CSV, Excel, Word ou PowerPoint puis publiez les produits autorisés.", href: "/pharmacie/import-inventaire" },
+];
+
+const pharmacyQualityChecklist = [
+  "Les disponibilités récentes peuvent être publiées côté utilisateur",
+  "Le stock exact reste interne et n’est jamais affiché au public",
+  "Les prix affichés restent indicatifs et à confirmer auprès de la pharmacie",
+  "Les contacts restent verrouillés côté utilisateur par crédits SABLIN",
+  "Les images publiques doivent être propres et sans données confidentielles",
+  "Les données anciennes deviennent À confirmer côté utilisateur",
+];
+
+const pharmacyOperationalLanes = [
+  { title: "Inventaire", owner: "Équipe stock", status: "À vérifier", detail: "Disponibilités, prix indicatifs, quantité interne et statut public." },
+  { title: "Demandes utilisateurs", owner: "Comptoir", status: "Nouvelle", detail: "Conseils, confirmations, appels et demandes liées à ordonnance." },
+  { title: "Qualité des données", owner: "Responsable", status: "Données à jour", detail: "Fiabilité, source, dernière mise à jour et publication autorisée." },
+  { title: "Synchronisation", owner: "SABLIN", status: "Connecté", detail: "Les données validées alimentent la marketplace et les fiches utilisateur." },
+];
+
 const WEEK_DAYS = [
   { key: "monday", label: "Lundi" },
   { key: "tuesday", label: "Mardi" },
@@ -415,6 +438,123 @@ function PillList({ items }: { items: readonly string[] }) {
     <div className="flex flex-wrap gap-2">
       {items.map((item) => <StatusBadge key={item} label={item} />)}
     </div>
+  );
+}
+
+function DashboardHero({
+  title,
+  description,
+  badge,
+  icon: Icon = LayoutDashboard,
+  children,
+}: {
+  title: string;
+  description: string;
+  badge: string;
+  icon?: typeof LayoutDashboard;
+  children?: React.ReactNode;
+}) {
+  return (
+    <Card className="border-border/70 bg-white p-5 shadow-card">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="grid size-10 place-items-center rounded-lg bg-brand text-white">
+              <Icon className="size-5" />
+            </span>
+            <Badge className="border-0 bg-brand-light text-brand-dark">{badge}</Badge>
+          </div>
+          <Heading level="h2" className="mt-3">{title}</Heading>
+          <Muted className="mt-2 max-w-3xl">{description}</Muted>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => window.location.reload()}>
+            Actualiser
+          </Button>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = "/pharmacie/import-inventaire")}>
+            <Upload className="size-4" /> Importer
+          </Button>
+        </div>
+      </div>
+      {children && <div className="mt-5">{children}</div>}
+    </Card>
+  );
+}
+
+function DashboardMetric({
+  label,
+  value,
+  badge,
+  icon: Icon = CheckCircle2,
+}: {
+  label: string;
+  value: string | number;
+  badge: string;
+  icon?: typeof CheckCircle2;
+}) {
+  return (
+    <Card className="border-border/70 bg-white p-4 shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-extrabold uppercase text-muted-foreground">{label}</p>
+          <p className="mt-2 break-words text-2xl font-extrabold text-foreground">{value}</p>
+        </div>
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-light text-brand-dark">
+          <Icon className="size-4" />
+        </span>
+      </div>
+      <div className="mt-3"><StatusBadge label={badge} /></div>
+    </Card>
+  );
+}
+
+function DailyActionBoard() {
+  return (
+    <SectionBlock title="Actions prioritaires du jour" description="Les actions qui améliorent immédiatement la fiabilité côté utilisateur.">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {pharmacyDailyActions.map((item) => (
+          <a key={item.title} href={item.href} className="rounded-xl border border-border bg-white p-4 transition-colors hover:border-brand/40">
+            <StatusBadge label={item.status} />
+            <p className="mt-3 font-extrabold text-foreground">{item.title}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{item.detail}</p>
+          </a>
+        ))}
+      </div>
+    </SectionBlock>
+  );
+}
+
+function OperationalLanes() {
+  return (
+    <SectionBlock title="Organisation opérationnelle" description="Vue simple de ce qui doit être suivi par l’équipe pharmacie.">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {pharmacyOperationalLanes.map((lane) => (
+          <Card key={lane.title} className="border-border/70 bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <StatusBadge label={lane.status} />
+              <Badge className="border border-border bg-white text-foreground">{lane.owner}</Badge>
+            </div>
+            <p className="mt-3 font-extrabold text-foreground">{lane.title}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{lane.detail}</p>
+          </Card>
+        ))}
+      </div>
+    </SectionBlock>
+  );
+}
+
+function QualityChecklist() {
+  return (
+    <SectionBlock title="Checklist qualité avant publication" description="Ces règles évitent les informations trompeuses côté utilisateur.">
+      <div className="grid gap-2 md:grid-cols-2">
+        {pharmacyQualityChecklist.map((item) => (
+          <div key={item} className="flex gap-3 rounded-lg border border-border bg-white p-3 text-sm font-semibold text-foreground">
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand" />
+            <span>{item}</span>
+          </div>
+        ))}
+      </div>
+    </SectionBlock>
   );
 }
 
@@ -837,16 +977,58 @@ function Dashboard() {
           </p>
         </Card>
       )}
+      <DashboardHero
+        badge="Espace Pharmacie"
+        title="Tableau de bord pharmacie"
+        description="Console quotidienne pour gérer vos disponibilités, vos horaires, votre garde, vos demandes utilisateurs et la qualité des données publiées par SABLIN PHARMA."
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-xs font-extrabold uppercase text-muted-foreground">Priorité immédiate</p>
+            <p className="mt-1 font-bold text-foreground">Traiter les confirmations et mettre à jour les disponibilités anciennes.</p>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-xs font-extrabold uppercase text-muted-foreground">Publication utilisateur</p>
+            <p className="mt-1 font-bold text-foreground">Seuls les statuts simples et les prix indicatifs validés alimentent la plateforme utilisateur.</p>
+          </div>
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-xs font-extrabold uppercase text-muted-foreground">Confidentialité</p>
+            <p className="mt-1 font-bold text-foreground">Stock exact, contacts et documents restent protégés hors affichage public gratuit.</p>
+          </div>
+        </div>
+      </DashboardHero>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Médicaments de ma pharmacie" value={loadingSummary ? "..." : summary.medicationCount} badge="Données à jour" />
-        <Stat label="Disponibilités à mettre à jour" value={loadingSummary ? "..." : summary.staleAvailabilityCount} badge="À confirmer" />
-        <Stat label="Demandes reçues" value={loadingSummary ? "..." : summary.receivedRequests} badge="Nouvelle" />
-        <Stat label="Confirmations en attente" value={loadingSummary ? "..." : summary.pendingConfirmations} badge="En cours" />
-        <Stat label="Statut de garde" value={loadingSummary ? "..." : summary.dutyStatus} badge={summary.dutyStatus === "Actif" ? "De garde" : "Fermé"} />
-        <Stat label="Qualité de mes données" value={loadingSummary ? "..." : `${summary.dataQualityPercent}%`} badge="Données à jour" />
-        <Stat label="Dernière mise à jour" value={loadingSummary ? "..." : summary.lastDataUpdateLabel} badge="Confirmé" />
-        <Stat label="Prix à vérifier" value={loadingSummary ? "..." : summary.priceToCheck} badge="À vérifier" />
+        <DashboardMetric label="Médicaments de ma pharmacie" value={loadingSummary ? "..." : summary.medicationCount} badge="Données à jour" icon={Pill} />
+        <DashboardMetric label="Disponibilités à mettre à jour" value={loadingSummary ? "..." : summary.staleAvailabilityCount} badge="À confirmer" icon={CalendarClock} />
+        <DashboardMetric label="Demandes reçues" value={loadingSummary ? "..." : summary.receivedRequests} badge="Nouvelle" icon={MessageCircle} />
+        <DashboardMetric label="Confirmations en attente" value={loadingSummary ? "..." : summary.pendingConfirmations} badge="En cours" icon={ClipboardCheck} />
+        <DashboardMetric label="Statut de garde" value={loadingSummary ? "..." : summary.dutyStatus} badge={summary.dutyStatus === "Actif" ? "De garde" : "Fermé"} icon={CalendarClock} />
+        <DashboardMetric label="Qualité de mes données" value={loadingSummary ? "..." : `${summary.dataQualityPercent}%`} badge="Données à jour" icon={ShieldCheck} />
+        <DashboardMetric label="Dernière mise à jour" value={loadingSummary ? "..." : summary.lastDataUpdateLabel} badge="Confirmé" icon={CheckCircle2} />
+        <DashboardMetric label="Prix à vérifier" value={loadingSummary ? "..." : summary.priceToCheck} badge="À vérifier" icon={FileSpreadsheet} />
       </div>
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <DailyActionBoard />
+        <SectionBlock title="État de publication" description="Ce résumé vous montre ce qui influence directement l’affichage utilisateur.">
+          <div className="grid gap-3">
+            {[
+              ["Inventaire", `${loadingSummary ? "..." : summary.medicationCount} médicament(s) suivis`, "Base pharmacie"],
+              ["À corriger", `${loadingSummary ? "..." : summary.staleAvailabilityCount + summary.priceToCheck} point(s) à vérifier`, "Qualité"],
+              ["Demandes", `${loadingSummary ? "..." : summary.pendingRequests} demande(s) en attente`, "Utilisateur"],
+              ["Garde", summary.dutyStatus, summary.dutyStatus === "Actif" ? "Visible garde" : "Non actif"],
+            ].map(([title, value, status]) => (
+              <div key={title} className="rounded-lg border border-border bg-white p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-extrabold text-foreground">{title}</p>
+                  <StatusBadge label={status} />
+                </div>
+                <p className="mt-1 text-sm font-bold text-brand-dark">{value}</p>
+              </div>
+            ))}
+          </div>
+        </SectionBlock>
+      </div>
+      <OperationalLanes />
       <DataVisibilityBlocks />
       <SectionBlock title="Connexion avec la plateforme utilisateur" description="Seules les données validées et non confidentielles sont publiées côté utilisateur.">
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -858,6 +1040,7 @@ function Dashboard() {
           ))}
         </div>
       </SectionBlock>
+      <QualityChecklist />
     </div>
   );
 }

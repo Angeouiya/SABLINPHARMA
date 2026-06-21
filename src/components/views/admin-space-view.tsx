@@ -153,6 +153,20 @@ const adminOperationalWorkflows = [
   { title: "Images médicaments", status: "Licence à confirmer", owner: "Enrichissement", detail: "Aucune image web non validée ne doit être visible côté utilisateur." },
 ];
 
+const adminExecutivePillars = [
+  { title: "Utilisateurs", score: "92%", status: "Stable", detail: "Crédits, Pass Ordonnance Unique, demandes et restrictions actives." },
+  { title: "Pharmacies", score: "86%", status: "À renforcer", detail: "Validation, horaires, garde, photos et données anciennes à suivre." },
+  { title: "Marketplace", score: "78%", status: "Contrôle", detail: "Imports sûrs publiés, images et descriptions sous validation admin." },
+  { title: "Paiements", score: "100%", status: "Sécurisé", detail: "Aucun crédit ajouté sans SUCCESS serveur et webhook vérifié." },
+];
+
+const adminPriorityQueue = [
+  { title: "Valider les nouvelles pharmacies", value: "3 dossiers", status: "Avant publication", href: "/admin/validations-pharmacies" },
+  { title: "Traiter les imports ambigus", value: "12 lignes", status: "Référentiel", href: "/admin/imports" },
+  { title: "Contrôler les images web", value: "8 images", status: "Licence", href: "/admin/sources-licences-images" },
+  { title: "Suivre les paiements suspects", value: "1 dossier", status: "Finance", href: "/admin/paiements-fraudes" },
+];
+
 const adminRiskControls = [
   "Routes /admin réservées aux rôles Administrateur SABLIN et Super administrateur",
   "Actions sensibles journalisées dans l’historique professionnel",
@@ -1088,11 +1102,57 @@ function Dashboard() {
           <Stat key={String(label)} label={String(label)} value={loadingSummary ? "..." : value} badge={String(badge)} />
         ))}
       </div>
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <SectionBlock title="Santé exécutive de la plateforme" description="Lecture rapide des quatre piliers de SABLIN PHARMA avant décision opérationnelle.">
+          <div className="grid gap-3 md:grid-cols-2">
+            {adminExecutivePillars.map((pillar) => (
+              <Card key={pillar.title} className="border-border/70 bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <StatusBadge label={pillar.status} />
+                    <p className="mt-3 font-extrabold text-foreground">{pillar.title}</p>
+                  </div>
+                  <p className="text-2xl font-extrabold text-brand-dark">{pillar.score}</p>
+                </div>
+                <p className="mt-2 text-sm font-medium text-muted-foreground">{pillar.detail}</p>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+        <SectionBlock title="File prioritaire" description="Actions à traiter en premier pour garder les trois plateformes synchronisées.">
+          <div className="grid gap-3">
+            {adminPriorityQueue.map((item) => (
+              <a key={item.title} href={item.href} className="rounded-lg border border-border bg-white p-3 transition-colors hover:border-brand/40">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-extrabold text-foreground">{item.title}</p>
+                  <StatusBadge label={item.status} />
+                </div>
+                <p className="mt-1 text-sm font-bold text-brand-dark">{item.value}</p>
+              </a>
+            ))}
+          </div>
+        </SectionBlock>
+      </div>
       <WorkflowBoard
         title="Pilotage opérationnel"
         description="Vue rapide des chantiers qui impactent directement l’espace utilisateur, pharmacie et marketplace."
         items={adminOperationalWorkflows}
       />
+      <SectionBlock title="Raccourcis de contrôle" description="Accès direct aux zones qui gouvernent la synchronisation entre Admin, Pharmacie et Utilisateur.">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["Moteur Marketplace", "/admin/moteur-marketplace", "Imports, images, descriptions"],
+            ["Qualité données", "/admin/qualite-donnees", "Ancien, incomplet, à vérifier"],
+            ["Crédits & transactions", "/admin/credits-transactions", "Solde serveur et historique"],
+            ["Administrateurs", "/admin/administrateurs", "Rôles, sessions, permissions"],
+          ].map(([label, href, detail]) => (
+            <a key={label} href={href} className="rounded-xl border border-border bg-white p-4 hover:border-brand/40">
+              <p className="font-extrabold text-foreground">{label}</p>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">{detail}</p>
+            </a>
+          ))}
+        </div>
+      </SectionBlock>
       <ControlChecklist title="Garde-fous de production" items={adminRiskControls} />
     </div>
   );

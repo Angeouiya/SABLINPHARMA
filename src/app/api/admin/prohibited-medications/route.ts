@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requirePharmacyPermission } from "@/lib/pharmacy-access";
 import {
   addProhibitedMedicationTerm,
   disableProhibitedMedicationTerm,
+  enableProhibitedMedicationTerm,
 } from "@/lib/prohibited-medications";
 
 export async function GET(req: NextRequest) {
@@ -12,12 +14,46 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const includeInactive = searchParams.get("includeInactive") === "true";
-  const terms = await db.prohibitedMedicationTerm.findMany({
-    where: includeInactive ? {} : { active: true },
-    orderBy: [{ active: "desc" }, { name: "asc" }],
-  });
+  const q = searchParams.get("q")?.trim() ?? "";
+  const status = searchParams.get("status") || "all";
+  const where: Prisma.ProhibitedMedicationTermWhereInput = {
+    ...(includeInactive || status !== "active" ? {} : { active: true }),
+    ...(status === "active" ? { active: true } : status === "inactive" ? { active: false } : {}),
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q } },
+            { normalizedName: { contains: q.toLowerCase() } },
+            { reason: { contains: q } },
+          ],
+        }
+      : {}),
+  };
 
-  return NextResponse.json({ terms });
+  const [terms, total, active, inactive, blockedImportRows, recentActions] = await Promise.all([
+    db.prohibitedMedicationTerm.findMany({
+      where,
+      orderBy: [{ active: "desc" }, { updatedAt: "desc" }, { name: "asc" }],
+      take: 150,
+    }),
+    db.prohibitedMedicationTerm.count(),
+    db.prohibitedMedicationTerm.count({ where: { active: true } }),
+    db.prohibitedMedicationTerm.count({ where: { active: false } }),
+    db.inventoryImportRow.count({ where: { errorsJson: { contains: "Médicament interdit" } } }),
+    db.professionalActionLog.findMany({
+      where: { scope: "admin", entityType: "prohibited-medication" },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: { id: true, label: true, action: true, status: true, actorRole: true, message: true, createdAt: true },
+    }),
+  ]);
+
+  return NextResponse.json({
+    terms,
+    summary: { total, active, inactive, blockedImportRows, visible: terms.length },
+    recentActions,
+    filters: { includeInactive, q, status },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -67,21 +103,29 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const term = await disableProhibitedMedicationTerm({
-      id,
-      disabledBy: access.session?.name ?? access.role ?? "Administration SABLIN",
-    });
+    const action = String(body.action ?? "disable");
+    const actor = access.session?.name ?? access.role ?? "Administration SABLIN";
+    const term =
+      action === "enable"
+        ? await enableProhibitedMedicationTerm({ id, enabledBy: actor })
+        : await disableProhibitedMedicationTerm({
+            id,
+            disabledBy: actor,
+          });
 
     await db.professionalActionLog.create({
       data: {
         scope: "admin",
-        action: "prohibited-medication-disabled",
-        label: "Médicament interdit désactivé",
+        action: action === "enable" ? "prohibited-medication-enabled" : "prohibited-medication-disabled",
+        label: action === "enable" ? "Médicament interdit réactivé" : "Médicament interdit désactivé",
         entityType: "prohibited-medication",
         entityId: term.id,
         actorRole: access.role ?? "admin",
         status: "réussi",
-        message: `${term.name} n’est plus bloqué automatiquement.`,
+        message:
+          action === "enable"
+            ? `${term.name} bloque à nouveau automatiquement les publications pharmacie.`
+            : `${term.name} n’est plus bloqué automatiquement.`,
         source: "Administration SABLIN",
       },
     }).catch(() => null);

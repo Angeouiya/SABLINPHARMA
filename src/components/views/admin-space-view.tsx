@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Database,
+  Filter,
   FileCheck2,
   FileSpreadsheet,
   History,
@@ -33,6 +34,10 @@ import { InventorySyncPanel } from "@/components/views/inventory-sync-panels";
 import { ProfessionalRequestsPanel } from "@/components/views/professional-requests-panel";
 import { ProfessionalActionButton } from "@/components/shared/professional-action-button";
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
+import { PlatformUxSyncPanel } from "@/components/shared/platform-ux-sync-panel";
+import { PlatformSectionGuide } from "@/components/shared/platform-section-guide";
+import { PlatformCoverageMatrix } from "@/components/shared/platform-coverage-matrix";
+import { PlatformSectionWorkflowPanel } from "@/components/shared/platform-section-workflow-panel";
 import {
   ImportValidationPanel,
   safePublishLineNumbers,
@@ -53,6 +58,7 @@ import {
   PHARMACY_ACCOUNT_STATUSES,
   PHARMACY_CREATION_SOURCES,
   PHARMACY_IMAGE_FIELDS,
+  PHARMACY_OPERATION_STATUSES,
   PHARMACY_PORTAL_MEDICATIONS,
   PHARMACY_PORTAL_PHARMACIES,
   PHARMACY_PROFILE_STEPS,
@@ -60,6 +66,7 @@ import {
   PUBLIC_AVAILABILITY_STATUSES,
   PUBLIC_PHARMACY_DATA,
   RELIABILITY_LEVELS,
+  REQUEST_STATUSES,
   USER_VISIBLE_MAPPING,
 } from "@/lib/pharmacy-platform";
 
@@ -76,6 +83,9 @@ export type AdminPage =
   | "pharmacy-demandes"
   | "pharmacy-confirmations"
   | "pharmacy-horaires-garde"
+  | "pharmacy-profil"
+  | "pharmacy-photos"
+  | "pharmacy-equipe"
   | "pharmacy-historique"
   | "validations-pharmacies"
   | "comptes-professionnels"
@@ -106,6 +116,9 @@ type AdminPharmacyMode =
   | "demandes"
   | "confirmations"
   | "horaires-garde"
+  | "profil"
+  | "photos"
+  | "equipe"
   | "historique";
 
 const adminNavItems: { page: AdminPage; label: string; icon: typeof LayoutDashboard; href: string }[] = [
@@ -137,13 +150,10 @@ const managementNav: { mode: AdminPharmacyMode; label: string; href: (slug: stri
   { mode: "demandes", label: "Demandes", href: (slug) => `/admin/pharmacies/${slug}/demandes` },
   { mode: "confirmations", label: "Confirmations", href: (slug) => `/admin/pharmacies/${slug}/confirmations` },
   { mode: "horaires-garde", label: "Horaires & garde", href: (slug) => `/admin/pharmacies/${slug}/horaires-garde` },
+  { mode: "profil", label: "Profil", href: (slug) => `/admin/pharmacies/${slug}/profil` },
+  { mode: "photos", label: "Photos", href: (slug) => `/admin/pharmacies/${slug}/photos` },
+  { mode: "equipe", label: "Équipe", href: (slug) => `/admin/pharmacies/${slug}/equipe` },
   { mode: "historique", label: "Historique", href: (slug) => `/admin/pharmacies/${slug}/historique` },
-];
-
-const adminUsers = [
-  { id: "demo-sablin", name: "Demo SABLIN", phone: "+225 07 00 00 00 01", email: "demo@sablinpharma.ci", commune: "Cocody", credits: 10, transactions: 8, prescriptions: 2, status: "Actif", activity: "Aujourd’hui" },
-  { id: "utilisateur-yopougon", name: "Awa Koné", phone: "+225 05 12 44 90 10", email: "awa.kone@example.ci", commune: "Yopougon", credits: 0, transactions: 3, prescriptions: 1, status: "Solde insuffisant", activity: "Hier" },
-  { id: "utilisateur-marcory", name: "Moussa Traoré", phone: "+225 01 45 88 20 15", email: "moussa.traore@example.ci", commune: "Marcory", credits: 6, transactions: 12, prescriptions: 4, status: "Actif", activity: "17/06/2026" },
 ];
 
 const adminOperationalWorkflows = [
@@ -152,6 +162,45 @@ const adminOperationalWorkflows = [
   { title: "Paiement suspect", status: "Vérification manuelle", owner: "Finance", detail: "Contrôler référence, montant, webhook et idempotence avant toute action." },
   { title: "Images médicaments", status: "Licence à confirmer", owner: "Enrichissement", detail: "Aucune image web non validée ne doit être visible côté utilisateur." },
 ];
+
+const ADMIN_WEEK_DAYS = [
+  { key: "monday", label: "Lundi" },
+  { key: "tuesday", label: "Mardi" },
+  { key: "wednesday", label: "Mercredi" },
+  { key: "thursday", label: "Jeudi" },
+  { key: "friday", label: "Vendredi" },
+  { key: "saturday", label: "Samedi" },
+  { key: "sunday", label: "Dimanche" },
+] as const;
+
+type AdminDaySchedule = {
+  enabled: boolean;
+  open: string;
+  close: string;
+  breakStart: string;
+  breakEnd: string;
+  status: string;
+};
+
+const adminDefaultSchedule: Record<string, AdminDaySchedule> = Object.fromEntries(
+  ADMIN_WEEK_DAYS.map((day, index) => [
+    day.key,
+    {
+      enabled: index < 6,
+      open: index < 5 ? "08:00" : "08:30",
+      close: index < 5 ? "22:00" : "20:00",
+      breakStart: "13:00",
+      breakEnd: "14:00",
+      status: index === 6 ? "Fermé" : "Ouvert",
+    },
+  ])
+) as Record<string, AdminDaySchedule>;
+
+function toDateTimeInput(value: unknown, fallback = "") {
+  if (!value) return fallback;
+  const raw = String(value);
+  return raw.includes("T") ? raw.slice(0, 16) : fallback;
+}
 
 const adminExecutivePillars = [
   { title: "Utilisateurs", score: "92%", status: "Stable", detail: "Crédits, Pass Ordonnance Unique, demandes et restrictions actives." },
@@ -176,38 +225,43 @@ const adminRiskControls = [
   "Images web publiées uniquement après validation source/licence",
 ];
 
-const professionalAccountRows = [
-  { name: "Pharmacie Sainte Marie Cocody", role: "PHARMACY_OWNER", scope: "pharmacie-sainte-marie-cocody", status: "Actif", permissions: "Profil, horaires, inventaire, demandes", lastLogin: "Aujourd’hui 09:40", risk: "Normal" },
-  { name: "Koffi Yao", role: "PHARMACY_STOCK_MANAGER", scope: "pharmacie-sainte-marie-cocody", status: "Actif", permissions: "Inventaire, import, confirmations", lastLogin: "Hier 18:12", risk: "À surveiller" },
-  { name: "Pharmacie Les Palmiers", role: "PHARMACIST_MANAGER", scope: "pharmacie-les-palmiers-yopougon", status: "En attente", permissions: "Accès bloqué avant validation", lastLogin: "Invitation envoyée", risk: "En attente" },
-  { name: "Assistant Plateau", role: "PHARMACY_EMPLOYEE", scope: "pharmacie-centrale-plateau", status: "Suspendu", permissions: "Disponibilités uniquement", lastLogin: "Il y a 11 jours", risk: "Suspendu" },
-];
+const professionalPermissionLabels: Record<string, string> = {
+  "pharmacy.profile.read": "Voir profil",
+  "pharmacy.profile.update": "Modifier profil",
+  "pharmacy.images.read": "Voir images",
+  "pharmacy.images.create": "Ajouter images",
+  "pharmacy.images.update": "Modifier images",
+  "pharmacy.images.delete": "Retirer images",
+  "pharmacy.schedule.read": "Voir horaires",
+  "pharmacy.schedule.update": "Modifier horaires",
+  "pharmacy.inventory.read": "Voir inventaire",
+  "pharmacy.inventory.create": "Ajouter médicaments",
+  "pharmacy.inventory.update": "Modifier disponibilités",
+  "pharmacy.inventory.delete": "Retirer médicament",
+  "pharmacy.inventory.import": "Importer inventaire",
+  "pharmacy.requests.read": "Voir demandes",
+  "pharmacy.requests.assign": "Assigner demandes",
+  "pharmacy.requests.respond": "Répondre demandes",
+  "pharmacy.confirmations.read": "Voir confirmations",
+  "pharmacy.confirmations.respond": "Répondre confirmations",
+  "pharmacy.advice.respond": "Conseils pharmacie",
+  "pharmacy.team.read": "Voir équipe",
+  "pharmacy.team.invite": "Inviter équipe",
+  "pharmacy.team.update": "Modifier équipe",
+  "pharmacy.team.remove": "Révoquer équipe",
+  "pharmacy.history.read": "Voir historique",
+  "pharmacy.settings.update": "Paramètres",
+};
+
+function professionalPermissionLabel(permission: string) {
+  return professionalPermissionLabels[permission] ?? permission;
+}
 
 const adminPermissionMatrix = [
   ["Super administrateur", "Toutes pharmacies", "Utilisateurs", "Paiements", "Paramètres sensibles"],
   ["Administrateur SABLIN", "Pharmacies, imports, qualité", "Support utilisateur", "Transactions consultables", "Paramètres limités"],
   ["Data admin", "Référentiel, images, imports", "Aucun mot de passe", "Aucun remboursement", "Qualité données"],
   ["Support admin", "Demandes utilisateurs", "Assistance", "Lecture transactions", "Pas de publication directe"],
-];
-
-const medicationRequestRows = [
-  { medication: "Efferalgan 500 mg", pharmacy: "Pharmacie Sainte Marie Cocody", status: "En attente", confidence: "78%", action: "Fusion proposée" },
-  { medication: "Azithromycine 250 mg", pharmacy: "Pharmacie Les Palmiers Yopougon", status: "À vérifier", confidence: "64%", action: "Validation individuelle" },
-  { medication: "Paracétamol 500 mg", pharmacy: "Pharmacie Centrale Plateau", status: "Fusionné", confidence: "96%", action: "Alias ajouté" },
-];
-
-const adminHistoryRows = [
-  { date: "Aujourd’hui 10:42", actor: "Super administrateur", role: "SUPER_ADMIN", action: "Validation pharmacie", entity: "Pharmacie Sainte Marie Cocody", status: "Réussi" },
-  { date: "Aujourd’hui 10:18", actor: "Moteur import", role: "Système", action: "Publication lignes sûres", entity: "Import inventaire Cocody", status: "Réussi" },
-  { date: "Hier 17:50", actor: "Contrôle données", role: "DATA_ADMIN", action: "Refus image web", entity: "Doliprane 500 mg", status: "Licence inconnue" },
-  { date: "Hier 15:22", actor: "Finance", role: "FINANCE_ADMIN", action: "Paiement suspect", entity: "SP-PAY-2026-000128", status: "Vérification manuelle" },
-];
-
-const adminNotificationRows = [
-  { title: "Pharmacie en attente", detail: "Une inscription pharmacie attend validation avant publication.", status: "En attente" },
-  { title: "Import avec erreurs", detail: "Des statuts invalides ont été isolés avant publication marketplace.", status: "À vérifier" },
-  { title: "Données anciennes", detail: "Trois pharmacies doivent mettre à jour horaires ou disponibilités.", status: "Données anciennes" },
-  { title: "Paiement suspect", detail: "Un montant reçu ne correspond pas à un pack officiel.", status: "Suspect" },
 ];
 
 function slugify(value: string) {
@@ -230,6 +284,236 @@ function formatDateTime(value?: string | Date | null) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatFcfa(value: number) {
+  return `${Number(value || 0).toLocaleString("fr-FR")} FCFA`;
+}
+
+type ProfessionalRequestItem = {
+  id: string;
+  reference: string;
+  requestType: string;
+  serviceName: string;
+  status: string;
+  priority: string;
+  creditCost: number;
+  fcfaEquivalent: number;
+  userMessage?: string | null;
+  dosage?: string | null;
+  form?: string | null;
+  createdAt: string;
+  expiresAt: string;
+  medication?: { name: string; slug: string; dosage?: string | null; form?: string | null; packSize?: string | null } | null;
+  user?: { name: string; commune?: string | null } | null;
+  responses?: Array<{ id: string; availabilityStatus?: string | null; confirmedPrice?: number | null; responseMessage: string; createdAt: string }>;
+};
+
+type RequestStats = {
+  total?: number;
+  new?: number;
+  inProgress?: number;
+  answered?: number;
+  expired?: number;
+  highPriority?: number;
+};
+
+type HistoryRow = {
+  id: string;
+  date: string;
+  action: string;
+  author: string;
+  source: string;
+  oldValue?: unknown;
+  newValue?: unknown;
+  status: string;
+  message?: string | null;
+  kind: string;
+};
+
+type AdminSecurityNotification = {
+  id: string;
+  type: string;
+  group?: string;
+  title: string;
+  message: string;
+  status: string;
+  createdAt: string;
+  pharmacy?: {
+    id: string;
+    name: string;
+    slug: string;
+    accountStatus: string;
+    dataQuality: string;
+  } | null;
+};
+
+type AdminUserRow = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  commune?: string | null;
+  credits: number;
+  createdAt: string;
+  updatedAt: string;
+  lastActivity?: string | null;
+  status: string;
+  passStatus: string;
+  counts: {
+    transactions: number;
+    payments: number;
+    requests: number;
+    contacts: number;
+    featureAccesses: number;
+    favorites: number;
+    history: number;
+    notifications: number;
+    passOrdonnances: number;
+  };
+  recent: {
+    transactions: Array<{
+      id: string;
+      type: string;
+      amount: number;
+      fcfaEquivalent: number;
+      balanceBefore: number;
+      balanceAfter: number;
+      status: string;
+      reference?: string | null;
+      description: string;
+      createdAt: string;
+    }>;
+    requests: Array<{
+      id: string;
+      reference: string;
+      requestType: string;
+      serviceName: string;
+      status: string;
+      priority: string;
+      creditCost: number;
+      createdAt: string;
+    }>;
+    payments: Array<{
+      id: string;
+      reference: string;
+      amount: number;
+      provider: string;
+      productType: string;
+      status: string;
+      riskStatus: string;
+      createdAt: string;
+    }>;
+    passOrdonnances: Array<{
+      id: string;
+      status: string;
+      price: number;
+      ordonnanceId?: string | null;
+      paymentReference?: string | null;
+      createdAt: string;
+      usedAt?: string | null;
+    }>;
+    contacts: Array<{
+      id: string;
+      unlockType: string;
+      creditCost: number;
+      status: string;
+      unlockedAt: string;
+      expiresAt: string;
+    }>;
+    favorites: Array<{ id: string; kind: string; slug: string; label: string; createdAt: string }>;
+    history: Array<{ id: string; kind: string; label: string; query?: string | null; slug?: string | null; createdAt: string }>;
+  };
+};
+
+type AdminUsersSummary = {
+  totalUsers: number;
+  usersWithCredits: number;
+  zeroCreditUsers: number;
+  activeUsers: number;
+  transactionsToday: number;
+  pendingRequests: number;
+  listedUsers: number;
+  totalCreditsVisible: number;
+  totalTransactionsVisible: number;
+  totalPassVisible: number;
+};
+
+type AdminTransactionRow = {
+  id: string;
+  source: "credit" | "payment";
+  action: string;
+  user: string;
+  userId?: string | null;
+  amountFcfa: number;
+  credits: number;
+  balanceBefore?: number | null;
+  balanceAfter?: number | null;
+  status: string;
+  reference: string;
+  provider: string;
+  riskStatus: string;
+  description: string;
+  createdAt: string;
+};
+
+type AdminTransactionsSummary = {
+  creditsSold: number;
+  creditsSoldFcfa: number;
+  creditsDebited: number;
+  creditsDebitedFcfa: number;
+  netCredits: number;
+  passCount: number;
+  activePassCount: number;
+  successfulPayments: number;
+  pendingPayments: number;
+  failedPayments: number;
+  suspiciousPayments: number;
+  todayTransactions: number;
+  usersImpacted: number;
+  totalMovements: number;
+  visibleRows: number;
+};
+
+const emptyAdminTransactionsSummary: AdminTransactionsSummary = {
+  creditsSold: 0,
+  creditsSoldFcfa: 0,
+  creditsDebited: 0,
+  creditsDebitedFcfa: 0,
+  netCredits: 0,
+  passCount: 0,
+  activePassCount: 0,
+  successfulPayments: 0,
+  pendingPayments: 0,
+  failedPayments: 0,
+  suspiciousPayments: 0,
+  todayTransactions: 0,
+  usersImpacted: 0,
+  totalMovements: 0,
+  visibleRows: 0,
+};
+
+const emptyAdminUsersSummary: AdminUsersSummary = {
+  totalUsers: 0,
+  usersWithCredits: 0,
+  zeroCreditUsers: 0,
+  activeUsers: 0,
+  transactionsToday: 0,
+  pendingRequests: 0,
+  listedUsers: 0,
+  totalCreditsVisible: 0,
+  totalTransactionsVisible: 0,
+  totalPassVisible: 0,
+};
+
+function stringifyCell(value: unknown) {
+  if (value === null || value === undefined || value === "") return "Non renseigné";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "Valeur complexe";
+  }
 }
 
 function downloadImportTemplate(fileName = "modele-import-sablin-pharma.csv") {
@@ -287,6 +571,64 @@ type AdminDashboardSummary = {
   dataQualityPercent: number;
 };
 
+type AdminSettingsData = {
+  canManage: boolean;
+  dataFreshness: {
+    warningDays: number;
+    staleDays: number;
+    veryStaleDays: number;
+    updatedAt?: string | null;
+    updatedBy?: string | null;
+  };
+  environment: {
+    databaseConfigured: boolean;
+    supabaseConfigured: boolean;
+    sessionSecretConfigured: boolean;
+    proSessionHours: number;
+    paymentProviderMode: string;
+    paydunyaConfigured: boolean;
+    paymentWebhookConfigured: boolean;
+    googleApiConfigured: boolean;
+    googleSearchEngineConfigured: boolean;
+  };
+  enrichment: {
+    providerStatus: string;
+    modeLabel: string;
+    reason: string;
+    adminMessage: string;
+    imageSearchProvider: string;
+    activeProviders: string[];
+    googleApiConfigured: boolean;
+    googleSearchEngineConfigured: boolean;
+    braveApiConfigured?: boolean;
+    openverseEnabled?: boolean;
+    dailyLimit?: number;
+    confidenceThreshold?: number;
+    lastTest?: { status: string; at: string | null; message: string };
+    lastError?: string | null;
+    lastErrorAt?: string | null;
+  };
+  security: {
+    activeAdminSessions: number;
+    adminAccounts: number;
+    pharmacyAccounts: number;
+    unreadAdminNotifications: number;
+    criticalAdminNotifications: number;
+    recentSensitiveActions: number;
+  };
+  policies: Array<{ title: string; status: string; detail: string }>;
+  recentActions: Array<{
+    id: string;
+    action: string;
+    label: string;
+    status: string;
+    actorRole?: string | null;
+    createdAt: string;
+    message?: string | null;
+  }>;
+  message?: string;
+};
+
 const adminDashboardFallback: AdminDashboardSummary = {
   totalUsers: 0,
   activeUsers: 0,
@@ -304,6 +646,77 @@ const adminDashboardFallback: AdminDashboardSummary = {
   pendingConfirmations: 0,
   pendingUserRequests: 0,
   dataQualityPercent: 0,
+};
+
+type AdminManagedDashboardSummary = {
+  medicationCount: number;
+  staleAvailabilityCount: number;
+  receivedRequests: number;
+  pendingRequests: number;
+  pendingConfirmations: number;
+  dutyStatus: string;
+  dataQualityPercent: number;
+  lastDataUpdateLabel: string;
+  priceToCheck: number;
+};
+
+const adminManagedDashboardFallback: AdminManagedDashboardSummary = {
+  medicationCount: 0,
+  staleAvailabilityCount: 0,
+  receivedRequests: 0,
+  pendingRequests: 0,
+  pendingConfirmations: 0,
+  dutyStatus: "Inactif",
+  dataQualityPercent: 0,
+  lastDataUpdateLabel: "Non renseignée",
+  priceToCheck: 0,
+};
+
+const adminSettingsFallback: AdminSettingsData = {
+  canManage: false,
+  dataFreshness: {
+    warningDays: 3,
+    staleDays: 5,
+    veryStaleDays: 15,
+    updatedAt: null,
+    updatedBy: null,
+  },
+  environment: {
+    databaseConfigured: false,
+    supabaseConfigured: false,
+    sessionSecretConfigured: false,
+    proSessionHours: 12,
+    paymentProviderMode: "sandbox",
+    paydunyaConfigured: false,
+    paymentWebhookConfigured: false,
+    googleApiConfigured: false,
+    googleSearchEngineConfigured: false,
+  },
+  enrichment: {
+    providerStatus: "disabled",
+    modeLabel: "Fallback interne",
+    reason: "Configuration non chargée.",
+    adminMessage: "L’état d’enrichissement sera affiché après chargement serveur.",
+    imageSearchProvider: "auto",
+    activeProviders: [],
+    googleApiConfigured: false,
+    googleSearchEngineConfigured: false,
+    dailyLimit: 100,
+    confidenceThreshold: 85,
+    lastTest: { status: "not_run", at: null, message: "Aucun test récent enregistré." },
+    lastError: null,
+    lastErrorAt: null,
+  },
+  security: {
+    activeAdminSessions: 0,
+    adminAccounts: 0,
+    pharmacyAccounts: 0,
+    unreadAdminNotifications: 0,
+    criticalAdminNotifications: 0,
+    recentSensitiveActions: 0,
+  },
+  policies: [],
+  recentActions: [],
 };
 
 function statusClass(label: string) {
@@ -737,12 +1150,34 @@ function AdminMediaUploadPanel({ pharmacySlug, helper }: { pharmacySlug: string;
 }
 
 function GlobalAdminImports() {
+  const [pharmacies, setPharmacies] = useState<AdminPharmacyListRow[]>([]);
   const [pharmacySlug, setPharmacySlug] = useState(adminPharmacies[0]?.slug ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewData | null>(null);
   const [selectedLineNumbers, setSelectedLineNumbers] = useState<Set<number>>(new Set());
+
+  const loadPharmacies = useCallback(async () => {
+    const res = await fetch("/api/pharmacy-platform/pharmacies?accountStatus=all&publicationStatus=all", {
+      headers: { "x-sablin-session-kind": "admin" },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMessage(data?.error ?? "Chargement des pharmacies impossible.");
+      return;
+    }
+    const rows = data.pharmacies ?? [];
+    setPharmacies(rows);
+    if (rows.length && !rows.some((pharmacy: AdminPharmacyListRow) => pharmacy.slug === pharmacySlug)) {
+      setPharmacySlug(rows[0].slug);
+    }
+  }, [pharmacySlug]);
+
+  useEffect(() => {
+    void loadPharmacies();
+  }, [loadPharmacies]);
+
   const previewImport = async () => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
@@ -828,7 +1263,7 @@ function GlobalAdminImports() {
         <div className="mt-4 max-w-xl">
           <Label className="text-xs font-extrabold text-foreground">Pharmacie cible</Label>
           <select value={pharmacySlug} onChange={(e) => setPharmacySlug(e.target.value)} className="mt-2 h-11 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
-            {adminPharmacies.map((pharmacy) => <option key={pharmacy.slug} value={pharmacy.slug}>{pharmacy.name}</option>)}
+            {(pharmacies.length ? pharmacies : adminPharmacies).map((pharmacy) => <option key={pharmacy.slug} value={pharmacy.slug}>{pharmacy.name}</option>)}
           </select>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
@@ -878,11 +1313,13 @@ function GlobalAdminImports() {
 function Field({
   label,
   placeholder,
+  type = "text",
   value,
   onChange,
 }: {
   label: string;
   placeholder?: string;
+  type?: string;
   value?: string;
   onChange?: (value: string) => void;
 }) {
@@ -890,6 +1327,7 @@ function Field({
     <div className="space-y-1.5">
       <Label className="text-xs font-bold text-foreground">{label}</Label>
       <Input
+        type={type}
         placeholder={placeholder ?? label}
         value={value}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}
@@ -903,24 +1341,129 @@ function selectedPharmacy(slug?: string) {
   return adminPharmacies.find((pharmacy) => pharmacy.slug === slug) ?? adminPharmacies[0];
 }
 
+type AdminManagedPharmacy = ReturnType<typeof selectedPharmacy>;
+
+function toManagedPharmacy(fallback: AdminManagedPharmacy, profile?: AdminPharmacyProfileData | null): AdminManagedPharmacy {
+  if (!profile) return fallback;
+  const duty = profile.isOnDuty ? "De garde" : profile.isOpen247 ? "Ouvert" : fallback.guard;
+  return {
+    ...fallback,
+    slug: profile.slug || fallback.slug,
+    name: profile.name || fallback.name,
+    commune: profile.commune || fallback.commune,
+    district: profile.district || fallback.district,
+    status: profile.accountStatus || fallback.status,
+    source: profile.creationSource || fallback.source,
+    guard: duty,
+    quality: profile.dataQuality || fallback.quality,
+    manager: profile.managerName || fallback.manager,
+    phone: profile.phone || fallback.phone,
+    meds: profile.medicationCount ?? fallback.meds,
+    updatedAt: profile.lastDataUpdate ? formatDateTime(profile.lastDataUpdate) : fallback.updatedAt,
+    operationalStatus: duty,
+  };
+}
+
+function useAdminPharmacyProfile(pharmacySlug?: string) {
+  const fallback = selectedPharmacy(pharmacySlug);
+  const [profile, setProfile] = useState<AdminPharmacyProfileData | null>(null);
+  const [dashboard, setDashboard] = useState<AdminManagedDashboardSummary>(adminManagedDashboardFallback);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    if (!fallback?.slug) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      const headers = { "x-sablin-session-kind": "admin" };
+      const [profileRes, dashboardRes] = await Promise.all([
+        fetch(`/api/pharmacy-platform/profile?pharmacySlug=${encodeURIComponent(fallback.slug)}`, { headers }),
+        fetch(`/api/pharmacy-platform/dashboard-summary?pharmacySlug=${encodeURIComponent(fallback.slug)}`, { headers }),
+      ]);
+      const profileData = await profileRes.json().catch(() => ({}));
+      const dashboardData = await dashboardRes.json().catch(() => ({}));
+      if (!profileRes.ok) throw new Error(profileData?.error ?? "Profil pharmacie introuvable.");
+      setProfile(profileData.profile ?? null);
+      if (dashboardRes.ok) {
+        setDashboard({ ...adminManagedDashboardFallback, ...dashboardData });
+      } else {
+        setDashboard(adminManagedDashboardFallback);
+      }
+    } catch (error) {
+      setProfile(null);
+      setDashboard(adminManagedDashboardFallback);
+      setMessage(error instanceof Error ? error.message : "Chargement de la pharmacie impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [fallback]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return {
+    fallback,
+    profile,
+    pharmacy: toManagedPharmacy(fallback, profile),
+    dashboard,
+    loading,
+    message,
+    reload: load,
+  };
+}
+
 function PharmacySelector({ currentSlug }: { currentSlug?: string }) {
-  const active = selectedPharmacy(currentSlug);
+  const [rows, setRows] = useState<Array<{ slug: string; name: string; commune?: string | null; accountStatus?: string | null }>>([]);
+  const [loading, setLoading] = useState(false);
+  const fallbackRows = adminPharmacies.map((pharmacy) => ({
+    slug: pharmacy.slug,
+    name: pharmacy.name,
+    commune: pharmacy.commune,
+    accountStatus: pharmacy.status,
+  }));
+  const options = rows.length ? rows : fallbackRows;
+  const activeSlug = options.some((pharmacy) => pharmacy.slug === currentSlug) ? currentSlug : options[0]?.slug;
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetch("/api/pharmacy-platform/pharmacies?accountStatus=all&publicationStatus=all", {
+      headers: { "x-sablin-session-kind": "admin" },
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (active && ok) setRows(data.pharmacies ?? []);
+      })
+      .catch(() => {
+        if (active) setRows([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="rounded-xl border border-border bg-white p-3">
       <Label className="text-xs font-extrabold text-foreground">Sélectionner une pharmacie à gérer</Label>
       <select
-        value={active.slug}
+        value={activeSlug}
         onChange={(event) => {
           window.location.href = `/admin/pharmacies/${event.target.value}/dashboard`;
         }}
         className="mt-2 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground outline-none focus:border-brand"
       >
-        {adminPharmacies.map((pharmacy) => (
+        {options.map((pharmacy) => (
           <option key={pharmacy.slug} value={pharmacy.slug}>
-            {pharmacy.name}
+            {pharmacy.name}{pharmacy.accountStatus ? ` · ${pharmacy.accountStatus}` : ""}
           </option>
         ))}
       </select>
+      {loading && <p className="mt-1 text-xs font-semibold text-muted-foreground">Chargement base...</p>}
     </div>
   );
 }
@@ -973,7 +1516,11 @@ function AdminShell({ page, pharmacyId, children }: { page: AdminPage; pharmacyI
             </div>
           </Card>
         </aside>
-        <main className="min-w-0">{children}</main>
+        <main className="min-w-0 space-y-5">
+          <PlatformSectionGuide scope="admin" pageKey={page} />
+          <PlatformSectionWorkflowPanel scope="admin" pageKey={page} />
+          {children}
+        </main>
       </div>
     </div>
   );
@@ -1138,6 +1685,11 @@ function Dashboard() {
         description="Vue rapide des chantiers qui impactent directement l’espace utilisateur, pharmacie et marketplace."
         items={adminOperationalWorkflows}
       />
+      <PlatformUxSyncPanel
+        scope="admin"
+        title="Synchronisation maître des plateformes"
+        description="L’Admin reste l’espace central : il contrôle les données, les publications, les comptes, les crédits et les règles qui alimentent les espaces Pharmacie et Utilisateur sans mélanger leurs interfaces."
+      />
       <SectionBlock title="Raccourcis de contrôle" description="Accès direct aux zones qui gouvernent la synchronisation entre Admin, Pharmacie et Utilisateur.">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
@@ -1159,6 +1711,48 @@ function Dashboard() {
 }
 
 function PharmaciesList() {
+  const [pharmacies, setPharmacies] = useState<AdminPharmacyListRow[]>([]);
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [query, setQuery] = useState("");
+  const [commune, setCommune] = useState("");
+  const [accountStatus, setAccountStatus] = useState("all");
+  const [publicationStatus, setPublicationStatus] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        commune,
+        accountStatus,
+        publicationStatus,
+      });
+      const res = await fetch(`/api/pharmacy-platform/pharmacies?${params}`, { headers: { "x-sablin-session-kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des pharmacies impossible.");
+      setPharmacies(data.pharmacies ?? []);
+      setSummary(data.summary ?? {});
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des pharmacies impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [accountStatus, commune, publicationStatus, query]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const resetFilters = () => {
+    setQuery("");
+    setCommune("");
+    setAccountStatus("all");
+    setPublicationStatus("all");
+  };
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -1170,36 +1764,58 @@ function PharmaciesList() {
       />
       <MetricsGrid
         metrics={[
-          { label: "Pharmacies", value: adminPharmacies.length, status: "Toutes pharmacies", icon: Building2 },
-          { label: "Validées", value: adminPharmacies.filter((p) => p.status === "Validée").length, status: "Publication possible", icon: CheckCircle2 },
-          { label: "En attente", value: adminPharmacies.filter((p) => p.status !== "Validée").length, status: "Contrôle requis", icon: AlertTriangle },
-          { label: "Données anciennes", value: adminPharmacies.filter((p) => p.quality.includes("ancienne") || p.updatedAt.includes("jours")).length, status: "À mettre à jour", icon: CalendarClock },
+          { label: "Pharmacies", value: summary.total ?? 0, status: `${summary.visible ?? pharmacies.length} affichée(s)`, icon: Building2 },
+          { label: "Validées", value: summary.validated ?? 0, status: "Publication possible", icon: CheckCircle2 },
+          { label: "En attente", value: summary.pending ?? 0, status: "Contrôle requis", icon: AlertTriangle },
+          { label: "Suspendues", value: summary.suspended ?? 0, status: "Bloquées", icon: LockKeyhole },
+          { label: "Publiées", value: summary.published ?? 0, status: "Visible utilisateur", icon: Database },
+          { label: "Avec photo publique", value: summary.withPublicMedia ?? 0, status: "Logo/façade validés", icon: ImageIcon },
         ]}
       />
-      <AdminFilterPanel filters={["Recherche nom, commune, responsable", "Commune", "Validation", "Ouvert / garde", "Qualité / mise à jour"]} />
       <Card className="border-border/70 p-5 shadow-card">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_180px_220px_180px_auto_auto]">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Recherche nom, commune, responsable, téléphone" className="bg-white" />
+          <Input value={commune} onChange={(event) => setCommune(event.target.value)} placeholder="Commune" className="bg-white" />
+          <select value={accountStatus} onChange={(event) => setAccountStatus(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous statuts</option>
+            <option value="pending">En attente / incomplète</option>
+            {["Validée", "En attente", "En attente de validation", "Refusée", "Suspendue", "Incomplète"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <select value={publicationStatus} onChange={(event) => setPublicationStatus(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Publication</option>
+            {["Publiée", "Non publiée", "Brouillon"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <Button onClick={load} disabled={loading} className="bg-brand text-white hover:bg-brand-dark">
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Actualiser
+          </Button>
+          <Button variant="outline" onClick={resetFilters}>Réinitialiser</Button>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+        {loading && <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm font-bold text-muted-foreground">Chargement des pharmacies depuis la base...</p>}
       <div className="mt-4 overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[1180px] text-sm">
           <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-            <tr>{["Pharmacie", "Commune", "Responsable", "Téléphone interne", "Validation", "Ouvert/Garde", "Médicaments", "Mise à jour", "Qualité", "Actions"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
+            <tr>{["Pharmacie", "Commune", "Responsable", "Téléphone interne", "Validation", "Publication/Garde", "Médicaments", "Photos", "Mise à jour", "Qualité", "Actions"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-border bg-white">
-            {adminPharmacies.map((p) => (
+            {pharmacies.map((p) => (
               <tr key={p.slug}>
                 <td className="px-4 py-3 font-bold text-foreground">{p.name}<p className="text-xs font-normal text-muted-foreground">{p.district}</p></td>
                 <td className="px-4 py-3">{p.commune}</td>
-                <td className="px-4 py-3">{p.manager}</td>
-                <td className="px-4 py-3">{p.phone}</td>
-                <td className="px-4 py-3"><StatusBadge label={p.status} /></td>
-                <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><StatusBadge label={p.operationalStatus} /><StatusBadge label={p.guard} /></div></td>
-                <td className="px-4 py-3">{p.meds}</td>
-                <td className="px-4 py-3">{p.updatedAt}</td>
-                <td className="px-4 py-3"><StatusBadge label={p.quality} /></td>
+                <td className="px-4 py-3">{p.managerName ?? "Responsable à compléter"}</td>
+                <td className="px-4 py-3">{p.phone ?? "Téléphone interne absent"}</td>
+                <td className="px-4 py-3"><StatusBadge label={p.accountStatus} /></td>
+                <td className="px-4 py-3"><div className="flex flex-wrap gap-1"><StatusBadge label={p.publicationStatus} />{p.isOnDuty && <StatusBadge label="De garde" />}{p.isOpen247 && <StatusBadge label="24h/24" />}</div></td>
+                <td className="px-4 py-3">{p.medicationCount}</td>
+                <td className="px-4 py-3">{p.publicMediaCount} publique(s)</td>
+                <td className="px-4 py-3">{formatDateTime(p.lastDataUpdate)}</td>
+                <td className="px-4 py-3"><StatusBadge label={p.dataQuality} /></td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" className="bg-brand text-white" onClick={() => (window.location.href = `/admin/pharmacies/${p.slug}/dashboard`)}>Gérer cette pharmacie</Button>
                     <Button size="sm" variant="outline" onClick={() => (window.location.href = `/admin/pharmacies/${p.slug}`)}>Voir détail</Button>
-                    {p.status !== "Validée" && (
+                    {p.accountStatus !== "Validée" && (
                       <ProfessionalActionButton action="validate-pharmacy" label="Valider" pharmacySlug={p.slug} size="sm" variant="outline" className="border-brand/30 text-brand-dark">
                         Valider
                       </ProfessionalActionButton>
@@ -1214,6 +1830,7 @@ function PharmaciesList() {
           </tbody>
         </table>
       </div>
+      {!loading && pharmacies.length === 0 && <p className="mt-4 rounded-lg border border-dashed border-border p-6 text-center text-sm font-bold text-foreground">Aucune pharmacie ne correspond aux filtres.</p>}
       </Card>
       <WorkflowBoard
         title="Cycle de contrôle pharmacie"
@@ -1251,6 +1868,14 @@ type CreatePharmacyForm = {
   longitude: string;
   landmark: string;
   coverageZone: string;
+  imageUrl: string;
+  hoursWeekday: string;
+  hoursSaturday: string;
+  hoursSunday: string;
+  specialHoursMessage: string;
+  isOnDuty: string;
+  dutyPeriod: string;
+  servicesCsv: string;
   internalNotes: string;
   mode: (typeof createPharmacyModes)[number]["id"];
 };
@@ -1270,6 +1895,14 @@ const emptyCreatePharmacyForm: CreatePharmacyForm = {
   longitude: "",
   landmark: "",
   coverageZone: "",
+  imageUrl: "",
+  hoursWeekday: "08:00 - 22:00",
+  hoursSaturday: "08:00 - 20:00",
+  hoursSunday: "09:00 - 13:00",
+  specialHoursMessage: "",
+  isOnDuty: "false",
+  dutyPeriod: "",
+  servicesCsv: "paiement mobile, conseil pharmaceutique, parapharmacie",
   internalNotes: "",
   mode: "fiche",
 };
@@ -1322,6 +1955,14 @@ function CreatePharmacy() {
           longitude: form.longitude ? Number(form.longitude) : undefined,
           landmark: form.landmark,
           coverageZone: form.coverageZone,
+          imageUrl: form.imageUrl,
+          hoursWeekday: form.hoursWeekday,
+          hoursSaturday: form.hoursSaturday,
+          hoursSunday: form.hoursSunday,
+          specialHoursMessage: form.specialHoursMessage,
+          isOnDuty: form.isOnDuty === "true",
+          dutyPeriod: form.dutyPeriod,
+          servicesCsv: form.servicesCsv,
           creationSource: "Création administrateur",
           accountStatus: "En attente de validation",
           publishProvisional: false,
@@ -1371,6 +2012,7 @@ function CreatePharmacy() {
         </div>
       </SectionBlock>
       <SectionBlock title="Étape 3 : photos & documents" description="Les documents d’autorisation restent admin uniquement.">
+        <Field label="URL image publique initiale" placeholder="Logo, façade ou couverture validée" value={form.imageUrl} onChange={update("imageUrl")} />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {PHARMACY_IMAGE_FIELDS.map((image) => (
             <Card key={image.label} className="border-border/70 p-3">
@@ -1383,13 +2025,36 @@ function CreatePharmacy() {
       </SectionBlock>
       <SectionBlock title="Étape 4 : horaires, garde et services" description="Les horaires alimentent les pharmacies ouvertes et de garde côté utilisateur.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {["Horaires lundi", "Horaires mardi", "Horaires mercredi", "Horaires jeudi", "Horaires vendredi", "Horaires samedi", "Horaires dimanche", "Période de garde"].map((field) => <Field key={field} label={field} />)}
+          <Field label="Horaires semaine" value={form.hoursWeekday} onChange={update("hoursWeekday")} />
+          <Field label="Horaires samedi" value={form.hoursSaturday} onChange={update("hoursSaturday")} />
+          <Field label="Horaires dimanche" value={form.hoursSunday} onChange={update("hoursSunday")} />
+          <Field label="Période de garde" value={form.dutyPeriod} onChange={update("dutyPeriod")} />
+          <label className="text-sm font-semibold text-foreground">
+            Statut de garde
+            <select value={form.isOnDuty} onChange={(event) => update("isOnDuty")(event.target.value)} className="mt-2 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="false">Pas de garde</option>
+              <option value="true">De garde</option>
+            </select>
+          </label>
+          <Field label="Message horaires spécial" value={form.specialHoursMessage} onChange={update("specialHoursMessage")} />
+          <Field label="Services disponibles" value={form.servicesCsv} onChange={update("servicesCsv")} />
         </div>
         <div className="mt-4"><PillList items={PHARMACY_SERVICES} /></div>
       </SectionBlock>
       <SectionBlock title="Étape 5 : médicaments et publication" description="Le stock exact reste interne. Le public voit uniquement Disponible, Stock faible, Rupture ou À confirmer.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {["Nom commercial", "DCI", "Dosage", "Forme", "Catégorie", "Prix indicatif", "Quantité interne", "Seuil stock faible", "Remarque"].map((field) => <Field key={field} label={field} />)}
+          <Card className="border-border/70 p-4">
+            <p className="font-extrabold text-foreground">Après création</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Ajoutez les médicaments depuis le mode gestion pharmacie ou importez un inventaire Excel/CSV.</p>
+          </Card>
+          <Card className="border-border/70 p-4">
+            <p className="font-extrabold text-foreground">Publication contrôlée</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Les médicaments interdits sont retirés automatiquement. Les lignes ambiguës restent en validation Admin.</p>
+          </Card>
+          <Card className="border-border/70 p-4">
+            <p className="font-extrabold text-foreground">Côté utilisateur</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Disponibilités, prix détaillés et liste des médicaments restent verrouillés par crédits.</p>
+          </Card>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">{PUBLIC_AVAILABILITY_STATUSES.map((s) => <StatusBadge key={s} label={s} />)}{DATA_SOURCES.map((s) => <StatusBadge key={s} label={s} />)}{RELIABILITY_LEVELS.map((s) => <StatusBadge key={s} label={s} />)}</div>
       </SectionBlock>
@@ -1420,7 +2085,7 @@ function CreatePharmacy() {
 }
 
 function PharmacyDetail({ pharmacyId }: { pharmacyId?: string }) {
-  const pharmacy = selectedPharmacy(pharmacyId);
+  const { pharmacy, profile, dashboard, loading, message, reload } = useAdminPharmacyProfile(pharmacyId);
   const actions = [
     { label: "Statut de validation", action: "validate-pharmacy" },
     { label: "Qualité des données", action: "mark-data-quality", payload: { dataQuality: "Données à jour" } },
@@ -1445,16 +2110,35 @@ function PharmacyDetail({ pharmacyId }: { pharmacyId?: string }) {
           </div>
           <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = `/admin/pharmacies/${pharmacy.slug}/dashboard`)}>Gérer comme cette pharmacie</Button>
         </div>
+        {loading && <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm font-bold text-muted-foreground">Chargement du profil depuis la base...</p>}
+        {message && <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-bold text-amber-800">{message}</p>}
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat label="Médicaments" value={pharmacy.meds} badge="Données pharmacie" />
-          <Stat label="Dernière mise à jour" value={pharmacy.updatedAt} badge={pharmacy.quality} />
-          <Stat label="Demandes reçues" value={11} badge="En cours" />
-          <Stat label="Confirmations" value={4} badge="En attente" />
+          <Stat label="Médicaments" value={dashboard.medicationCount || pharmacy.meds} badge="Données pharmacie" />
+          <Stat label="Dernière mise à jour" value={dashboard.lastDataUpdateLabel || pharmacy.updatedAt} badge={pharmacy.quality} />
+          <Stat label="Demandes reçues" value={dashboard.receivedRequests} badge="En cours" />
+          <Stat label="Confirmations" value={dashboard.pendingConfirmations} badge="En attente" />
+          <Stat label="Photos publiques chargées" value={profile?.mediaCount ?? 0} badge="Photos" />
+          <Stat label="Score complétude" value={`${profile?.completenessScore ?? dashboard.dataQualityPercent}%`} badge="Qualité" />
         </div>
       </Card>
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="border-border/70 p-5 shadow-card">
           <Heading level="h3">Informations générales et actions administratives</Heading>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {[
+              ["Téléphone interne", profile?.phone ?? pharmacy.phone],
+              ["WhatsApp interne", profile?.whatsapp ?? "Non renseigné"],
+              ["Email professionnel", profile?.professionalEmail ?? "Non renseigné"],
+              ["Adresse complète", profile?.address ?? "Adresse à compléter"],
+              ["GPS", profile?.latitude && profile?.longitude ? `${profile.latitude}, ${profile.longitude}` : "GPS à compléter"],
+              ["Publication", profile?.publicationStatus ?? "Non publiée"],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-xs font-extrabold uppercase text-muted-foreground">{label}</p>
+                <p className="mt-1 break-words text-sm font-bold text-foreground">{value}</p>
+              </div>
+            ))}
+          </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {actions.map((item) => (
               <ProfessionalActionButton
@@ -1463,6 +2147,7 @@ function PharmacyDetail({ pharmacyId }: { pharmacyId?: string }) {
                 label={item.label}
                 pharmacySlug={pharmacy.slug}
                 payload={item.payload}
+                onSuccess={() => void reload()}
                 variant="outline"
                 className="justify-start border-brand/30 text-brand-dark hover:bg-brand-light"
               >
@@ -1501,7 +2186,7 @@ function PharmacyDetail({ pharmacyId }: { pharmacyId?: string }) {
   );
 }
 
-function ModeBanner({ pharmacy, mode }: { pharmacy: ReturnType<typeof selectedPharmacy>; mode: AdminPharmacyMode }) {
+function ModeBanner({ pharmacy, mode }: { pharmacy: AdminManagedPharmacy; mode: AdminPharmacyMode }) {
   return (
     <Card className="border-brand/20 bg-brand-light/50 p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1520,128 +2205,975 @@ function ModeBanner({ pharmacy, mode }: { pharmacy: ReturnType<typeof selectedPh
 }
 
 function AdminPharmacyModeView({ pharmacyId, mode }: { pharmacyId?: string; mode: AdminPharmacyMode }) {
-  const pharmacy = selectedPharmacy(pharmacyId);
+  const { pharmacy, dashboard, loading, message } = useAdminPharmacyProfile(pharmacyId);
   return (
     <div className="space-y-5">
       <ModeBanner pharmacy={pharmacy} mode={mode} />
       {mode === "dashboard" && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat label="Médicaments de cette pharmacie" value={pharmacy.meds} badge="Données pharmacie" />
-          <Stat label="Disponibilités à confirmer" value={18} badge="À vérifier" />
-          <Stat label="Demandes reçues" value={9} badge="Nouvelle" />
-          <Stat label="Qualité des données" value="86%" badge={pharmacy.quality} />
-        </div>
+        <AdminManagedPharmacyDashboard
+          pharmacy={pharmacy}
+          dashboard={dashboard}
+          loading={loading}
+          message={message}
+        />
       )}
       {mode === "medicaments" && <AdminMedicationManagement pharmacySlug={pharmacy.slug} />}
-      {mode === "import-inventaire" && <AdminImportForPharmacy pharmacy={pharmacy.name} />}
-      {mode === "synchronisation-inventaire" && <InventorySyncPanel kind="admin" pharmacySlug={pharmacy.slug} />}
+      {mode === "import-inventaire" && <AdminImportForPharmacy pharmacySlug={pharmacy.slug} pharmacyName={pharmacy.name} />}
+      {mode === "synchronisation-inventaire" && (
+        <div className="space-y-5">
+          <PlatformUxSyncPanel
+            scope="admin"
+            compact
+            title={`Synchronisation contrôlée : ${pharmacy.name}`}
+            description="L’Admin agit sur cette pharmacie depuis l’espace maître, sans ouvrir de session pharmacie. Les publications sûres alimentent l’utilisateur, les données sensibles restent verrouillées."
+          />
+          <PlatformCoverageMatrix
+            scope="pharmacy"
+            title={`Couverture UX pharmacie : ${pharmacy.name}`}
+            description="Contrôle des sections pharmacie que l’Admin peut superviser pour cette pharmacie sélectionnée."
+          />
+          <InventorySyncPanel kind="admin" pharmacySlug={pharmacy.slug} />
+        </div>
+      )}
       {mode === "demandes" && <ProfessionalRequestsPanel kind="admin" pharmacySlug={pharmacy.slug} />}
-      {mode === "confirmations" && <SimpleAdmin title="Confirmations supervisées" items={["Paracétamol 500 mg", "Augmentin", "Ventoline", "Confirmer prix"]} pharmacySlug={pharmacy.slug} />}
+      {mode === "confirmations" && <AdminPharmacyConfirmationsPanel pharmacy={pharmacy} />}
       {mode === "horaires-garde" && <ScheduleAdmin pharmacySlug={pharmacy.slug} />}
-      {mode === "historique" && <SimpleAdmin title="Historique de cette pharmacie" items={["Modification par pharmacie", "Correction admin", "Import inventaire", "Validation donnée"]} pharmacySlug={pharmacy.slug} />}
+      {mode === "profil" && <PharmacyAdminProfilePanel pharmacy={pharmacy} />}
+      {mode === "photos" && (
+        <AdminMediaUploadPanel
+          pharmacySlug={pharmacy.slug}
+          helper="Chargez et contrôlez les images publiques de cette pharmacie. Les documents d’autorisation restent visibles uniquement par l’administration."
+        />
+      )}
+      {mode === "equipe" && <AdminPharmacyTeamPanel pharmacySlug={pharmacy.slug} pharmacyName={pharmacy.name} />}
+      {mode === "historique" && <AdminPharmacyHistoryPanel pharmacy={pharmacy} />}
+    </div>
+  );
+}
+
+function AdminManagedPharmacyDashboard({
+  pharmacy,
+  dashboard,
+  loading,
+  message,
+}: {
+  pharmacy: AdminManagedPharmacy;
+  dashboard: AdminManagedDashboardSummary;
+  loading: boolean;
+  message: string;
+}) {
+  return (
+    <div className="space-y-5">
+      {message && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">{message}</p>}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Médicaments de cette pharmacie" value={loading ? "..." : dashboard.medicationCount || pharmacy.meds} badge="Données pharmacie" />
+        <Stat label="Disponibilités à mettre à jour" value={loading ? "..." : dashboard.staleAvailabilityCount} badge="À vérifier" />
+        <Stat label="Demandes reçues" value={loading ? "..." : dashboard.receivedRequests} badge="Nouvelle" />
+        <Stat label="Confirmations en attente" value={loading ? "..." : dashboard.pendingConfirmations} badge="En cours" />
+        <Stat label="Demandes en cours" value={loading ? "..." : dashboard.pendingRequests} badge="Traitement" />
+        <Stat label="Prix à vérifier" value={loading ? "..." : dashboard.priceToCheck} badge="Prix indicatifs" />
+        <Stat label="Statut de garde" value={loading ? "..." : dashboard.dutyStatus} badge={dashboard.dutyStatus === "Actif" ? "De garde" : pharmacy.guard} />
+        <Stat label="Qualité des données" value={loading ? "..." : `${dashboard.dataQualityPercent}%`} badge={pharmacy.quality} />
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="border-border/70 p-5 shadow-card">
+          <Heading level="h3">Priorités opérationnelles</Heading>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {[
+              ["Disponibilités anciennes", `${dashboard.staleAvailabilityCount} ligne(s) à corriger`, "Ouvrir les médicaments"],
+              ["Confirmations utilisateurs", `${dashboard.pendingConfirmations} demande(s) à traiter`, "Ouvrir confirmations"],
+              ["Prix indicatifs", `${dashboard.priceToCheck} prix à contrôler`, "Corriger les prix"],
+              ["Dernière mise à jour", dashboard.lastDataUpdateLabel, "Voir historique"],
+            ].map(([title, detail, action]) => (
+              <div key={title} className="rounded-xl border border-border bg-white p-4">
+                <p className="font-extrabold text-foreground">{title}</p>
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">{detail}</p>
+                <p className="mt-3 text-xs font-extrabold uppercase text-brand-dark">{action}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <ControlChecklist
+          title="Synchronisation utilisateur"
+          items={[
+            "Pharmacie validée avant publication côté utilisateur",
+            "Contacts et listes médicaments toujours verrouillés par crédits",
+            "Données anciennes affichées comme À confirmer après déblocage",
+            "Chaque action admin est journalisée dans l’historique",
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PharmacyAdminProfilePanel({ pharmacy }: { pharmacy: AdminManagedPharmacy }) {
+  const [profile, setProfile] = useState<AdminPharmacyProfileData | null>(null);
+  const [profileForm, setProfileForm] = useState<Record<string, string>>({
+    name: "",
+    managerName: "",
+    managerRole: "",
+    phone: "",
+    whatsapp: "",
+    professionalEmail: "",
+    authorizationNumber: "",
+    commune: "",
+    district: "",
+    address: "",
+    latitude: "",
+    longitude: "",
+    landmark: "",
+    coverageZone: "",
+    description: "",
+  });
+  const [services, setServices] = useState<string[]>([]);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const updateProfileField = (key: string, value: string) => {
+    setProfileForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const loadProfile = useCallback(async () => {
+    setLoadingProfile(true);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/pharmacy-platform/profile?pharmacySlug=${encodeURIComponent(pharmacy.slug)}`, {
+        headers: { "X-Sablin-Session-Kind": "admin" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement du profil impossible.");
+      const loaded = data.profile as AdminPharmacyProfileData;
+      setProfile(loaded);
+      setServices(loaded.services?.length ? loaded.services : []);
+      setProfileForm({
+        name: loaded.name ?? "",
+        managerName: loaded.managerName ?? "",
+        managerRole: loaded.managerRole ?? "",
+        phone: loaded.phone ?? "",
+        whatsapp: loaded.whatsapp ?? "",
+        professionalEmail: loaded.professionalEmail ?? "",
+        authorizationNumber: loaded.authorizationNumber ?? "",
+        commune: loaded.commune ?? "",
+        district: loaded.district ?? "",
+        address: loaded.address ?? "",
+        latitude: String(loaded.latitude ?? ""),
+        longitude: String(loaded.longitude ?? ""),
+        landmark: loaded.landmark ?? "",
+        coverageZone: loaded.coverageZone ?? "",
+        description: loaded.description ?? "",
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement du profil impossible.");
+    } finally {
+      setLoadingProfile(false);
+    }
+  }, [pharmacy.slug]);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  const toggleService = (service: string) => {
+    setServices((current) => (current.includes(service) ? current.filter((item) => item !== service) : [...current, service]));
+  };
+
+  const saveProfile = async () => {
+    setSavingProfile(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/pharmacy-platform/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+        body: JSON.stringify({ pharmacySlug: pharmacy.slug, ...profileForm, services }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Enregistrement impossible.");
+      setProfile(data.profile);
+      setMessage("Profil pharmacie enregistré, journalisé et synchronisable côté utilisateur après validation.");
+      await loadProfile();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Enregistrement impossible.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge label={profile?.accountStatus ?? pharmacy.status} />
+              <StatusBadge label={profile?.dataQuality ?? pharmacy.quality} />
+              <StatusBadge label={profile?.creationSource ?? pharmacy.source} />
+              <StatusBadge label="Contact verrouillé côté utilisateur" />
+            </div>
+            <Heading level="h2" className="mt-4">Profil contrôlé : {profile?.name ?? pharmacy.name}</Heading>
+            <Muted className="mt-2">L’Admin modifie ici les données publiques et internes de cette pharmacie sans créer de session pharmacie. Les contacts restent verrouillés côté utilisateur.</Muted>
+          </div>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => void loadProfile()} disabled={loadingProfile}>
+            {loadingProfile ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Actualiser
+          </Button>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <Stat label="Score complétude profil" value={loadingProfile ? "..." : `${profile?.completenessScore ?? 0}%`} badge="Dossier pharmacie" />
+          <Stat label="Photos chargées" value={loadingProfile ? "..." : profile?.mediaCount ?? 0} badge="Photos" />
+          <Stat label="Services actifs" value={services.length} badge="Profil utilisateur" />
+          <Stat label="Médicaments rattachés" value={loadingProfile ? "..." : profile?.medicationCount ?? pharmacy.meds} badge="Inventaire" />
+        </div>
+      </Card>
+
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="border-border/70 p-5 shadow-card">
+          <h3 className="text-base font-extrabold text-foreground">Identification officielle</h3>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">Ces données alimentent la fiche utilisateur après validation. Les contacts restent protégés par crédits.</p>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <Field label="Nom de la pharmacie" placeholder="Pharmacie Sainte Marie Cocody" value={profileForm.name} onChange={(value) => updateProfileField("name", value)} />
+            <Field label="Nom du pharmacien responsable" placeholder="Dr Awa N’Guessan" value={profileForm.managerName} onChange={(value) => updateProfileField("managerName", value)} />
+            <Field label="Fonction du responsable" placeholder="Pharmacien responsable" value={profileForm.managerRole} onChange={(value) => updateProfileField("managerRole", value)} />
+            <Field label="Téléphone professionnel interne" placeholder="+225 07 00 00 00 00" value={profileForm.phone} onChange={(value) => updateProfileField("phone", value)} />
+            <Field label="WhatsApp professionnel interne" placeholder="+225 05 00 00 00 00" value={profileForm.whatsapp} onChange={(value) => updateProfileField("whatsapp", value)} />
+            <Field label="Email professionnel" placeholder="contact@pharmacie.ci" value={profileForm.professionalEmail} onChange={(value) => updateProfileField("professionalEmail", value)} />
+            <Field label="Numéro d’autorisation / agrément" placeholder="AGR-CI-..." value={profileForm.authorizationNumber} onChange={(value) => updateProfileField("authorizationNumber", value)} />
+            <Field label="Description courte" placeholder="Pharmacie de proximité à Cocody." value={profileForm.description} onChange={(value) => updateProfileField("description", value)} />
+          </div>
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+            Même renseignés ici, le téléphone, WhatsApp et l’e-mail direct ne sont jamais affichés gratuitement côté utilisateur.
+          </p>
+        </Card>
+
+        <Card className="border-border/70 p-5 shadow-card">
+          <h3 className="text-base font-extrabold text-foreground">Localisation & repères</h3>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">Ces informations alimentent les recherches par commune, les pharmacies proches et les itinéraires.</p>
+          <div className="mt-4 grid gap-3">
+            <Field label="Commune" placeholder="Cocody" value={profileForm.commune} onChange={(value) => updateProfileField("commune", value)} />
+            <Field label="Quartier" placeholder="Riviera 2" value={profileForm.district} onChange={(value) => updateProfileField("district", value)} />
+            <Field label="Adresse complète" placeholder="Près de la station Total" value={profileForm.address} onChange={(value) => updateProfileField("address", value)} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Latitude GPS" placeholder="5.3599" value={profileForm.latitude} onChange={(value) => updateProfileField("latitude", value)} />
+              <Field label="Longitude GPS" placeholder="-3.9876" value={profileForm.longitude} onChange={(value) => updateProfileField("longitude", value)} />
+            </div>
+            <Field label="Repère connu" placeholder="En face du supermarché" value={profileForm.landmark} onChange={(value) => updateProfileField("landmark", value)} />
+            <Field label="Zone de couverture" placeholder="Riviera, M’Badon, Angré" value={profileForm.coverageZone} onChange={(value) => updateProfileField("coverageZone", value)} />
+          </div>
+        </Card>
+      </div>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-extrabold text-foreground">Services proposés</h3>
+            <p className="text-sm font-medium text-muted-foreground">Ces services aident au filtrage côté utilisateur sans créer de vente en ligne.</p>
+          </div>
+          <StatusBadge label="Information générale" />
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {PHARMACY_SERVICES.map((service) => (
+            <label key={service} className="flex min-h-12 items-start gap-2 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">
+              <input type="checkbox" checked={services.includes(service)} onChange={() => toggleService(service)} className="mt-0.5 size-4 accent-brand" />
+              <span>{service}</span>
+            </label>
+          ))}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button onClick={saveProfile} disabled={savingProfile} className="w-full bg-brand text-white hover:bg-brand-dark sm:w-auto">
+            {savingProfile ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+            Enregistrer le profil
+          </Button>
+          <ProfessionalActionButton action="validate-pharmacy" label="Valider la fiche" pharmacySlug={pharmacy.slug} payload={{ status: "Validée" }} onSuccess={() => void loadProfile()} className="bg-brand text-white hover:bg-brand-dark">
+            Valider la fiche
+          </ProfessionalActionButton>
+          <ProfessionalActionButton action="suspend-pharmacy" label="Suspendre" pharmacySlug={pharmacy.slug} payload={{ status: "Suspendue" }} onSuccess={() => void loadProfile()} variant="outline">
+            Suspendre
+          </ProfessionalActionButton>
+        </div>
+      </Card>
+
+      <AdminMediaUploadPanel pharmacySlug={pharmacy.slug} helper="Ajoutez les photos publiques du profil ou les documents internes. Les images publiques validées alimentent la fiche utilisateur." />
+      <ControlChecklist
+        title="Publication utilisateur"
+        items={[
+          "Pharmacie validée avant affichage public",
+          "Téléphone et WhatsApp verrouillés par crédits",
+          "Photos publiques propres et sans document confidentiel",
+          "Horaires et garde synchronisés avec l’accueil utilisateur",
+        ]}
+      />
+    </div>
+  );
+}
+
+type AdminProfessionalPharmacyInfo = {
+  id: string;
+  name: string;
+  slug: string;
+  commune?: string | null;
+  district?: string | null;
+  accountStatus?: string | null;
+};
+
+type AdminProfessionalMember = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role: string;
+  permissions: string[];
+  status: string;
+  accountStatus: string;
+  lastLoginAt?: string | null;
+  pharmacy?: AdminProfessionalPharmacyInfo | null;
+};
+
+type AdminProfessionalInvitation = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role: string;
+  permissions: string[];
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  pharmacy?: AdminProfessionalPharmacyInfo | null;
+};
+
+function AdminPharmacyTeamPanel({ pharmacySlug, pharmacyName }: { pharmacySlug: string; pharmacyName: string }) {
+  const [members, setMembers] = useState<AdminProfessionalMember[]>([]);
+  const [invitations, setInvitations] = useState<AdminProfessionalInvitation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const loadTeam = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/professional/team?pharmacySlug=${encodeURIComponent(pharmacySlug)}`, {
+        headers: { "x-sablin-session-kind": "admin" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des comptes impossible.");
+      setMembers(data.members ?? []);
+      setInvitations(data.invitations ?? []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des comptes impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [pharmacySlug]);
+
+  useEffect(() => {
+    loadTeam();
+  }, [loadTeam]);
+
+  const updateMemberStatus = async (member: AdminProfessionalMember, status: "Actif" | "Suspendu" | "Révoqué") => {
+    const res = await fetch("/api/professional/team", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+      body: JSON.stringify({ membershipId: member.id, role: member.role, permissions: member.permissions, status }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMessage(res.ok ? "Accès professionnel mis à jour." : data?.error ?? "Action impossible.");
+    await loadTeam();
+  };
+
+  return (
+    <Card className="border-border/70 p-5 shadow-card">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <Heading level="h2">Équipe de {pharmacyName}</Heading>
+          <Muted className="mt-2">L’Admin contrôle les accès rattachés à cette pharmacie sans mélanger les sessions.</Muted>
+        </div>
+        <ProfessionalActionButton action="create-pharmacy-account" label="Créer un accès" pharmacySlug={pharmacySlug} payload={{ role: "PHARMACY_EMPLOYEE" }} className="bg-brand text-white hover:bg-brand-dark">
+          Créer un accès
+        </ProfessionalActionButton>
+      </div>
+      <div className="mt-4 grid gap-3">
+        {loading && <Card className="border-border/70 p-4 text-sm font-bold text-muted-foreground">Chargement des accès de cette pharmacie...</Card>}
+        {!loading && members.length === 0 && <Card className="border-dashed border-border p-4 text-sm font-bold text-foreground">Aucun compte rattaché pour le moment.</Card>}
+        {members.map((row) => (
+          <div key={row.id} className="rounded-xl border border-border bg-white p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge label={row.status} />
+                  <StatusBadge label={row.accountStatus} />
+                </div>
+                <p className="mt-3 break-words font-extrabold text-foreground">{row.name}</p>
+                <p className="text-sm font-semibold text-muted-foreground">{row.role} · {row.email ?? row.phone ?? "Contact non renseigné"}</p>
+                <p className="mt-1 text-xs font-bold text-muted-foreground">Dernière connexion : {formatDateTime(row.lastLoginAt)}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(row.permissions.length ? row.permissions.slice(0, 6) : ["Permissions héritées du rôle"]).map((permission) => (
+                    <StatusBadge key={permission} label={professionalPermissionLabel(permission)} />
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => updateMemberStatus(row, row.status === "Suspendu" ? "Actif" : "Suspendu")}>
+                  {row.status === "Suspendu" ? "Réactiver" : "Suspendre"}
+                </Button>
+                <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => updateMemberStatus(row, "Révoqué")}>
+                  Révoquer
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {invitations.length > 0 && (
+          <div className="rounded-xl border border-border bg-white p-4">
+            <p className="font-extrabold text-foreground">Invitations en attente</p>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {invitations.map((invitation) => (
+                <div key={invitation.id} className="rounded-lg border border-border bg-white p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-foreground">{invitation.name}</p>
+                      <p className="text-xs font-semibold text-muted-foreground">{invitation.role} · Expire : {formatDateTime(invitation.expiresAt)}</p>
+                    </div>
+                    <StatusBadge label={invitation.status} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {message && <p className="rounded-xl border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </div>
+    </Card>
+  );
+}
+
+function AdminPharmacyConfirmationsPanel({ pharmacy }: { pharmacy: AdminManagedPharmacy }) {
+  const [filter, setFilter] = useState("Tous");
+  const [query, setQuery] = useState("");
+  const [requests, setRequests] = useState<ProfessionalRequestItem[]>([]);
+  const [stats, setStats] = useState<RequestStats>({});
+  const [responses, setResponses] = useState<Record<string, { availability: string; price: string; note: string }>>({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ pharmacySlug: pharmacy.slug, workflow: "confirmations" });
+    if (filter !== "Tous") params.set("status", filter);
+    if (query.trim()) params.set("q", query.trim());
+    try {
+      const res = await fetch(`/api/pharmacy-platform/user-requests?${params}`, { headers: { "X-Sablin-Session-Kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des confirmations impossible.");
+      setRequests(data.requests ?? []);
+      setStats(data.stats ?? {});
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des confirmations impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, pharmacy.slug, query]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const respond = async (request: ProfessionalRequestItem, mode: "availability" | "price" | "rupture" | "full") => {
+    const response = responses[request.reference] ?? { availability: "À confirmer", price: "", note: "" };
+    const availabilityStatus = mode === "rupture" ? "Rupture" : response.availability;
+    const responseMessage = response.note.trim() || "Réponse supervisée par l’administration SABLIN après confirmation avec la pharmacie.";
+    try {
+      const res = await fetch("/api/pharmacy-platform/user-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+        body: JSON.stringify({
+          reference: request.reference,
+          pharmacySlug: pharmacy.slug,
+          action: "respond",
+          availabilityStatus,
+          confirmedPrice: response.price ? Number(response.price) : null,
+          responseMessage,
+          updateInventory: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Réponse impossible.");
+      setMessage(`Confirmation ${request.reference} traitée et synchronisée avec ${pharmacy.name}.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Réponse impossible.");
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge label="Supervision admin" />
+              <StatusBadge label={pharmacy.name} />
+            </div>
+            <Heading level="h2" className="mt-3">Confirmations supervisées</Heading>
+            <Muted className="mt-1">L’Admin peut traiter ou assister les confirmations de cette pharmacie sans créer de session pharmacie. Chaque réponse met à jour l’historique et peut fiabiliser l’inventaire publié.</Muted>
+          </div>
+          <div className="grid w-full gap-2 sm:grid-cols-[1fr_180px_auto] lg:max-w-2xl">
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Référence, médicament, message..." className="bg-white" />
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="Tous">Tous les statuts</option>
+              {REQUEST_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load}>Actualiser</Button>
+          </div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Confirmations" value={stats.total ?? requests.length} badge="Toutes" />
+        <Stat label="À traiter" value={(stats.new ?? 0) + (stats.inProgress ?? 0)} badge="En cours" />
+        <Stat label="Priorité haute" value={stats.highPriority ?? 0} badge="Priorité" />
+        <Stat label="Répondues" value={stats.answered ?? 0} badge="Synchronisé" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {loading && <Card className="border-border/70 p-5 text-sm font-bold text-muted-foreground">Chargement des confirmations réelles...</Card>}
+        {!loading && requests.length === 0 && (
+          <Card className="border-dashed border-border p-8 text-center text-sm font-bold text-foreground">
+            Aucune confirmation dans ce filtre. Les futures demandes utilisateur de cette pharmacie apparaîtront ici.
+          </Card>
+        )}
+        {requests.map((item) => {
+          const latest = item.responses?.[0];
+          const response = responses[item.reference] ?? {
+            availability: latest?.availabilityStatus ?? "À confirmer",
+            price: latest?.confirmedPrice ? String(latest.confirmedPrice) : "",
+            note: latest?.responseMessage ?? "",
+          };
+          return (
+            <Card key={item.id} className="border-border/70 p-4 shadow-card">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge label={item.status} />
+                    <StatusBadge label={item.priority} />
+                    <StatusBadge label={`${item.creditCost} crédit${item.creditCost > 1 ? "s" : ""}`} />
+                  </div>
+                  <h3 className="mt-3 break-words text-lg font-extrabold text-foreground">{item.medication?.name ?? item.serviceName}</h3>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {[item.medication?.dosage ?? item.dosage, item.medication?.form ?? item.form].filter(Boolean).join(" · ") || "Information libre"} · Échéance : {formatDateTime(item.expiresAt)}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-muted-foreground">{item.reference} · Utilisateur : {item.user?.name ?? "Référence anonymisée"}</p>
+                </div>
+                <Price amount={item.fcfaEquivalent} size="sm" variant="brand" />
+              </div>
+              {item.userMessage && <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm font-semibold text-foreground">{item.userMessage}</p>}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-foreground">Prix indicatif confirmé</Label>
+                  <Input value={response.price} onChange={(event) => setResponses((current) => ({ ...current, [item.reference]: { ...response, price: event.target.value } }))} inputMode="numeric" className="bg-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-foreground">Disponibilité confirmée</Label>
+                  <select value={response.availability} onChange={(event) => setResponses((current) => ({ ...current, [item.reference]: { ...response, availability: event.target.value } }))} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+                    {PUBLIC_AVAILABILITY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                  </select>
+                </div>
+              </div>
+              <Textarea value={response.note} onChange={(event) => setResponses((current) => ({ ...current, [item.reference]: { ...response, note: event.target.value } }))} className="mt-3 min-h-20 bg-white" placeholder="Note admin ou réponse confirmée avec la pharmacie." />
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => respond(item, "availability")}>Confirmer disponible</Button>
+                <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => respond(item, "price")}>Confirmer prix</Button>
+                <Button variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => respond(item, "rupture")}>Confirmer rupture</Button>
+                <Button variant="outline" onClick={() => respond(item, "full")}>Répondre & synchroniser</Button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AdminPharmacyHistoryPanel({ pharmacy }: { pharmacy: AdminManagedPharmacy }) {
+  const [filter, setFilter] = useState("Tous");
+  const [query, setQuery] = useState("");
+  const [rows, setRows] = useState<HistoryRow[]>([]);
+  const [stats, setStats] = useState<{ total?: number; success?: number; review?: number; imports?: number }>({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ pharmacySlug: pharmacy.slug });
+    if (filter === "Réussi" || filter === "À vérifier") params.set("status", filter.toLowerCase() === "réussi" ? "réussi" : "à vérifier");
+    if (filter === "Import pharmacie" || filter === "Demande utilisateur") params.set("source", filter);
+    if (query.trim()) params.set("q", query.trim());
+    try {
+      const res = await fetch(`/api/pharmacy-platform/history?${params}`, { headers: { "X-Sablin-Session-Kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement de l’historique impossible.");
+      setRows(data.rows ?? []);
+      setStats(data.stats ?? {});
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement de l’historique impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, pharmacy.slug, query]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge label="Historique audité" />
+              <StatusBadge label={pharmacy.name} />
+            </div>
+            <Heading level="h2" className="mt-3">Historique de cette pharmacie</Heading>
+            <Muted className="mt-1">Vue admin consolidée des actions pharmacie, corrections administrateur, imports, publications, validations et audits.</Muted>
+          </div>
+          <div className="flex w-full flex-wrap gap-2 lg:max-w-3xl lg:justify-end">
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Action, auteur, commentaire..." className="h-9 w-full bg-white sm:w-72" />
+            {["Tous", "Réussi", "À vérifier", "Import pharmacie", "Demande utilisateur"].map((item) => (
+              <Button key={item} size="sm" variant={filter === item ? "default" : "outline"} className={filter === item ? "bg-brand text-white hover:bg-brand-dark" : "border-brand/30 text-brand-dark hover:bg-brand-light"} onClick={() => setFilter(item)}>
+                {item}
+              </Button>
+            ))}
+            <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load}>Actualiser</Button>
+          </div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Actions tracées" value={stats.total ?? rows.length} badge="Historique" />
+        <Stat label="Réussies" value={stats.success ?? 0} badge="Réussi" />
+        <Stat label="À vérifier" value={stats.review ?? 0} badge="À vérifier" />
+        <Stat label="Imports" value={stats.imports ?? 0} badge="Import" />
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-white">
+        <div className="hidden grid-cols-[150px_1fr_150px_170px_1fr_1fr_110px] gap-0 bg-muted/40 px-4 py-3 text-xs font-extrabold uppercase text-muted-foreground lg:grid">
+          <span>Date</span><span>Action</span><span>Auteur</span><span>Source</span><span>Avant</span><span>Après</span><span>Statut</span>
+        </div>
+        <div className="divide-y divide-border">
+          {loading && <div className="p-4 text-sm font-bold text-muted-foreground">Chargement de l’historique réel...</div>}
+          {!loading && rows.length === 0 && <div className="p-8 text-center text-sm font-bold text-foreground">Aucune action journalisée pour cette pharmacie dans ce filtre.</div>}
+          {rows.map((item) => (
+            <div key={item.id} className="grid gap-3 p-4 text-sm lg:grid-cols-[150px_1fr_150px_170px_1fr_1fr_110px] lg:items-center">
+              <p className="font-bold text-foreground">{formatDateTime(item.date)}</p>
+              <div>
+                <p className="font-extrabold text-foreground">{item.action}</p>
+                {item.message && <p className="mt-1 text-xs font-semibold text-muted-foreground">{item.message}</p>}
+              </div>
+              <p className="text-muted-foreground">{item.author}</p>
+              <StatusBadge label={item.source} />
+              <p className="break-words text-muted-foreground">{stringifyCell(item.oldValue)}</p>
+              <p className="break-words font-bold text-foreground">{stringifyCell(item.newValue)}</p>
+              <StatusBadge label={item.status} />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
 function AdminMedicationManagement({ pharmacySlug }: { pharmacySlug: string }) {
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
-  const rows = PHARMACY_PORTAL_MEDICATIONS.map((item) => ({ ...item, status: statusOverrides[item.name] ?? item.status }));
+  const [inventory, setInventory] = useState<AdminPharmacyInventoryItem[]>([]);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const loadInventory = useCallback(async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const res = await fetch(`/api/pharmacy-platform/inventory?pharmacySlug=${encodeURIComponent(pharmacySlug)}`, {
+        headers: { "x-sablin-session-kind": "admin" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement de l’inventaire impossible.");
+      setInventory(data.inventory ?? []);
+    } catch (error) {
+      setInventory([]);
+      setMessage(error instanceof Error ? error.message : "Chargement de l’inventaire impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [pharmacySlug]);
+
+  useEffect(() => {
+    void loadInventory();
+  }, [loadInventory]);
+
+  const sources = useMemo(() => [...new Set(inventory.map((item) => item.dataSource).filter(Boolean))].sort(), [inventory]);
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return inventory.filter((item) => {
+      const searchable = `${item.medication} ${item.dci} ${item.dosage} ${item.form} ${item.category} ${item.dataSource}`.toLowerCase();
+      return (
+        (!q || searchable.includes(q)) &&
+        (statusFilter === "all" || item.publicStatus === statusFilter || item.privateStatus === statusFilter) &&
+        (sourceFilter === "all" || item.dataSource === sourceFilter)
+      );
+    });
+  }, [inventory, query, sourceFilter, statusFilter]);
+  const stats = useMemo(() => ({
+    total: inventory.length,
+    visible: inventory.filter((item) => item.publicStatus !== "À confirmer").length,
+    toVerify: inventory.filter((item) => item.publicStatus === "À confirmer" || item.reliabilityLevel !== "Confirmé").length,
+    old: inventory.filter((item) => item.reliabilityLevel === "Ancien" || item.dataSource === "Donnée ancienne").length,
+  }), [inventory]);
+
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Médicaments de la pharmacie sélectionnée</Heading>
-      <Muted>L’admin peut corriger, vérifier, changer la source, la fiabilité et publier côté utilisateur.</Muted>
-      <div className="mt-4 overflow-x-auto rounded-xl border border-border">
-        <table className="w-full min-w-[980px] text-sm">
-          <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-            <tr>{["Médicament", "Prix indicatif", "Statut public", "Interne", "Source", "Fiabilité", "Dernière modification", "Actions admin"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-white">
-            {rows.map((m) => (
-              <tr key={m.name}>
-                <td className="px-4 py-3"><p className="font-bold text-foreground">{m.name}</p><p className="text-xs text-muted-foreground">{m.dci} · {m.form} · {m.dosage}</p></td>
-                <td className="px-4 py-3"><Price amount={m.price} size="sm" variant="brand" /></td>
-                <td className="px-4 py-3"><StatusBadge label={m.status} /></td>
-                <td className="px-4 py-3 text-muted-foreground">Quantité interne : {m.internalQuantity}. Non publiée.</td>
-                <td className="px-4 py-3">{m.source}</td>
-                <td className="px-4 py-3"><StatusBadge label={m.reliability} /></td>
-                <td className="px-4 py-3">Auteur : pharmacie · {m.updatedAt}</td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    <ProfessionalActionButton action="quick-availability" label="Corriger" pharmacySlug={pharmacySlug} medicationName={m.name} payload={{ availabilityStatus: "À confirmer", reliabilityLevel: "À vérifier", dataSource: "Saisie administrateur" }} onSuccess={() => setStatusOverrides((current) => ({ ...current, [m.name]: "À confirmer" }))} size="sm" variant="outline">
-                      Corriger
-                    </ProfessionalActionButton>
-                    <ProfessionalActionButton action="mark-inventory-verified" label="Marquer vérifié" pharmacySlug={pharmacySlug} medicationName={m.name} payload={{ availabilityStatus: m.status, reliabilityLevel: "Confirmé", dataSource: "Saisie administrateur" }} onSuccess={() => setStatusOverrides((current) => ({ ...current, [m.name]: m.status }))} size="sm" className="bg-brand text-white">
-                      Marquer vérifié
-                    </ProfessionalActionButton>
-                    <ProfessionalActionButton action="publish-inventory" label="Publier/retirer" pharmacySlug={pharmacySlug} medicationName={m.name} payload={{ availabilityStatus: m.status, reliabilityLevel: m.reliability, dataSource: "Saisie administrateur" }} onSuccess={() => setStatusOverrides((current) => ({ ...current, [m.name]: m.status }))} size="sm" variant="outline">
-                      Publier/retirer
-                    </ProfessionalActionButton>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
+    <div className="space-y-4">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading level="h2">Médicaments de la pharmacie sélectionnée</Heading>
+            <Muted>L’admin corrige l’inventaire réel de cette pharmacie. Les changements passent par l’API et alimentent la marketplace utilisateur selon les règles de publication.</Muted>
+          </div>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={loadInventory} disabled={loading}>
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Actualiser
+          </Button>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat label="Inventaire réel" value={loading ? "..." : stats.total} badge="Base commune" />
+          <Stat label="Publiables" value={loading ? "..." : stats.visible} badge="Utilisateur" />
+          <Stat label="À vérifier" value={loading ? "..." : stats.toVerify} badge="Contrôle" />
+          <Stat label="Données anciennes" value={loading ? "..." : stats.old} badge="Qualité" />
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1.3fr_220px_220px_auto]">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher nom, DCI, forme, source..." className="bg-white" />
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous statuts</option>
+            {PUBLIC_AVAILABILITY_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+          <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Toutes sources</option>
+            {sources.map((source) => <option key={source} value={source}>{source}</option>)}
+          </select>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => { setQuery(""); setStatusFilter("all"); setSourceFilter("all"); }}>
+            Réinitialiser
+          </Button>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+
+      <Card className="border-border/70 p-0 shadow-card">
+        {loading && <p className="p-4 text-sm font-bold text-muted-foreground">Chargement de l’inventaire réel...</p>}
+        {!loading && rows.length === 0 && <p className="p-4 text-sm font-bold text-foreground">Aucun médicament ne correspond aux filtres.</p>}
+        <div className="hidden overflow-x-auto rounded-xl border-border lg:block">
+          <table className="w-full min-w-[980px] text-sm">
+            <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+              <tr>{["Médicament", "Prix indicatif", "Statut public", "Interne", "Source", "Fiabilité", "Dernière modification", "Actions admin"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-white">
+              {rows.map((m) => (
+                <tr key={m.id}>
+                  <td className="px-4 py-3"><p className="font-bold text-foreground">{m.medication}</p><p className="text-xs text-muted-foreground">{m.dci} · {m.form} · {m.dosage}</p></td>
+                  <td className="px-4 py-3"><Price amount={m.price} size="sm" variant="brand" /></td>
+                  <td className="px-4 py-3"><StatusBadge label={m.publicStatus} /></td>
+                  <td className="px-4 py-3 text-muted-foreground">Quantité interne : {m.internalQuantity ?? "Non renseignée"}. Non publiée.</td>
+                  <td className="px-4 py-3">{m.dataSource}</td>
+                  <td className="px-4 py-3"><StatusBadge label={m.reliabilityLevel} /></td>
+                  <td className="px-4 py-3">{formatDateTime(m.lastUpdatedAt)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      <ProfessionalActionButton action="quick-availability" label="Corriger" pharmacySlug={pharmacySlug} entityType="pharmacy-medication" entityId={m.id} payload={{ availabilityStatus: "À confirmer", reliabilityLevel: "À vérifier", dataSource: "Saisie administrateur" }} onSuccess={() => void loadInventory()} size="sm" variant="outline">
+                        Corriger
+                      </ProfessionalActionButton>
+                      <ProfessionalActionButton action="mark-inventory-verified" label="Marquer vérifié" pharmacySlug={pharmacySlug} entityType="pharmacy-medication" entityId={m.id} payload={{ availabilityStatus: m.publicStatus, reliabilityLevel: "Confirmé", dataSource: "Saisie administrateur" }} onSuccess={() => void loadInventory()} size="sm" className="bg-brand text-white">
+                        Marquer vérifié
+                      </ProfessionalActionButton>
+                      <ProfessionalActionButton action="publish-inventory" label="Publier" pharmacySlug={pharmacySlug} entityType="pharmacy-medication" entityId={m.id} payload={{ availabilityStatus: m.publicStatus, reliabilityLevel: m.reliabilityLevel, dataSource: "Saisie administrateur" }} onSuccess={() => void loadInventory()} size="sm" variant="outline">
+                        Publier
+                      </ProfessionalActionButton>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="grid gap-3 p-4 lg:hidden">
+          {rows.map((m) => (
+            <Card key={m.id} className="border-border/70 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="font-extrabold text-foreground">{m.medication}</p>
+                  <p className="text-xs font-bold text-muted-foreground">{m.dci} · {m.dosage} · {m.form}</p>
+                </div>
+                <StatusBadge label={m.publicStatus} />
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-xs font-bold text-muted-foreground">Prix indicatif</p><Price amount={m.price} size="sm" variant="brand" /></div>
+                <div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-xs font-bold text-muted-foreground">Fiabilité</p><StatusBadge label={m.reliabilityLevel} /></div>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <ProfessionalActionButton action="quick-availability" label="Corriger" pharmacySlug={pharmacySlug} entityType="pharmacy-medication" entityId={m.id} payload={{ availabilityStatus: "À confirmer", reliabilityLevel: "À vérifier", dataSource: "Saisie administrateur" }} onSuccess={() => void loadInventory()} size="sm" variant="outline">Corriger</ProfessionalActionButton>
+                <ProfessionalActionButton action="mark-inventory-verified" label="Vérifier" pharmacySlug={pharmacySlug} entityType="pharmacy-medication" entityId={m.id} payload={{ availabilityStatus: m.publicStatus, reliabilityLevel: "Confirmé", dataSource: "Saisie administrateur" }} onSuccess={() => void loadInventory()} size="sm" className="bg-brand text-white">Vérifier</ProfessionalActionButton>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </Card>
+      <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
         Côté utilisateur : “Prix indicatif, à confirmer auprès de la pharmacie.” Si la fiabilité est Ancien, À vérifier ou Incomplet, le statut public devient “À confirmer”.
       </p>
-    </Card>
+    </div>
   );
 }
 
-function AdminImportForPharmacy({ pharmacy }: { pharmacy: string }) {
-  const target = adminPharmacies.find((item) => item.name === pharmacy) ?? adminPharmacies[0];
+function AdminImportForPharmacy({ pharmacySlug, pharmacyName }: { pharmacySlug: string; pharmacyName: string }) {
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
-  const uploadImport = async () => {
+  const [preview, setPreview] = useState<ImportPreviewData | null>(null);
+  const [selectedLineNumbers, setSelectedLineNumbers] = useState<Set<number>>(new Set());
+
+  const previewImport = async () => {
     if (!file) {
-      setMessage("Choisissez un fichier CSV, XLS ou XLSX avant l’import.");
+      setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
       return;
     }
     setUploading(true);
     setMessage("");
     try {
       const form = new FormData();
-      form.set("pharmacySlug", target.slug);
+      form.set("pharmacySlug", pharmacySlug);
       form.set("file", file);
-      const res = await fetch("/api/pharmacy-platform/imports", { method: "POST", headers: { "X-Sablin-Session-Kind": "admin" }, body: form });
+      const res = await fetch("/api/imports/preview", { method: "POST", headers: { "X-Sablin-Session-Kind": "admin" }, body: form });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error ?? "Import impossible.");
-      setMessage(`Import ${data.import.status} : ${data.report.validRows} ligne(s) valide(s), ${data.report.invalidRows} ligne(s) à vérifier, ${data.report.unknownMedications} médicament(s) non reconnu(s).`);
-      setFile(null);
+      if (!res.ok) throw new Error(data?.error ?? "Analyse impossible.");
+      const safeLines = safePublishLineNumbers(data);
+      setPreview(data);
+      setSelectedLineNumbers(safeLines);
+      setMessage(
+        `Analyse terminée pour ${pharmacyName} : ${safeLines.size} produit(s) prêt(s), ${data.unknownMedications} non reconnu(s), ${data.prohibitedRows ?? 0} interdit(s) retiré(s).`
+      );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Import impossible.");
+      setPreview(null);
+      setSelectedLineNumbers(new Set());
+      setMessage(error instanceof Error ? error.message : "Analyse impossible.");
     } finally {
       setUploading(false);
     }
   };
+
+  const submitImport = async (mode: "auto_publish_safe" | "draft") => {
+    if (!file) {
+      setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
+      return;
+    }
+    if (!preview) {
+      setMessage("Analysez le fichier avant validation. Vous pourrez retirer les lignes à ne pas afficher.");
+      return;
+    }
+    const rowsToConfirm = preview.confirmableRows ?? [];
+    if (!rowsToConfirm.length) {
+      setMessage("Aucune ligne analysée à enregistrer.");
+      return;
+    }
+    setUploading(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/imports/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+        body: JSON.stringify({
+          pharmacySlug,
+          fileName: file.name,
+          fileType: file.name.split(".").pop() ?? "CSV",
+          rows: rowsToConfirm,
+          publishLineNumbers: mode === "draft" ? [] : Array.from(selectedLineNumbers),
+          mode,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Validation impossible.");
+      setMessage(
+        mode === "draft"
+          ? `Liste enregistrée sans publication : ${data.report.totalRows ?? 0} ligne(s).`
+          : `Publication contrôlée terminée : ${data.report.safePublishedRows ?? 0} produit(s) publié(s), ${data.report.notPublishedRows ?? 0} non publié(s), ${data.report.prohibitedRows ?? 0} interdit(s) retiré(s).`
+      );
+      setFile(null);
+      setSelectedLineNumbers(new Set());
+      setPreview(data.report);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Validation impossible.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Import inventaire pour {pharmacy}</Heading>
-      <Muted>L’admin peut importer, corriger, forcer une correspondance médicament et publier la donnée.</Muted>
+      <Heading level="h2">Import inventaire pour {pharmacyName}</Heading>
+      <Muted>L’admin analyse le fichier, retire les lignes à ne pas afficher, publie les produits sûrs et garde les cas ambigus en validation.</Muted>
       <div className="mt-4">
-        <AdminMediaUploadPanel pharmacySlug={target.slug} helper="Chargez les photos des locaux ou documents liés à cette pharmacie sélectionnée." />
+        <AdminMediaUploadPanel pharmacySlug={pharmacySlug} helper="Chargez les photos des locaux ou documents liés à cette pharmacie sélectionnée." />
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-        <Input type="file" accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading}>{uploading ? "Import..." : "Importer fichier"}</Button>
-      </div>
-      {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate(`modele-import-${target.slug}.csv`)}>
+      <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
+        <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); }} />
+        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate(`modele-import-${pharmacySlug}.csv`)}>
           Télécharger modèle Excel
         </Button>
+        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Analyser le fichier"}</Button>
+        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => submitImport("auto_publish_safe")} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier les produits autorisés"}</Button>
+      </div>
+      {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      {preview && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat label="Lignes détectées" value={preview.totalRows} badge="Aperçu" />
+          <Stat label="Lignes valides" value={preview.validRows} badge="Confirmé" />
+          <Stat label="À corriger" value={preview.incompleteRows + preview.invalidRows} badge="À vérifier" />
+          <Stat label="Médicaments non reconnus" value={preview.unknownMedications} badge="Validation Admin" />
+          <Stat label="Doublons" value={preview.duplicateRows} badge="Conflit" />
+          <Stat label="Prix manquants" value={preview.missingPrices} badge="À compléter" />
+          <Stat label="Statuts invalides" value={preview.invalidStatuses} badge="Normalisation" />
+          <Stat label="Médicaments reconnus" value={preview.recognizedMedications} badge="Référentiel" />
+          <Stat label="À publier" value={safePublishLineNumbers(preview).size} badge="Publication" />
+          <Stat label="Interdits retirés" value={preview.prohibitedRows ?? 0} badge="Bloqué" />
+        </div>
+      )}
+      {preview?.confirmableRows?.length ? (
+        <div className="mt-4">
+          <ImportValidationPanel
+            preview={preview}
+            selectedLineNumbers={selectedLineNumbers}
+            onSelectionChange={setSelectedLineNumbers}
+          />
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => submitImport("auto_publish_safe")} disabled={uploading}>
+              Publier la sélection sûre
+            </Button>
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => submitImport("draft")} disabled={uploading}>
+              Enregistrer sans publication
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           ["Forcer correspondance", "force-import-match"],
-          ["Valider import", "import-validate"],
           ["Créer demande référentiel", "create-referential-request"],
           ["Corriger doublons", "fix-duplicates"],
           ["Marquer fiable", "mark-reliable"],
-          ["Publier côté utilisateur", "publish-import"],
         ].map(([label, action]) => (
-          <ProfessionalActionButton key={label} action={action} label={label} pharmacySlug={target.slug} variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light">
+          <ProfessionalActionButton key={label} action={action} label={label} pharmacySlug={pharmacySlug} variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light">
             {label}
           </ProfessionalActionButton>
         ))}
@@ -1651,29 +3183,279 @@ function AdminImportForPharmacy({ pharmacy }: { pharmacy: string }) {
           {IMPORT_TEMPLATE_COLUMNS.map((column) => <div key={column} className="rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{column}</div>)}
         </div>
       </SectionBlock>
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {["Lignes valides", "Lignes en erreur", "Médicaments reconnus", "Médicaments non reconnus", "Doublons", "Prix manquants", "Statuts invalides", "Import corrigé"].map((item, index) => <Stat key={item} label={item} value={index % 2 ? 7 : 42} badge={index % 2 ? "À vérifier" : "Confirmé"} />)}
-      </div>
     </Card>
   );
 }
 
 function ScheduleAdmin({ pharmacySlug }: { pharmacySlug: string }) {
+  const [schedule, setSchedule] = useState<Record<string, AdminDaySchedule>>(adminDefaultSchedule);
+  const [dutyEnabled, setDutyEnabled] = useState(false);
+  const [dutyStart, setDutyStart] = useState("2026-06-19T20:00");
+  const [dutyEnd, setDutyEnd] = useState("2026-06-20T08:00");
+  const [exceptionalClosureStart, setExceptionalClosureStart] = useState("");
+  const [exceptionalClosureEnd, setExceptionalClosureEnd] = useState("");
+  const [exceptionalOpeningMessage, setExceptionalOpeningMessage] = useState("");
+  const [specialMessage, setSpecialMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const loadSchedule = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/pharmacy-platform/schedule?pharmacySlug=${encodeURIComponent(pharmacySlug)}`, {
+        headers: { "X-Sablin-Session-Kind": "admin" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des horaires impossible.");
+      setSchedule({ ...adminDefaultSchedule, ...(data.schedule ?? {}) });
+      setDutyEnabled(Boolean(data.duty?.enabled));
+      setDutyStart(toDateTimeInput(data.duty?.start, "2026-06-19T20:00"));
+      setDutyEnd(toDateTimeInput(data.duty?.end, "2026-06-20T08:00"));
+      setExceptionalClosureStart(toDateTimeInput(data.exceptions?.closureStart));
+      setExceptionalClosureEnd(toDateTimeInput(data.exceptions?.closureEnd));
+      setExceptionalOpeningMessage(data.exceptions?.openingMessage || "");
+      setSpecialMessage(data.duty?.message || "");
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des horaires impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [pharmacySlug]);
+
+  useEffect(() => {
+    loadSchedule();
+  }, [loadSchedule]);
+
+  const updateDay = (dayKey: string, patch: Partial<AdminDaySchedule>) => {
+    setSchedule((current) => ({
+      ...current,
+      [dayKey]: {
+        ...current[dayKey],
+        ...patch,
+      },
+    }));
+  };
+
+  const saveSchedule = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pharmacy-platform/schedule?pharmacySlug=${encodeURIComponent(pharmacySlug)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+        body: JSON.stringify({
+          schedule,
+          dutyEnabled,
+          dutyStart,
+          dutyEnd,
+          specialMessage,
+          exceptionalClosureStart,
+          exceptionalClosureEnd,
+          exceptionalOpeningMessage,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Enregistrement impossible.");
+      setSchedule({ ...adminDefaultSchedule, ...(data.schedule ?? {}) });
+      setDutyEnabled(Boolean(data.duty?.enabled));
+      setDutyStart(toDateTimeInput(data.duty?.start, dutyStart));
+      setDutyEnd(toDateTimeInput(data.duty?.end, dutyEnd));
+      setExceptionalClosureStart(toDateTimeInput(data.exceptions?.closureStart));
+      setExceptionalClosureEnd(toDateTimeInput(data.exceptions?.closureEnd));
+      setExceptionalOpeningMessage(data.exceptions?.openingMessage || "");
+      setSpecialMessage(data.duty?.message || specialMessage);
+      setMessage(data?.message ?? "Horaires et garde enregistrés comme administrateur.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Enregistrement impossible.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">Horaires & garde de la pharmacie sélectionnée</Heading>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {["Horaires lundi", "Horaires mardi", "Horaires mercredi", "Horaires jeudi", "Horaires vendredi", "Horaires samedi", "Horaires dimanche", "Pause", "Ouverture exceptionnelle", "Fermeture exceptionnelle", "Statut de garde", "Période de garde", "Message spécial"].map((field) => <Field key={field} label={field} />)}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">{["Ouvert", "Fermé", "De garde", "Fermeture exceptionnelle", "Horaires à confirmer"].map((s) => <StatusBadge key={s} label={s} />)}</div>
-      <ProfessionalActionButton action="schedule-save" label="Enregistrer comme admin" pharmacySlug={pharmacySlug} className="mt-4 bg-brand text-white hover:bg-brand-dark">
-        Enregistrer comme admin
-      </ProfessionalActionButton>
-    </Card>
+    <div className="space-y-5">
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading level="h2">Horaires & garde de la pharmacie sélectionnée</Heading>
+            <Muted className="mt-1">Mode gestion pharmacie : l’admin corrige les horaires, garde et exceptions qui alimentent directement les pages utilisateur.</Muted>
+          </div>
+          <div className="flex flex-wrap gap-2">{PHARMACY_OPERATION_STATUSES.map((s) => <StatusBadge key={s} label={s} />)}</div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-base font-extrabold text-foreground">Planning hebdomadaire</h3>
+            <p className="text-sm font-medium text-muted-foreground">Chaque modification est journalisée avec la source “Saisie administrateur”.</p>
+          </div>
+          {loading ? <StatusBadge label="Chargement" /> : <StatusBadge label="Données à jour" />}
+        </div>
+        <div className="mt-4 space-y-3">
+          {ADMIN_WEEK_DAYS.map((day) => {
+            const item = schedule[day.key];
+            return (
+              <div key={day.key} className="rounded-xl border border-border bg-white p-4">
+                <div className="grid gap-3 lg:grid-cols-[118px_160px_1fr_1fr_1fr_1fr_150px] lg:items-end">
+                  <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 text-sm font-extrabold text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={item.enabled}
+                      onChange={(event) => updateDay(day.key, { enabled: event.target.checked, status: event.target.checked ? "Ouvert" : "Fermé" })}
+                      className="size-4 accent-brand"
+                    />
+                    {day.label}
+                  </label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-foreground">Statut public</Label>
+                    <select
+                      value={item.status}
+                      onChange={(event) => updateDay(day.key, { status: event.target.value, enabled: event.target.value !== "Fermé" })}
+                      className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground"
+                    >
+                      {PHARMACY_OPERATION_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+                    </select>
+                  </div>
+                  {[
+                    ["Ouverture", "open"],
+                    ["Fermeture", "close"],
+                    ["Début pause", "breakStart"],
+                    ["Fin pause", "breakEnd"],
+                  ].map(([label, key]) => (
+                    <div key={key} className="space-y-1.5">
+                      <Label className="text-xs font-bold text-foreground">{label}</Label>
+                      <Input
+                        type="time"
+                        value={String(item[key as keyof AdminDaySchedule] ?? "")}
+                        onChange={(event) => updateDay(day.key, { [key]: event.target.value })}
+                        className="bg-white"
+                      />
+                    </div>
+                  ))}
+                  <div className="flex lg:justify-end"><StatusBadge label={item.enabled ? item.status : "Fermé"} /></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-extrabold text-foreground">Garde et exceptions</h3>
+            <p className="text-sm font-medium text-muted-foreground">Ces informations pilotent “pharmacies de garde”, “ouvert/fermé” et les messages de prudence côté utilisateur.</p>
+          </div>
+          <StatusBadge label={dutyEnabled ? "De garde" : "Fermé"} />
+        </div>
+        <label className="mt-4 flex items-center gap-3 rounded-xl border border-brand/20 bg-brand-light/50 p-3 text-sm font-extrabold text-brand-dark">
+          <input type="checkbox" checked={dutyEnabled} onChange={(event) => setDutyEnabled(event.target.checked)} className="size-4 accent-brand" />
+          Activer le statut pharmacie de garde
+        </label>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5"><Label className="text-xs font-bold text-foreground">Début de garde</Label><Input type="datetime-local" value={dutyStart} onChange={(event) => setDutyStart(event.target.value)} className="bg-white" /></div>
+          <div className="space-y-1.5"><Label className="text-xs font-bold text-foreground">Fin de garde</Label><Input type="datetime-local" value={dutyEnd} onChange={(event) => setDutyEnd(event.target.value)} className="bg-white" /></div>
+          <div className="space-y-1.5"><Label className="text-xs font-bold text-foreground">Début fermeture exceptionnelle</Label><Input type="datetime-local" value={exceptionalClosureStart} onChange={(event) => setExceptionalClosureStart(event.target.value)} className="bg-white" /></div>
+          <div className="space-y-1.5"><Label className="text-xs font-bold text-foreground">Fin fermeture exceptionnelle</Label><Input type="datetime-local" value={exceptionalClosureEnd} onChange={(event) => setExceptionalClosureEnd(event.target.value)} className="bg-white" /></div>
+        </div>
+        <Label className="mt-4 block text-xs font-bold text-foreground">Ouverture exceptionnelle ou précision horaire</Label>
+        <Textarea value={exceptionalOpeningMessage} onChange={(event) => setExceptionalOpeningMessage(event.target.value)} className="mt-2 min-h-20 bg-white" />
+        <Label className="mt-4 block text-xs font-bold text-foreground">Message spécial public si validé</Label>
+        <Textarea value={specialMessage} onChange={(event) => setSpecialMessage(event.target.value)} className="mt-2 min-h-24 bg-white" />
+        <Button onClick={saveSchedule} disabled={saving || loading} className="mt-4 w-full bg-brand text-white hover:bg-brand-dark sm:w-auto">
+          {saving ? <Loader2 className="size-4 animate-spin" /> : <CalendarClock className="size-4" />}
+          Enregistrer comme admin
+        </Button>
+      </Card>
+    </div>
   );
 }
 
 function Reference() {
+  const [medications, setMedications] = useState<AdminMedicationReferenceRow[]>([]);
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [verificationStatus, setVerificationStatus] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    genericName: "",
+    dosage: "",
+    form: "",
+    category: "Autres",
+    packSize: "",
+    manufacturer: "",
+    avgPrice: "",
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const params = new URLSearchParams({
+        scope: "admin",
+        q: query,
+        status,
+        verificationStatus,
+      });
+      const res = await fetch(`/api/medications?${params}`, { headers: { "x-sablin-session-kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement du référentiel impossible.");
+      setMedications(data.medications ?? []);
+      setSummary(data.summary ?? {});
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement du référentiel impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [query, status, verificationStatus]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const createMedication = async () => {
+    setSaving(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/medications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+        body: JSON.stringify({
+          ...form,
+          avgPrice: Number(form.avgPrice || 0),
+          verificationStatus: "Validé",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Ajout impossible.");
+      setMessage("Médicament ajouté au référentiel et audité.");
+      setForm({ name: "", genericName: "", dosage: "", form: "", category: "Autres", packSize: "", manufacturer: "", avgPrice: "" });
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Ajout impossible.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const disableMedication = async (id: string) => {
+    const res = await fetch("/api/medications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+      body: JSON.stringify({ id, action: "disable" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMessage(res.ok ? "Médicament désactivé dans le référentiel." : data?.error ?? "Désactivation impossible.");
+    if (res.ok) await load();
+  };
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -1684,33 +3466,65 @@ function Reference() {
       />
       <MetricsGrid
         metrics={[
-          { label: "Médicaments actifs", value: PHARMACY_PORTAL_MEDICATIONS.length, status: "Référentiel", icon: Pill },
-          { label: "Demandes à traiter", value: medicationRequestRows.filter((row) => row.status !== "Fusionné").length, status: "Validation admin", icon: ClipboardList },
-          { label: "Aliases contrôlés", value: 18, status: "Anti-doublon", icon: FileCheck2 },
-          { label: "Désactivations", value: 2, status: "Contrôle", icon: LockKeyhole },
+          { label: "Médicaments actifs", value: summary.active ?? 0, status: `${summary.visible ?? medications.length} affichés`, icon: Pill },
+          { label: "Publiés / validés", value: summary.published ?? 0, status: "Marketplace", icon: CheckCircle2 },
+          { label: "À vérifier", value: summary.toVerify ?? 0, status: "Contrôle", icon: AlertTriangle },
+          { label: "Demandes à traiter", value: summary.requestsPending ?? 0, status: "Validation admin", icon: ClipboardList },
+          { label: "Désactivés", value: summary.inactive ?? 0, status: "Contrôle", icon: LockKeyhole },
         ]}
       />
-      <AdminFilterPanel filters={["Nom commercial ou DCI", "Dosage", "Forme", "Catégorie", "Statut référentiel"]} />
       <Card className="border-border/70 p-5 shadow-card">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Field label="Nom commercial" />
-          <Field label="DCI" />
-          <Field label="Dosage" />
-          <Field label="Forme" />
-          <Field label="Catégorie" />
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_180px_220px_auto]">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, DCI, dosage, forme, fabricant..." className="bg-white" />
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous statuts</option>
+            <option value="Actif">Actif</option>
+            <option value="Inactif">Inactif</option>
+          </select>
+          <select value={verificationStatus} onChange={(event) => setVerificationStatus(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Toute vérification</option>
+            {["À vérifier", "Validé", "Publié", "Archivé", "Conflit"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <Button onClick={load} disabled={loading} className="bg-brand text-white hover:bg-brand-dark">
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Actualiser
+          </Button>
         </div>
-        <ProfessionalActionButton action="reference-update" label="Ajouter au référentiel" entityType="medication-reference" className="mt-4 bg-brand text-white hover:bg-brand-dark">
+      </Card>
+      <Card className="border-border/70 p-5 shadow-card">
+        <Heading level="h3">Ajouter au référentiel</Heading>
+        <Muted>Les pharmacies ne modifient pas ce référentiel. Les ajouts Admin sont tracés et peuvent ensuite alimenter les imports, la marketplace et les ordonnances.</Muted>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Nom commercial" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+          <Field label="DCI" value={form.genericName} onChange={(value) => setForm((current) => ({ ...current, genericName: value }))} />
+          <Field label="Dosage" value={form.dosage} onChange={(value) => setForm((current) => ({ ...current, dosage: value }))} />
+          <Field label="Forme" value={form.form} onChange={(value) => setForm((current) => ({ ...current, form: value }))} />
+          <Field label="Catégorie" value={form.category} onChange={(value) => setForm((current) => ({ ...current, category: value }))} />
+          <Field label="Conditionnement" value={form.packSize} onChange={(value) => setForm((current) => ({ ...current, packSize: value }))} />
+          <Field label="Fabricant" value={form.manufacturer} onChange={(value) => setForm((current) => ({ ...current, manufacturer: value }))} />
+          <Field label="Prix indicatif interne" value={form.avgPrice} onChange={(value) => setForm((current) => ({ ...current, avgPrice: value }))} />
+        </div>
+        <Button onClick={createMedication} disabled={saving} className="mt-4 bg-brand text-white hover:bg-brand-dark">
+          {saving ? <Loader2 className="size-4 animate-spin" /> : <Pill className="size-4" />}
           Ajouter au référentiel
-        </ProfessionalActionButton>
+        </Button>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
       </Card>
       <div className="grid gap-3 md:grid-cols-2">
-        {PHARMACY_PORTAL_MEDICATIONS.map((m) => (
-          <Card key={m.name} className="border-border/70 p-4 shadow-card">
+        {loading && <Card className="border-border/70 p-4 text-sm font-bold text-muted-foreground">Chargement du référentiel...</Card>}
+        {!loading && medications.length === 0 && <Card className="border-dashed border-border p-4 text-sm font-bold text-foreground">Aucun médicament ne correspond aux filtres.</Card>}
+        {medications.map((m) => (
+          <Card key={m.id} className="border-border/70 p-4 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <StatusBadge label="Actif" />
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge label={m.status} />
+                  <StatusBadge label={m.verificationStatus} />
+                  <StatusBadge label={`${m.counts.pharmacies} pharmacie(s)`} />
+                </div>
                 <p className="mt-3 font-bold text-foreground">{m.name}</p>
-                <p className="text-sm text-muted-foreground">{m.dci} · {m.dosage} · {m.form} · {m.category}</p>
+                <p className="text-sm text-muted-foreground">{m.genericName} · {m.dosage} · {m.form} · {m.category?.name ?? "Catégorie à vérifier"}</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">Images : {m.counts.images} · Alias : {m.counts.aliases} · Prix indicatif interne : {formatFcfa(m.avgPrice)}</p>
               </div>
               <Badge className="border border-border bg-white text-foreground">Marketplace</Badge>
             </div>
@@ -1718,9 +3532,9 @@ function Reference() {
               <ProfessionalActionButton action="reference-update" label="Modifier" entityType="medication-reference" entityId={m.name} size="sm" variant="outline">
                 Modifier
               </ProfessionalActionButton>
-              <ProfessionalActionButton action="reference-disable" label="Désactiver" entityType="medication-reference" entityId={m.name} size="sm" variant="outline" className="border-red-300 text-red-700">
+              <Button size="sm" variant="outline" className="border-red-300 text-red-700" onClick={() => disableMedication(m.id)}>
                 Désactiver
-              </ProfessionalActionButton>
+              </Button>
             </div>
           </Card>
         ))}
@@ -1735,25 +3549,39 @@ type ProhibitedMedicationTermView = {
   normalizedName: string;
   reason?: string | null;
   active: boolean;
+  createdBy?: string | null;
   createdAt: string;
+  updatedAt?: string | null;
   disabledAt?: string | null;
+  disabledBy?: string | null;
 };
 
 function ProhibitedMedicationsAdmin() {
   const [terms, setTerms] = useState<ProhibitedMedicationTermView[]>([]);
+  const [summary, setSummary] = useState({ total: 0, active: 0, inactive: 0, blockedImportRows: 0, visible: 0 });
+  const [recentActions, setRecentActions] = useState<Array<{ id: string; label: string; status: string; actorRole?: string | null; message?: string | null; createdAt: string }>>([]);
   const [name, setName] = useState("");
   const [reason, setReason] = useState("");
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/prohibited-medications?includeInactive=true", {
+    const params = new URLSearchParams({ includeInactive: "true", status: statusFilter });
+    if (query.trim()) params.set("q", query.trim());
+    const res = await fetch(`/api/admin/prohibited-medications?${params}`, {
       headers: { "X-Sablin-Session-Kind": "admin" },
     });
     const json = await res.json().catch(() => ({}));
-    if (res.ok) setTerms(json.terms ?? []);
-    else setMessage(json.error ?? "Chargement impossible.");
-  }, []);
+    if (res.ok) {
+      setTerms(json.terms ?? []);
+      setSummary(json.summary ?? { total: 0, active: 0, inactive: 0, blockedImportRows: 0, visible: 0 });
+      setRecentActions(json.recentActions ?? []);
+    } else {
+      setMessage(json.error ?? "Chargement impossible.");
+    }
+  }, [query, statusFilter]);
 
   useEffect(() => {
     load();
@@ -1783,21 +3611,21 @@ function ProhibitedMedicationsAdmin() {
     await load();
   };
 
-  const disableTerm = async (id: string) => {
+  const updateTerm = async (id: string, action: "disable" | "enable") => {
     setLoading(true);
     setMessage("");
     const res = await fetch("/api/admin/prohibited-medications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({ id, action }),
     });
     const json = await res.json().catch(() => ({}));
     setLoading(false);
     if (!res.ok) {
-      setMessage(json.error ?? "Désactivation impossible.");
+      setMessage(json.error ?? "Mise à jour impossible.");
       return;
     }
-    setMessage("Règle désactivée.");
+    setMessage(action === "enable" ? "Règle réactivée." : "Règle désactivée.");
     await load();
   };
 
@@ -1815,7 +3643,10 @@ function ProhibitedMedicationsAdmin() {
               Les pharmacies publient librement les produits autorisés, mais ces noms sont retirés sans intervention manuelle.
             </Muted>
           </div>
-          <Badge className="w-fit border-0 bg-brand text-white">{activeTerms.length} règle(s) active(s)</Badge>
+          <div className="flex flex-wrap gap-2">
+            <Badge className="w-fit border-0 bg-brand text-white">{summary.active} active(s)</Badge>
+            <StatusBadge label={`${summary.blockedImportRows} ligne(s) bloquée(s)`} />
+          </div>
         </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto]">
@@ -1835,8 +3666,39 @@ function ProhibitedMedicationsAdmin() {
             Ajouter
           </Button>
         </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px_auto]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") load();
+              }}
+              placeholder="Rechercher une règle, un motif ou un nom normalisé"
+              className="bg-white pl-9"
+            />
+          </div>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Toutes les règles</option>
+            <option value="active">Actives uniquement</option>
+            <option value="inactive">Désactivées uniquement</option>
+          </select>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load} disabled={loading}>
+            <Filter className="size-4" /> Filtrer
+          </Button>
+        </div>
         {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
       </Card>
+
+      <MetricsGrid
+        metrics={[
+          { label: "Règles totales", value: summary.total, status: "Référentiel interdit", icon: ShieldCheck },
+          { label: "Règles actives", value: summary.active, status: "Blocage actif", icon: LockKeyhole },
+          { label: "Règles désactivées", value: summary.inactive, status: "Historisées", icon: History },
+          { label: "Lignes import retirées", value: summary.blockedImportRows, status: "Publication contrôlée", icon: FileCheck2 },
+        ]}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <SectionBlock
@@ -1851,11 +3713,12 @@ function ProhibitedMedicationsAdmin() {
                     <StatusBadge label="Blocage actif" />
                     <p className="mt-3 font-extrabold text-foreground">{term.name}</p>
                     <p className="text-xs font-semibold text-muted-foreground">Nom normalisé : {term.normalizedName}</p>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">Créé : {formatDateTime(term.createdAt)} · {term.createdBy ?? "Administration"}</p>
                   </div>
                   <Button
                     variant="outline"
                     className="border-red-200 text-red-700 hover:bg-red-50"
-                    onClick={() => disableTerm(term.id)}
+                    onClick={() => updateTerm(term.id, "disable")}
                     disabled={loading}
                   >
                     Désactiver
@@ -1878,13 +3741,39 @@ function ProhibitedMedicationsAdmin() {
               <Card key={term.id} className="border-border/70 p-3">
                 <StatusBadge label="Désactivée" />
                 <p className="mt-2 text-sm font-extrabold text-foreground">{term.name}</p>
-                <p className="text-xs font-semibold text-muted-foreground">{term.disabledAt ? formatDateTime(term.disabledAt) : "Date non renseignée"}</p>
+                <p className="text-xs font-semibold text-muted-foreground">{term.disabledAt ? formatDateTime(term.disabledAt) : "Date non renseignée"} · {term.disabledBy ?? "Administration"}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 border-brand/30 text-brand-dark hover:bg-brand-light"
+                  onClick={() => updateTerm(term.id, "enable")}
+                  disabled={loading}
+                >
+                  Réactiver
+                </Button>
               </Card>
             ))}
             {!inactiveTerms.length && <p className="text-sm font-semibold text-muted-foreground">Aucune règle désactivée.</p>}
           </div>
         </SectionBlock>
       </div>
+
+      <SectionBlock title="Audit des règles interdites" description="Chaque ajout, désactivation ou réactivation est journalisé côté Admin.">
+        <ResponsiveTable
+          headers={["Date", "Action", "Rôle", "Statut", "Message"]}
+          rows={
+            recentActions.length
+              ? recentActions.map((action) => [
+                  formatDateTime(action.createdAt),
+                  <span key="label" className="font-bold text-foreground">{action.label}</span>,
+                  action.actorRole ?? "Admin",
+                  <StatusBadge key="status" label={action.status} />,
+                  action.message ?? "Action enregistrée",
+                ])
+              : [["-", "Aucune action récente", "-", "-", ""]]
+          }
+        />
+      </SectionBlock>
     </div>
   );
 }
@@ -2461,6 +4350,36 @@ function MarketplaceEngineAdmin() {
 }
 
 function UsersList() {
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [summary, setSummary] = useState<AdminUsersSummary>(emptyAdminUsersSummary);
+  const [query, setQuery] = useState("");
+  const [commune, setCommune] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const params = new URLSearchParams({ limit: "80" });
+      if (query.trim()) params.set("q", query.trim());
+      if (commune.trim()) params.set("commune", commune.trim());
+      const res = await fetch(`/api/admin/users?${params}`, { headers: { "x-sablin-session-kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des utilisateurs impossible.");
+      setUsers(data.users ?? []);
+      setSummary({ ...emptyAdminUsersSummary, ...(data.summary ?? {}) });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des utilisateurs impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [commune, query]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -2471,31 +4390,49 @@ function UsersList() {
       />
       <MetricsGrid
         metrics={[
-          { label: "Utilisateurs suivis", value: adminUsers.length, status: "Actifs et support", icon: Users },
-          { label: "Avec crédits", value: adminUsers.filter((u) => u.credits > 0).length, status: "Crédits SABLIN", icon: WalletCards },
-          { label: "Solde insuffisant", value: adminUsers.filter((u) => u.credits === 0).length, status: "À accompagner", icon: AlertTriangle },
-          { label: "Ordonnances", value: adminUsers.reduce((sum, user) => sum + user.prescriptions, 0), status: "Pass / crédits", icon: ClipboardList },
+          { label: "Utilisateurs suivis", value: summary.totalUsers, status: `${summary.listedUsers} affichés`, icon: Users },
+          { label: "Avec crédits", value: summary.usersWithCredits, status: "Crédits SABLIN", icon: WalletCards },
+          { label: "Solde insuffisant", value: summary.zeroCreditUsers, status: "À accompagner", icon: AlertTriangle },
+          { label: "Transactions visibles", value: summary.totalTransactionsVisible, status: "Serveur", icon: ClipboardList },
         ]}
       />
-      <AdminFilterPanel filters={["Recherche utilisateur, téléphone, e-mail", "Commune", "Solde crédits", "Activité", "Statut compte"]} />
       <Card className="border-border/70 p-5 shadow-card">
+        <div className="grid gap-3 lg:grid-cols-[1fr_220px_auto]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, téléphone, e-mail ou commune" className="bg-white pl-9" />
+          </div>
+          <Input value={commune} onChange={(event) => setCommune(event.target.value)} placeholder="Commune" className="bg-white" />
+          <Button onClick={load} disabled={loading} className="bg-brand text-white hover:bg-brand-dark">
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Actualiser
+          </Button>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{message}</p>}
         <div className="overflow-x-auto rounded-xl border border-border">
         <table className="w-full min-w-[980px] text-sm">
           <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
-            <tr>{["Nom", "Téléphone", "Email", "Commune", "Solde", "Transactions", "Ordonnances", "Statut", "Dernière activité", "Action"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
+            <tr>{["Nom", "Téléphone", "Email", "Commune", "Solde", "Transactions", "Demandes", "Pass", "Statut", "Dernière activité", "Action"].map((h) => <th key={h} className="px-4 py-3">{h}</th>)}</tr>
           </thead>
           <tbody className="divide-y divide-border bg-white">
-            {adminUsers.map((user) => (
+            {loading && (
+              <tr><td colSpan={11} className="px-4 py-6 text-center font-bold text-muted-foreground">Chargement des utilisateurs réels...</td></tr>
+            )}
+            {!loading && users.length === 0 && (
+              <tr><td colSpan={11} className="px-4 py-8 text-center font-bold text-foreground">Aucun utilisateur trouvé pour ces filtres.</td></tr>
+            )}
+            {!loading && users.map((user) => (
               <tr key={user.id}>
                 <td className="px-4 py-3 font-bold">{user.name}</td>
-                <td className="px-4 py-3">{user.phone}</td>
-                <td className="px-4 py-3">{user.email}</td>
-                <td className="px-4 py-3">{user.commune}</td>
+                <td className="px-4 py-3">{user.phone ?? "Non renseigné"}</td>
+                <td className="px-4 py-3">{user.email ?? "Non renseigné"}</td>
+                <td className="px-4 py-3">{user.commune ?? "Non renseignée"}</td>
                 <td className="px-4 py-3">{user.credits} crédits</td>
-                <td className="px-4 py-3">{user.transactions}</td>
-                <td className="px-4 py-3">{user.prescriptions}</td>
+                <td className="px-4 py-3">{user.counts.transactions}</td>
+                <td className="px-4 py-3">{user.counts.requests}</td>
+                <td className="px-4 py-3"><StatusBadge label={user.passStatus} /></td>
                 <td className="px-4 py-3"><StatusBadge label={user.status} /></td>
-                <td className="px-4 py-3">{user.activity}</td>
+                <td className="px-4 py-3">{formatDateTime(user.lastActivity)}</td>
                 <td className="px-4 py-3"><Button size="sm" className="bg-brand text-white" onClick={() => (window.location.href = `/admin/utilisateurs/${user.id}`)}>Voir détail</Button></td>
               </tr>
             ))}
@@ -2506,10 +4443,10 @@ function UsersList() {
       <ActionQueue
         title="File support utilisateurs"
         items={[
-          { title: "Solde insuffisant", detail: "Aider l’utilisateur à recharger ou comprendre les crédits SABLIN.", status: "Support" },
-          { title: "Paiement en vérification", detail: "Vérifier le statut serveur avant tout crédit ou Pass.", status: "Paiement" },
-          { title: "Contact pharmacie débloqué", detail: "Contrôler la transaction et l’accès temporaire si besoin.", status: "Crédits" },
-          { title: "Ordonnance bloquée", detail: "Confirmer crédit suffisant ou Pass Ordonnance Unique actif.", status: "Restriction" },
+          { title: "Soldes insuffisants", detail: `${summary.zeroCreditUsers} comptes sans crédit doivent voir des invitations claires à recharger.`, status: "Support" },
+          { title: "Demandes ouvertes", detail: `${summary.pendingRequests} demandes utilisateurs sont encore en cours côté pharmacies.`, status: "Demandes" },
+          { title: "Transactions du jour", detail: `${summary.transactionsToday} mouvements de crédits ont été enregistrés aujourd’hui.`, status: "Crédits" },
+          { title: "Pass suivis", detail: `${summary.totalPassVisible} Pass Ordonnance Unique visibles dans la sélection courante.`, status: "Pass Ordonnance Unique" },
         ]}
       />
     </div>
@@ -2517,13 +4454,38 @@ function UsersList() {
 }
 
 function Transactions() {
-  const rows = [
-    { action: "Recharge crédits", user: "Demo SABLIN", amount: "500 FCFA", credits: "+6", before: "4", after: "10", status: "Réussi", ref: "SP-PAY-2026-000101" },
-    { action: "Achat Pass Ordonnance Unique", user: "Awa Koné", amount: "500 FCFA", credits: "Pass", before: "0", after: "0", status: "Confirmé", ref: "SP-PAY-2026-000102" },
-    { action: "Contact débloqué", user: "Moussa Traoré", amount: "100 FCFA", credits: "-1", before: "7", after: "6", status: "Réussi", ref: "SP-CRD-2026-000103" },
-    { action: "Paiement échoué", user: "Awa Koné", amount: "1 000 FCFA", credits: "0", before: "0", after: "0", status: "Échoué", ref: "SP-PAY-2026-000104" },
-    { action: "Remboursement support", user: "Demo SABLIN", amount: "200 FCFA", credits: "-2", before: "12", after: "10", status: "Vérification manuelle", ref: "SP-RFD-2026-000105" },
-  ];
+  const [rows, setRows] = useState<AdminTransactionRow[]>([]);
+  const [summary, setSummary] = useState<AdminTransactionsSummary>(emptyAdminTransactionsSummary);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [type, setType] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const params = new URLSearchParams({ limit: "100" });
+      if (query.trim()) params.set("q", query.trim());
+      if (status !== "all") params.set("status", status);
+      if (type !== "all") params.set("type", type);
+      const res = await fetch(`/api/admin/transactions?${params}`, { headers: { "x-sablin-session-kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des transactions impossible.");
+      setRows(data.rows ?? []);
+      setSummary({ ...emptyAdminTransactionsSummary, ...(data.summary ?? {}) });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des transactions impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [query, status, type]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -2534,41 +4496,132 @@ function Transactions() {
       />
       <MetricsGrid
         metrics={[
-          { label: "Crédits vendus", value: "47", status: "Confirmé", icon: WalletCards },
-          { label: "Recharges", value: "12", status: "SUCCESS", icon: CheckCircle2 },
-          { label: "Pass achetés", value: "4", status: "500 FCFA", icon: FileCheck2 },
-          { label: "Anomalies", value: "1", status: "À vérifier", icon: AlertTriangle },
+          { label: "Crédits vendus", value: summary.creditsSold, status: formatFcfa(summary.creditsSoldFcfa), icon: WalletCards },
+          { label: "Crédits utilisés", value: summary.creditsDebited, status: formatFcfa(summary.creditsDebitedFcfa), icon: Activity },
+          { label: "Net crédits serveur", value: summary.netCredits, status: "Recharges - débits", icon: Database },
+          { label: "Transactions du jour", value: summary.todayTransactions, status: "Serveur", icon: CheckCircle2 },
+          { label: "Paiements confirmés", value: summary.successfulPayments, status: `${summary.pendingPayments} en attente`, icon: ShieldCheck },
+          { label: "Pass actifs", value: summary.activePassCount, status: `${summary.passCount} achetés`, icon: FileCheck2 },
+          { label: "Utilisateurs concernés", value: summary.usersImpacted, status: `${summary.totalMovements} mouvements`, icon: Users },
+          { label: "Anomalies", value: summary.failedPayments + summary.suspiciousPayments, status: "À vérifier", icon: AlertTriangle },
         ]}
       />
-      <AdminFilterPanel filters={["Référence", "Utilisateur", "Type d’action", "Statut", "Date"]} />
       <Card className="border-border/70 p-5 shadow-card">
+        <div className="grid gap-3 xl:grid-cols-[1fr_180px_180px_auto]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Référence, utilisateur, prestataire ou description" className="bg-white pl-9" />
+          </div>
+          <select value={type} onChange={(event) => setType(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous types</option>
+            <option value="recharge">Recharges</option>
+            <option value="debit">Débits crédits</option>
+            <option value="pass">Pass Ordonnance</option>
+          </select>
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous statuts</option>
+            <option value="réussi">Réussi</option>
+            <option value="échoué">Échoué</option>
+            <option value="SUCCESS">SUCCESS</option>
+            <option value="PENDING">PENDING</option>
+            <option value="SUSPICIOUS">SUSPICIOUS</option>
+          </select>
+          <Button onClick={load} disabled={loading} className="bg-brand text-white hover:bg-brand-dark">
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Actualiser
+          </Button>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{message}</p>}
+        {loading && <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm font-bold text-muted-foreground">Chargement des mouvements serveur...</p>}
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          <Card className="border-border/70 p-4">
+            <p className="text-sm font-extrabold text-foreground">Règle comptable</p>
+            <p className="mt-1 text-xs font-semibold text-muted-foreground">1 crédit = 100 FCFA. Les crédits affichés proviennent des transactions serveur, jamais du navigateur.</p>
+          </Card>
+          <Card className="border-border/70 p-4">
+            <p className="text-sm font-extrabold text-foreground">Pass Ordonnance Unique</p>
+            <p className="mt-1 text-xs font-semibold text-muted-foreground">{summary.activePassCount} pass actif(s) ou lié(s). Un pass utilisé ou expiré ne débloque plus une nouvelle ordonnance.</p>
+          </Card>
+          <Card className="border-border/70 p-4">
+            <p className="text-sm font-extrabold text-foreground">Paiements à surveiller</p>
+            <p className="mt-1 text-xs font-semibold text-muted-foreground">{summary.pendingPayments} paiement(s) en attente de confirmation officielle, {summary.suspiciousPayments} suspect(s).</p>
+          </Card>
+        </div>
         <ResponsiveTable
           headers={["Action", "Utilisateur", "Montant", "Crédits", "Solde avant", "Solde après", "Statut", "Référence", "Actions"]}
           rows={rows.map((row) => [
             <span key="action" className="font-bold text-foreground">{row.action}</span>,
             row.user,
-            row.amount,
-            row.credits,
-            row.before,
-            row.after,
+            formatFcfa(row.amountFcfa),
+            `${row.credits > 0 ? "+" : ""}${row.credits}`,
+            row.balanceBefore ?? "Paiement",
+            row.balanceAfter ?? "Vérification",
             <StatusBadge key="status" label={row.status} />,
-            <span key="ref" className="font-mono text-xs font-bold">{row.ref}</span>,
-            <ProfessionalActionButton key="btn" action="refund-transaction" label="Analyser" entityType="transaction" entityId={row.ref} size="sm" variant="outline">Analyser</ProfessionalActionButton>,
+            <span key="ref" className="break-all font-mono text-xs font-bold">{row.reference}</span>,
+            <ProfessionalActionButton key="btn" action="refund-transaction" label="Analyser" entityType={row.source} entityId={row.reference} size="sm" variant="outline">Analyser</ProfessionalActionButton>,
           ])}
         />
+        {!loading && rows.length === 0 && <p className="mt-4 rounded-lg border border-dashed border-border p-6 text-center text-sm font-bold text-foreground">Aucune transaction trouvée pour ces filtres.</p>}
       </Card>
     </div>
   );
 }
 
 function UserDetail({ userId }: { userId?: string }) {
-  const user = adminUsers.find((item) => item.id === userId) ?? adminUsers[0];
+  const [user, setUser] = useState<AdminUserRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    if (!userId) {
+      setMessage("Utilisateur introuvable.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    try {
+      const params = new URLSearchParams({ userId, limit: "1" });
+      const res = await fetch(`/api/admin/users?${params}`, { headers: { "x-sablin-session-kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement du dossier utilisateur impossible.");
+      setUser(data.user ?? null);
+      if (!data.user) setMessage("Utilisateur introuvable dans la base.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement du dossier utilisateur impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) {
+    return (
+      <Card className="border-border/70 p-6 text-sm font-bold text-muted-foreground shadow-card">
+        Chargement du dossier utilisateur réel...
+      </Card>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Card className="border-border/70 p-6 shadow-card">
+        <Heading level="h2">Utilisateur introuvable</Heading>
+        <Muted className="mt-2">{message || "Aucun compte ne correspond à cet identifiant."}</Muted>
+        <Button className="mt-4 bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = "/admin/utilisateurs")}>Retour aux utilisateurs</Button>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <AdminHero
         badge={user.status}
         title={user.name}
-        description={`${user.phone} · ${user.email} · ${user.commune}. Actions support sans mot de passe en clair.`}
+        description={`${user.phone ?? "Téléphone non renseigné"} · ${user.email ?? "E-mail non renseigné"} · ${user.commune ?? "Commune non renseignée"}. Actions support sans mot de passe en clair.`}
         icon={Users}
         actions={
           <ProfessionalActionButton action="user-block-toggle" label="Bloquer ou débloquer" entityType="user" entityId={user.id} variant="outline" className="border-red-300 text-red-700">
@@ -2579,19 +4632,109 @@ function UserDetail({ userId }: { userId?: string }) {
       <MetricsGrid
         metrics={[
           { label: "Solde crédits", value: `${user.credits} crédits`, status: "Crédits SABLIN", icon: WalletCards },
-          { label: "Transactions", value: user.transactions, status: "Historique", icon: History },
-          { label: "Ordonnances", value: user.prescriptions, status: "Pass Ordonnance Unique", icon: ClipboardList },
-          { label: "Dernière activité", value: user.activity, status: "Actif", icon: Activity },
+          { label: "Transactions", value: user.counts.transactions, status: "Historique serveur", icon: History },
+          { label: "Demandes", value: user.counts.requests, status: "Pharmacies", icon: ClipboardList },
+          { label: "Dernière activité", value: formatDateTime(user.lastActivity), status: user.passStatus, icon: Activity },
         ]}
       />
-      <ActionQueue
-        title="Dossier utilisateur"
-        items={["Historique transactions", "Ordonnances", "Pharmacies consultées", "Contacts débloqués", "Pass acheté/utilisé/expiré", "Notifications", "Actions support", "Note interne"].map((item) => ({
-          title: item,
-          detail: "Consultation ou action support journalisée côté administration.",
-          status: item.includes("Pass") ? "Pass Ordonnance Unique" : "Support",
-        }))}
-      />
+      {message && <p className="rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      <div className="grid gap-5 xl:grid-cols-2">
+        <SectionBlock title="Transactions crédits" description="Débits, recharges, Pass et corrections visibles depuis la base.">
+          <div className="grid gap-3">
+            {user.recent.transactions.length === 0 && <p className="text-sm font-bold text-muted-foreground">Aucune transaction récente.</p>}
+            {user.recent.transactions.map((item) => (
+              <Card key={item.id} className="border-border/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-extrabold text-foreground">{item.description}</p>
+                    <p className="text-xs font-bold text-muted-foreground">{formatDateTime(item.createdAt)} · {item.reference ?? "Sans référence"}</p>
+                  </div>
+                  <StatusBadge label={item.status} />
+                </div>
+                <p className="mt-2 text-sm font-bold text-foreground">
+                  {item.amount > 0 ? "+" : ""}{item.amount} crédits · {formatFcfa(item.fcfaEquivalent)} · solde {item.balanceBefore} → {item.balanceAfter}
+                </p>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+
+        <SectionBlock title="Paiements et Pass Ordonnance Unique" description="Aucun Pass ne doit être actif sans paiement confirmé côté serveur.">
+          <div className="grid gap-3">
+            {[...user.recent.payments, ...user.recent.passOrdonnances].length === 0 && <p className="text-sm font-bold text-muted-foreground">Aucun paiement ou pass récent.</p>}
+            {user.recent.payments.map((item) => (
+              <Card key={item.id} className="border-border/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-extrabold text-foreground">{item.productType === "pass_ordonnance" ? "Pass Ordonnance Unique" : "Recharge crédits"}</p>
+                    <p className="text-xs font-bold text-muted-foreground">{item.reference} · {item.provider}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2"><StatusBadge label={item.status} /><StatusBadge label={item.riskStatus} /></div>
+                </div>
+                <p className="mt-2 text-sm font-bold text-foreground">{formatFcfa(item.amount)} · {formatDateTime(item.createdAt)}</p>
+              </Card>
+            ))}
+            {user.recent.passOrdonnances.map((item) => (
+              <Card key={item.id} className="border-border/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-extrabold text-foreground">Pass Ordonnance Unique</p>
+                    <p className="text-xs font-bold text-muted-foreground">{item.paymentReference ?? "Référence non renseignée"} · {formatFcfa(item.price)}</p>
+                  </div>
+                  <StatusBadge label={item.status} />
+                </div>
+                <p className="mt-2 text-sm font-medium text-muted-foreground">Ordonnance : {item.ordonnanceId ?? "Non liée"} · Utilisé : {formatDateTime(item.usedAt)}</p>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-3">
+        <SectionBlock title="Demandes pharmacies" description="Conseils, confirmations, contacts ou demandes liées à ordonnance.">
+          <div className="grid gap-3">
+            {user.recent.requests.length === 0 && <p className="text-sm font-bold text-muted-foreground">Aucune demande récente.</p>}
+            {user.recent.requests.map((item) => (
+              <Card key={item.id} className="border-border/70 p-4">
+                <StatusBadge label={item.status} />
+                <p className="mt-2 font-extrabold text-foreground">{item.serviceName}</p>
+                <p className="text-xs font-bold text-muted-foreground">{item.reference} · {item.creditCost} crédit(s) · {formatDateTime(item.createdAt)}</p>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+        <SectionBlock title="Contacts débloqués" description="Accès temporaires aux contacts pharmacies, jamais gratuits.">
+          <div className="grid gap-3">
+            {user.recent.contacts.length === 0 && <p className="text-sm font-bold text-muted-foreground">Aucun contact débloqué récemment.</p>}
+            {user.recent.contacts.map((item) => (
+              <Card key={item.id} className="border-border/70 p-4">
+                <StatusBadge label={item.status} />
+                <p className="mt-2 font-extrabold text-foreground">{item.unlockType}</p>
+                <p className="text-xs font-bold text-muted-foreground">{item.creditCost} crédit(s) · expire {formatDateTime(item.expiresAt)}</p>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+        <SectionBlock title="Favoris et historique" description="Signaux utiles au support et à l’amélioration de l’expérience utilisateur.">
+          <div className="grid gap-3">
+            {[...user.recent.favorites, ...user.recent.history].length === 0 && <p className="text-sm font-bold text-muted-foreground">Aucun signal récent.</p>}
+            {user.recent.favorites.map((item) => (
+              <Card key={item.id} className="border-border/70 p-4">
+                <StatusBadge label={item.kind} />
+                <p className="mt-2 font-extrabold text-foreground">{item.label}</p>
+                <p className="text-xs font-bold text-muted-foreground">Favori · {formatDateTime(item.createdAt)}</p>
+              </Card>
+            ))}
+            {user.recent.history.map((item) => (
+              <Card key={item.id} className="border-border/70 p-4">
+                <StatusBadge label={item.kind} />
+                <p className="mt-2 font-extrabold text-foreground">{item.label}</p>
+                <p className="text-xs font-bold text-muted-foreground">Historique · {formatDateTime(item.createdAt)}</p>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+      </div>
     </div>
   );
 }
@@ -2600,48 +4743,250 @@ type AdminPaymentRow = {
   reference: string;
   providerReference?: string | null;
   user: string;
+  userContact?: string | null;
   amount: number;
+  currency?: string;
+  method?: string;
   productType: string;
   expectedCredits: number;
   provider: string;
   status: string;
   statusLabel: string;
   riskStatus: string;
+  riskScore?: number;
   riskReasons?: string | null;
+  webhookSignatureValid?: boolean;
   createdAt: string;
   expiresAt?: string | null;
+  processedAt?: string | null;
+  verifiedAt?: string | null;
+  refundedAt?: string | null;
+  manualReviewReason?: string | null;
+  manualValidatedBy?: string | null;
+  manualValidatedAt?: string | null;
+};
+
+type PaymentFraudAlert = {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  status: string;
+  createdAt: string;
+};
+
+type PaymentFraudAudit = {
+  id: string;
+  action: string;
+  entityId?: string | null;
+  actorName?: string | null;
+  actorRole?: string | null;
+  result: string;
+  comment?: string | null;
+  createdAt: string;
+};
+
+type AdminAdministratorRow = {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  role: string;
+  permissions: string[];
+  status: string;
+  mustResetPassword: boolean;
+  twoFactorEnabled: boolean;
+  twoFactorRecommended: boolean;
+  sessionVersion: number;
+  lastLoginAt?: string | null;
+  lastPasswordChangeAt?: string | null;
+  suspendedReason?: string | null;
+  internalNotes?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  counts: {
+    sessions: number;
+    auditLogs: number;
+    passwordResets: number;
+  };
+};
+
+type AdminAdministratorsSummary = {
+  total: number;
+  active: number;
+  pending: number;
+  suspended: number;
+  superAdmins: number;
+  mustResetPassword: number;
+  twoFactorEnabled: number;
+  visibleRows: number;
+};
+
+type AdminPharmacyListRow = {
+  id: string;
+  slug: string;
+  name: string;
+  commune: string;
+  district?: string | null;
+  managerName?: string | null;
+  phone?: string | null;
+  accountStatus: string;
+  publicationStatus: string;
+  dataQuality: string;
+  isOnDuty: boolean;
+  isOpen247: boolean;
+  hoursWeekday?: string | null;
+  hoursSaturday?: string | null;
+  hoursSunday?: string | null;
+  lastDataUpdate?: string | null;
+  medicationCount: number;
+  requestCount: number;
+  teamCount: number;
+  publicMediaCount: number;
+};
+
+type AdminPharmacyProfileData = {
+  id: string;
+  slug: string;
+  name: string;
+  managerName?: string | null;
+  managerRole?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  professionalEmail?: string | null;
+  authorizationNumber?: string | null;
+  commune?: string | null;
+  district?: string | null;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  landmark?: string | null;
+  coverageZone?: string | null;
+  description?: string | null;
+  accountStatus?: string | null;
+  publicationStatus?: string | null;
+  creationSource?: string | null;
+  dataQuality?: string | null;
+  isOnDuty?: boolean | null;
+  isOpen247?: boolean | null;
+  services?: string[];
+  mediaCount?: number;
+  medicationCount?: number;
+  completenessScore?: number;
+  lastDataUpdate?: string | null;
+  internalNotes?: string | null;
+};
+
+type AdminPharmacyInventoryItem = {
+  id: string;
+  pharmacy: string;
+  medication: string;
+  dci: string;
+  dosage: string;
+  form: string;
+  category: string;
+  price: number;
+  internalQuantity?: number | null;
+  privateStatus: string;
+  publicStatus: string;
+  dataSource: string;
+  reliabilityLevel: string;
+  lastUpdatedAt: string;
+  remark?: string | null;
+};
+
+type AdminMedicationReferenceRow = {
+  id: string;
+  name: string;
+  slug: string;
+  genericName: string;
+  dosage: string;
+  form: string;
+  packSize: string;
+  packaging?: string | null;
+  manufacturer?: string | null;
+  barcode?: string | null;
+  category?: { name: string; slug: string } | null;
+  status: string;
+  verificationStatus: string;
+  confidenceLevel: number;
+  requiresRx: boolean;
+  avgPrice: number;
+  verifiedAt?: string | null;
+  verifiedBy?: string | null;
+  createdAt: string;
+  counts: {
+    pharmacies: number;
+    addRequests: number;
+    images: number;
+    aliases: number;
+  };
+};
+
+type AdminMedicationAddRequestRow = {
+  id: string;
+  proposedName: string;
+  genericName?: string | null;
+  dosage?: string | null;
+  form?: string | null;
+  packaging?: string | null;
+  manufacturer?: string | null;
+  remark?: string | null;
+  status: string;
+  createdByRole: string;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  pharmacy?: { name: string; slug: string; commune: string; district?: string | null } | null;
+  medication?: { name: string; slug: string } | null;
 };
 
 function PaymentsFraud() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<Record<string, number>>({});
   const [payments, setPayments] = useState<AdminPaymentRow[]>([]);
+  const [alerts, setAlerts] = useState<PaymentFraudAlert[]>([]);
+  const [audits, setAudits] = useState<PaymentFraudAudit[]>([]);
   const [filter, setFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [riskFilter, setRiskFilter] = useState("all");
+  const [providerFilter, setProviderFilter] = useState("all");
+  const [productFilter, setProductFilter] = useState("all");
   const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/payments/reconcile", { headers: { "x-sablin-session-kind": "admin" } });
+      const params = new URLSearchParams({
+        q: filter,
+        status: statusFilter,
+        risk: riskFilter,
+        provider: providerFilter,
+        productType: productFilter,
+      });
+      const res = await fetch(`/api/admin/payments-fraud?${params}`, { headers: { "x-sablin-session-kind": "admin" } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Chargement impossible");
       setSummary(data.summary ?? {});
-      setPayments(data.payments ?? []);
+      setPayments(data.rows ?? []);
+      setAlerts(data.alerts ?? []);
+      setAudits(data.audits ?? []);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Erreur de chargement");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filter, productFilter, providerFilter, riskFilter, statusFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const action = async (endpoint: string, body: Record<string, unknown>) => {
+  const action = async (endpoint: string, body: Record<string, unknown>, method = "POST") => {
     setMessage("");
     const res = await fetch(endpoint, {
-      method: "POST",
+      method,
       headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
       body: JSON.stringify(body),
     });
@@ -2650,24 +4995,26 @@ function PaymentsFraud() {
     await load();
   };
 
-  const visiblePayments = payments.filter((payment) => {
-    const q = filter.toLowerCase().trim();
-    if (!q) return true;
-    return [payment.reference, payment.user, payment.provider, payment.status, payment.riskStatus]
-      .join(" ")
-      .toLowerCase()
-      .includes(q);
-  });
-
   const cards = [
     ["Paiements totaux", summary.total ?? 0, "Tous statuts"],
+    ["Aujourd’hui", summary.today ?? 0, "Journalier"],
     ["Confirmés", summary.success ?? 0, "SUCCESS"],
     ["En attente", summary.pending ?? 0, "À vérifier"],
     ["Échoués", summary.failed ?? 0, "Bloqués"],
     ["Expirés", summary.expired ?? 0, "Sans crédit"],
     ["Suspects", summary.suspicious ?? 0, "Fraude"],
     ["Vérification manuelle", summary.manualReview ?? 0, "Finance"],
+    ["Remboursés", summary.refunded ?? 0, "Contrôle"],
+    ["Contestés", summary.chargeback ?? 0, "Litige"],
   ];
+
+  const resetFilters = () => {
+    setFilter("");
+    setStatusFilter("all");
+    setRiskFilter("all");
+    setProviderFilter("all");
+    setProductFilter("all");
+  };
 
   return (
     <div className="space-y-5">
@@ -2696,17 +5043,86 @@ function PaymentsFraud() {
       </Card>
 
       <Card className="border-border/70 p-5 shadow-card">
-        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.3fr_.8fr_.8fr_.8fr_.9fr_auto]">
           <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrer par référence, utilisateur, statut, risque..." />
-          <Button variant="outline" onClick={() => setFilter("")}>Réinitialiser</Button>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous les statuts</option>
+            <option value="INITIATED">Paiement initié</option>
+            <option value="PENDING">En attente</option>
+            <option value="PROCESSING">En cours</option>
+            <option value="SUCCESS">Confirmé</option>
+            <option value="FAILED">Échoué</option>
+            <option value="CANCELLED">Annulé</option>
+            <option value="EXPIRED">Expiré</option>
+            <option value="REJECTED">Rejeté</option>
+            <option value="SUSPICIOUS">Suspect</option>
+            <option value="REFUNDED">Remboursé</option>
+            <option value="CHARGEBACK">Contesté</option>
+            <option value="MANUAL_REVIEW">Vérification manuelle</option>
+          </select>
+          <select value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous les risques</option>
+            <option value="Normal">Normal</option>
+            <option value="À surveiller">À surveiller</option>
+            <option value="Suspect">Suspect</option>
+            <option value="Bloqué">Bloqué</option>
+          </select>
+          <select value={providerFilter} onChange={(event) => setProviderFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous les prestataires</option>
+            <option value="paydunya">PayDunya</option>
+            <option value="wave">Wave</option>
+            <option value="orange">Orange Money</option>
+            <option value="mtn">MTN Money</option>
+            <option value="moov">Moov Money</option>
+          </select>
+          <select value={productFilter} onChange={(event) => setProductFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous les achats</option>
+            <option value="credit_pack">Recharge crédits</option>
+            <option value="pass_ordonnance">Pass Ordonnance Unique</option>
+            <option value="legacy">Ancien paiement</option>
+          </select>
+          <Button variant="outline" onClick={resetFilters}>Réinitialiser</Button>
         </div>
         {message && (
           <div className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-semibold text-foreground">
             {message}
           </div>
         )}
+        <div className="mt-4 grid gap-3 xl:grid-cols-[1.2fr_.8fr]">
+          <Card className="border-border/70 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-extrabold text-foreground">Alertes paiement actives</p>
+                <p className="text-xs font-semibold text-muted-foreground">Webhooks invalides, montants incohérents, références suspectes et revues manuelles.</p>
+              </div>
+              <StatusBadge label={`${alerts.length} alerte(s)`} />
+            </div>
+            <div className="mt-3 grid gap-2">
+              {alerts.slice(0, 4).map((alert) => (
+                <div key={alert.id} className="rounded-lg border border-border bg-white p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="font-bold text-foreground">{alert.title}</p>
+                    <StatusBadge label={alert.type} />
+                  </div>
+                  <p className="mt-1 text-xs font-semibold text-muted-foreground">{alert.message}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(alert.createdAt)}</p>
+                </div>
+              ))}
+              {alerts.length === 0 && <p className="text-sm font-semibold text-muted-foreground">Aucune alerte paiement active.</p>}
+            </div>
+          </Card>
+          <Card className="border-border/70 p-4">
+            <p className="text-sm font-extrabold text-foreground">Règles de sécurité appliquées</p>
+            <div className="mt-3 grid gap-2 text-xs font-semibold text-muted-foreground">
+              <p>1. Le frontend ne valide jamais un paiement.</p>
+              <p>2. Seul le statut serveur SUCCESS ajoute des crédits ou active un Pass.</p>
+              <p>3. Les webhooks répétés restent idempotents.</p>
+              <p>4. Les remboursements exigent un rôle finance ou super admin.</p>
+            </div>
+          </Card>
+        </div>
         <div className="mt-4 grid gap-3">
-          {visiblePayments.map((payment) => (
+          {payments.map((payment) => (
             <Card key={payment.reference} className="border-border/70 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -2718,15 +5134,22 @@ function PaymentsFraud() {
                     {payment.productType === "pass_ordonnance" ? "Pass Ordonnance Unique" : `${payment.expectedCredits} crédits`} ·
                     Réf. prestataire : {payment.providerReference ?? "En attente"}
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Créé le {formatDateTime(payment.createdAt)}
+                    {payment.expiresAt ? ` · Expire le ${formatDateTime(payment.expiresAt)}` : ""}
+                    {payment.verifiedAt ? ` · Vérifié le ${formatDateTime(payment.verifiedAt)}` : ""}
+                  </p>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   <StatusBadge label={payment.statusLabel} />
                   <StatusBadge label={payment.riskStatus} />
+                  <StatusBadge label={`Risque ${payment.riskScore ?? 0}`} />
+                  <StatusBadge label={payment.webhookSignatureValid ? "Webhook signé" : "Webhook non confirmé"} />
                 </div>
               </div>
-              {payment.riskReasons && (
+              {(payment.riskReasons || payment.manualReviewReason) && (
                 <p className="mt-3 rounded-lg bg-danger-light px-3 py-2 text-xs font-semibold text-danger">
-                  {payment.riskReasons}
+                  {payment.riskReasons ?? payment.manualReviewReason}
                 </p>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
@@ -2736,13 +5159,16 @@ function PaymentsFraud() {
                 <Button size="sm" variant="outline" onClick={() => action("/api/payments/manual-review", { reference: payment.reference, reason: "Analyse manuelle demandée depuis le tableau anti-fraude." })}>
                   Revue manuelle
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => action("/api/admin/payments-fraud", { reference: payment.reference, action: "mark_suspicious", reason: "Anomalie signalée depuis le centre Paiements & fraudes." }, "PATCH")}>
+                  Marquer suspect
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => action("/api/payments/refund", { reference: payment.reference, reason: "Remboursement demandé depuis Paiements & Fraudes." })}>
                   Rembourser
                 </Button>
               </div>
             </Card>
           ))}
-          {!loading && visiblePayments.length === 0 && (
+          {!loading && payments.length === 0 && (
             <Card className="border-border/70 p-6 text-center">
               <p className="font-bold text-foreground">Aucun paiement trouvé</p>
               <p className="text-sm text-muted-foreground">Modifiez vos filtres ou actualisez la réconciliation.</p>
@@ -2750,11 +5176,110 @@ function PaymentsFraud() {
           )}
         </div>
       </Card>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <Heading level="h3">Audit paiement récent</Heading>
+            <Muted>Dernières actions sensibles liées aux paiements, sans secret ni clé API dans les journaux.</Muted>
+          </div>
+          <StatusBadge label={`${audits.length} trace(s)`} />
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {audits.map((item) => (
+            <Card key={item.id} className="border-border/70 p-4">
+              <div className="flex flex-wrap justify-between gap-2">
+                <p className="font-bold text-foreground">{item.action}</p>
+                <StatusBadge label={item.result} />
+              </div>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                {item.entityId ?? "Paiement"} · {item.actorName ?? "Système"} · {item.actorRole ?? "Serveur"}
+              </p>
+              {item.comment && <p className="mt-2 text-xs text-muted-foreground">{item.comment}</p>}
+              <p className="mt-2 text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</p>
+            </Card>
+          ))}
+          {audits.length === 0 && <p className="text-sm font-semibold text-muted-foreground">Aucune action paiement récente.</p>}
+        </div>
+      </Card>
     </div>
   );
 }
 
 function ProfessionalAccounts() {
+  const [members, setMembers] = useState<AdminProfessionalMember[]>([]);
+  const [invitations, setInvitations] = useState<AdminProfessionalInvitation[]>([]);
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("Tous");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const loadAccounts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/professional/team?scope=all", {
+        headers: { "x-sablin-session-kind": "admin" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des comptes professionnels impossible.");
+      setMembers(data.members ?? []);
+      setInvitations(data.invitations ?? []);
+      setSummary(data.summary ?? {});
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des comptes professionnels impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAccounts();
+  }, [loadAccounts]);
+
+  const updateMemberStatus = async (member: AdminProfessionalMember, status: "Actif" | "Suspendu" | "Révoqué") => {
+    const res = await fetch("/api/professional/team", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+      body: JSON.stringify({ membershipId: member.id, role: member.role, permissions: member.permissions, status }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMessage(res.ok ? "Compte professionnel mis à jour et journalisé." : data?.error ?? "Action impossible.");
+    await loadAccounts();
+  };
+
+  const updateInvitation = async (invitationId: string, status: "Annulée" | "Renvoyée") => {
+    const res = await fetch("/api/professional/team", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+      body: JSON.stringify({ invitationId, status }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMessage(res.ok ? "Invitation professionnelle mise à jour." : data?.error ?? "Action impossible.");
+    await loadAccounts();
+  };
+
+  const visibleMembers = members.filter((member) => {
+    const haystack = [
+      member.name,
+      member.email,
+      member.phone,
+      member.role,
+      member.status,
+      member.accountStatus,
+      member.pharmacy?.name,
+      member.pharmacy?.slug,
+      member.pharmacy?.commune,
+      member.pharmacy?.district,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const matchesQuery = !query.trim() || haystack.includes(query.trim().toLowerCase());
+    const matchesStatus = statusFilter === "Tous" || member.status === statusFilter || member.accountStatus === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -2765,33 +5290,84 @@ function ProfessionalAccounts() {
       />
       <MetricsGrid
         metrics={[
-          { label: "Comptes pro", value: professionalAccountRows.length, status: "Tous espaces", icon: UserCog },
-          { label: "Actifs", value: professionalAccountRows.filter((row) => row.status === "Actif").length, status: "Session autorisée", icon: CheckCircle2 },
-          { label: "En attente", value: professionalAccountRows.filter((row) => row.status === "En attente").length, status: "Invitation", icon: Bell },
-          { label: "Suspendus", value: professionalAccountRows.filter((row) => row.status === "Suspendu").length, status: "Bloqué", icon: LockKeyhole },
+          { label: "Comptes pro", value: summary.totalMembers ?? members.length, status: "Tous espaces", icon: UserCog },
+          { label: "Actifs", value: summary.activeMembers ?? members.filter((row) => row.status === "Actif").length, status: "Session autorisée", icon: CheckCircle2 },
+          { label: "En attente", value: summary.pendingInvitations ?? invitations.filter((row) => ["En attente", "Renvoyée"].includes(row.status)).length, status: "Invitation", icon: Bell },
+          { label: "Suspendus", value: summary.suspendedMembers ?? members.filter((row) => row.status === "Suspendu").length, status: "Bloqué", icon: LockKeyhole },
         ]}
       />
-      <AdminFilterPanel filters={["Recherche nom, e-mail, téléphone", "Rôle", "Statut", "Pharmacie rattachée", "Risque"]} />
+      <Card className="border-border/70 bg-white p-4 shadow-card">
+        <div className="flex flex-wrap items-center gap-2">
+          <SlidersHorizontal className="size-4 text-brand-dark" />
+          <p className="text-sm font-extrabold text-foreground">Filtres dynamiques</p>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_220px]">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, e-mail, téléphone, rôle ou pharmacie" className="bg-white text-foreground" />
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            {["Tous", "Actif", "Suspendu", "Révoqué", "ACTIVE", "SUSPENDED", "PENDING"].map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => { setQuery(""); setStatusFilter("Tous"); }}>Réinitialiser</Button>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={loadAccounts}>Actualiser</Button>
+        </div>
+      </Card>
       <div className="grid gap-3 md:grid-cols-2">
-        {professionalAccountRows.map((row) => (
-          <Card key={`${row.name}-${row.role}`} className="border-border/70 p-4 shadow-card">
+        {loading && <Card className="border-border/70 p-4 text-sm font-bold text-muted-foreground">Chargement des comptes professionnels...</Card>}
+        {!loading && visibleMembers.length === 0 && <Card className="border-dashed border-border p-4 text-sm font-bold text-foreground">Aucun compte professionnel ne correspond aux filtres.</Card>}
+        {visibleMembers.map((row) => (
+          <Card key={row.id} className="border-border/70 p-4 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-extrabold text-foreground">{row.name}</p>
-                <p className="text-sm font-medium text-muted-foreground">{row.role} · {row.scope}</p>
-                <p className="mt-1 text-xs font-semibold text-muted-foreground">Permissions : {row.permissions}</p>
-                <p className="text-xs font-semibold text-muted-foreground">Dernière connexion : {row.lastLogin}</p>
+                <p className="text-sm font-medium text-muted-foreground">{row.role} · {row.pharmacy?.name ?? "Pharmacie non renseignée"}</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">{row.email ?? row.phone ?? "Contact non renseigné"}</p>
+                <p className="text-xs font-semibold text-muted-foreground">Dernière connexion : {formatDateTime(row.lastLoginAt)}</p>
               </div>
-              <div className="flex flex-wrap gap-2"><StatusBadge label={row.status} /><StatusBadge label={row.risk} /></div>
+              <div className="flex flex-wrap gap-2"><StatusBadge label={row.status} /><StatusBadge label={row.accountStatus} /></div>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <ProfessionalActionButton action="professional-role-update" label="Modifier rôle" entityType="professional-account" entityId={row.name} size="sm" variant="outline">Modifier rôle</ProfessionalActionButton>
-              <ProfessionalActionButton action="professional-session-revoke" label="Révoquer session" entityType="professional-account" entityId={row.name} size="sm" variant="outline">Révoquer session</ProfessionalActionButton>
-              <ProfessionalActionButton action="professional-suspend" label="Suspendre" entityType="professional-account" entityId={row.name} size="sm" variant="outline" className="border-red-300 text-red-700">Suspendre</ProfessionalActionButton>
+              {(row.permissions.length ? row.permissions.slice(0, 7) : ["Permissions héritées du rôle"]).map((permission) => (
+                <StatusBadge key={permission} label={professionalPermissionLabel(permission)} />
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => updateMemberStatus(row, row.status === "Suspendu" ? "Actif" : "Suspendu")}>
+                {row.status === "Suspendu" ? "Réactiver" : "Suspendre"}
+              </Button>
+              <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => updateMemberStatus(row, "Révoqué")}>Révoquer</Button>
+              {row.pharmacy?.slug && (
+                <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => { window.location.href = `/admin/pharmacies/${row.pharmacy?.slug}/equipe`; }}>
+                  Gérer la pharmacie
+                </Button>
+              )}
             </div>
           </Card>
         ))}
       </div>
+      {invitations.length > 0 && (
+        <SectionBlock title="Invitations professionnelles" description="Les invitations restent liées à une pharmacie précise et expirent automatiquement.">
+          <div className="grid gap-3 md:grid-cols-2">
+            {invitations.slice(0, 12).map((invitation) => (
+              <Card key={invitation.id} className="border-border/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-extrabold text-foreground">{invitation.name}</p>
+                    <p className="text-sm font-medium text-muted-foreground">{invitation.role} · {invitation.pharmacy?.name ?? "Pharmacie non renseignée"}</p>
+                    <p className="text-xs font-semibold text-muted-foreground">{invitation.email ?? invitation.phone ?? "Contact non renseigné"} · Expire : {formatDateTime(invitation.expiresAt)}</p>
+                  </div>
+                  <StatusBadge label={invitation.status} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => updateInvitation(invitation.id, "Renvoyée")}>Renvoyer</Button>
+                  <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => updateInvitation(invitation.id, "Annulée")}>Annuler</Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </SectionBlock>
+      )}
+      {message && <p className="rounded-xl border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
       <SectionBlock title="Matrice des permissions" description="Séparation stricte entre espace pharmacie, administration globale, données, support et finance.">
         <ResponsiveTable
           headers={["Rôle", "Pharmacies", "Utilisateurs", "Paiements", "Portée"]}
@@ -2803,11 +5379,85 @@ function ProfessionalAccounts() {
 }
 
 function Administrators() {
-  const rows = [
-    { name: "Équipe SABLIN PHARMA", role: "SUPER_ADMIN", status: "Actif", activity: "Aujourd’hui" },
-    { name: "Contrôle données", role: "DATA_ADMIN", status: "Actif", activity: "Hier" },
-    { name: "Support SABLIN", role: "SUPPORT_ADMIN", status: "En attente", activity: "Invitation envoyée" },
-  ];
+  const [rows, setRows] = useState<AdminAdministratorRow[]>([]);
+  const [audits, setAudits] = useState<PaymentFraudAudit[]>([]);
+  const [summary, setSummary] = useState<AdminAdministratorsSummary>({
+    total: 0,
+    active: 0,
+    pending: 0,
+    suspended: 0,
+    superAdmins: 0,
+    mustResetPassword: 0,
+    twoFactorEnabled: 0,
+    visibleRows: 0,
+  });
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [role, setRole] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    role: "SUPPORT_ADMIN",
+    internalNotes: "",
+  });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ q: query, status, role });
+      const res = await fetch(`/api/admin/administrators?${params}`, { headers: { "x-sablin-session-kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des administrateurs impossible.");
+      setRows(data.rows ?? []);
+      setAudits(data.audits ?? []);
+      setSummary((current) => ({ ...current, ...(data.summary ?? {}) }));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des administrateurs impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [query, role, status]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const createAdministrator = async () => {
+    setSaving(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/administrators", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Création impossible.");
+      setMessage(data.message ?? "Compte administrateur créé.");
+      setForm({ name: "", email: "", phone: "", role: "SUPPORT_ADMIN", internalNotes: "" });
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Création impossible.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateAdministrator = async (account: AdminAdministratorRow, action: string, reason?: string) => {
+    const res = await fetch("/api/admin/administrators", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+      body: JSON.stringify({ accountId: account.id, action, reason: reason ?? `Action ${action} depuis Administrateurs.` }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMessage(res.ok ? "Action administrateur enregistrée et auditée." : data?.error ?? "Action refusée.");
+    await load();
+  };
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -2816,45 +5466,219 @@ function Administrators() {
         description="Création interne uniquement. Aucun administrateur ne peut s’inscrire publiquement, et les mots de passe ne sont jamais affichés en clair."
         icon={ShieldCheck}
       />
+      <MetricsGrid
+        metrics={[
+          { label: "Administrateurs", value: summary.total, status: `${summary.visibleRows} affiché(s)`, icon: ShieldCheck },
+          { label: "Actifs", value: summary.active, status: "Accès autorisé", icon: CheckCircle2 },
+          { label: "En attente", value: summary.pending, status: "Mot de passe à définir", icon: Bell },
+          { label: "Suspendus/Bloqués", value: summary.suspended, status: "Accès refusé", icon: LockKeyhole },
+          { label: "Super admins", value: summary.superAdmins, status: "Actions sensibles", icon: UserCog },
+          { label: "2FA activé", value: summary.twoFactorEnabled, status: `${summary.mustResetPassword} reset requis`, icon: ShieldCheck },
+        ]}
+      />
       <Card className="border-border/70 p-5 shadow-card">
-        <div className="grid gap-3 md:grid-cols-4">
-          <Field label="Nom administrateur" />
-          <Field label="Email professionnel" />
-          <Field label="Rôle" placeholder="DATA_ADMIN, SUPPORT_ADMIN..." />
-          <Field label="Permissions" placeholder="admin.pharmacies.read" />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <Heading level="h3">Créer un accès administrateur</Heading>
+            <Muted>Le compte est créé en attente, sans mot de passe visible. L’admin définit son mot de passe via un lien email sécurisé.</Muted>
+          </div>
+          <StatusBadge label="Super admin uniquement" />
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <Field label="Nom administrateur" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+          <Field label="Email professionnel" type="email" value={form.email} onChange={(value) => setForm((current) => ({ ...current, email: value }))} />
+          <Field label="Téléphone optionnel" value={form.phone} onChange={(value) => setForm((current) => ({ ...current, phone: value }))} />
+          <label className="text-sm font-semibold text-foreground">
+            Rôle
+            <select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))} className="mt-2 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              {["SUPPORT_ADMIN", "DATA_ADMIN", "PHARMACY_ADMIN", "FINANCE_ADMIN", "ADMIN", "SUPER_ADMIN"].map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <Field label="Note interne" value={form.internalNotes} onChange={(value) => setForm((current) => ({ ...current, internalNotes: value }))} />
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <ProfessionalActionButton action="admin-create" label="Créer administrateur" entityType="admin-account" className="bg-brand text-white hover:bg-brand-dark">
+          <Button onClick={createAdministrator} disabled={saving} className="bg-brand text-white hover:bg-brand-dark">
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
             Créer administrateur
-          </ProfessionalActionButton>
-          <ProfessionalActionButton action="admin-force-password-reset" label="Forcer réinitialisation" entityType="admin-account" variant="outline" className="border-brand/30 text-brand-dark">
-            Forcer réinitialisation
-          </ProfessionalActionButton>
+          </Button>
+          <Button variant="outline" onClick={() => setForm({ name: "", email: "", phone: "", role: "SUPPORT_ADMIN", internalNotes: "" })}>Réinitialiser</Button>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_220px_220px_auto]">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, email, téléphone, rôle ou note interne" className="bg-white" />
+          <select value={role} onChange={(event) => setRole(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous les rôles</option>
+            {["ADMIN", "DATA_ADMIN", "PHARMACY_ADMIN", "FINANCE_ADMIN", "SUPPORT_ADMIN", "SUPER_ADMIN"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous les statuts</option>
+            {["ACTIVE", "PENDING", "SUSPENDED", "BLOCKED", "ARCHIVED"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <Button onClick={load} disabled={loading} className="bg-brand text-white hover:bg-brand-dark">
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Actualiser
+          </Button>
         </div>
       </Card>
+
       <div className="grid gap-3 md:grid-cols-2">
+        {loading && <Card className="border-border/70 p-4 text-sm font-bold text-muted-foreground">Chargement des comptes administrateurs...</Card>}
+        {!loading && rows.length === 0 && <Card className="border-dashed border-border p-6 text-center text-sm font-bold text-foreground">Aucun administrateur ne correspond aux filtres.</Card>}
         {rows.map((row) => (
-          <Card key={row.name} className="border-border/70 p-4 shadow-card">
+          <Card key={row.id} className="border-border/70 p-4 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <p className="font-extrabold text-foreground">{row.name}</p>
-                <p className="text-sm font-medium text-muted-foreground">{row.role} · Activité : {row.activity}</p>
+                <p className="break-words text-sm font-medium text-muted-foreground">{row.email ?? row.phone ?? "Contact non renseigné"} · {row.role}</p>
+                <p className="text-xs font-semibold text-muted-foreground">Dernière connexion : {formatDateTime(row.lastLoginAt)} · Sessions : {row.counts.sessions}</p>
               </div>
-              <StatusBadge label={row.status} />
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge label={row.status} />
+                {row.mustResetPassword && <StatusBadge label="Mot de passe à définir" />}
+                <StatusBadge label={row.twoFactorEnabled ? "2FA actif" : "2FA recommandé"} />
+              </div>
+            </div>
+            {row.suspendedReason && <p className="mt-3 rounded-lg bg-danger-light px-3 py-2 text-xs font-semibold text-danger">{row.suspendedReason}</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {row.permissions.slice(0, 8).map((permission) => <StatusBadge key={permission} label={permission} />)}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <ProfessionalActionButton action="admin-permission-update" label="Permissions" entityType="admin-account" entityId={row.name} size="sm" variant="outline">Permissions</ProfessionalActionButton>
-              <ProfessionalActionButton action="admin-session-revoke" label="Révoquer session" entityType="admin-account" entityId={row.name} size="sm" variant="outline">Révoquer session</ProfessionalActionButton>
+              <Button size="sm" variant="outline" onClick={() => updateAdministrator(row, row.status === "ACTIVE" ? "suspend" : "activate", row.status === "ACTIVE" ? "Suspension demandée depuis la console Administrateurs." : "Réactivation demandée depuis la console Administrateurs.")}>
+                {row.status === "ACTIVE" ? "Suspendre" : "Réactiver"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => updateAdministrator(row, "revoke_sessions", "Révocation des sessions actives depuis la console Administrateurs.")}>
+                Révoquer sessions
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => updateAdministrator(row, "block", "Blocage de sécurité demandé depuis la console Administrateurs.")}>
+                Bloquer
+              </Button>
             </div>
           </Card>
         ))}
       </div>
+      <SectionBlock title="Audit administrateurs" description="Création, suspension, blocage et révocation de sessions sont journalisés côté serveur.">
+        <div className="grid gap-3 lg:grid-cols-2">
+          {audits.map((item) => (
+            <Card key={item.id} className="border-border/70 p-4">
+              <div className="flex flex-wrap justify-between gap-2">
+                <p className="font-bold text-foreground">{item.action}</p>
+                <StatusBadge label={item.result} />
+              </div>
+              <p className="mt-1 text-xs font-semibold text-muted-foreground">{item.actorName ?? "Système"} · {item.actorRole ?? "Serveur"} · {formatDateTime(item.createdAt)}</p>
+              {item.comment && <p className="mt-2 text-xs text-muted-foreground">{item.comment}</p>}
+            </Card>
+          ))}
+          {audits.length === 0 && <p className="text-sm font-semibold text-muted-foreground">Aucune action administrateur récente.</p>}
+        </div>
+      </SectionBlock>
       <ControlChecklist title="Sécurité administrateur" items={["Accès réservé à l’équipe interne", "Pas de section publique d’inscription admin", "Révocation de session journalisée", "Permissions sensibles séparées par rôle"]} />
     </div>
   );
 }
 
+type DataQualityRow = {
+  id: string;
+  name: string;
+  slug: string;
+  commune: string;
+  district: string;
+  accountStatus: string;
+  publicationStatus: string;
+  dataQuality: string;
+  storedDataQuality: string;
+  qualityScore: number;
+  computedScore: number;
+  creationSource: string;
+  lastDataUpdate?: string | null;
+  isOnDuty: boolean;
+  totalMedications: number;
+  staleMedications: number;
+  toConfirmMedications: number;
+  missingPrices: number;
+  pendingRequests: number;
+  publicMedia: number;
+  missingGps: boolean;
+  missingHours: boolean;
+};
+
+type DataQualityMetrics = {
+  oldData?: number;
+  toConfirm?: number;
+  missingPrices?: number;
+  staleAvailability?: number;
+  missingHours?: number;
+  missingGps?: number;
+  nonValidated?: number;
+  pendingRequests?: number;
+  averageScore?: number;
+};
+
 function Quality() {
+  const [rows, setRows] = useState<DataQualityRow[]>([]);
+  const [metrics, setMetrics] = useState<DataQualityMetrics>({});
+  const [query, setQuery] = useState("");
+  const [commune, setCommune] = useState("");
+  const [status, setStatus] = useState("");
+  const [quality, setQuality] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const loadQuality = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (query.trim()) params.set("q", query.trim());
+      if (commune) params.set("commune", commune);
+      if (status) params.set("status", status);
+      if (quality) params.set("quality", quality);
+      const res = await fetch(`/api/admin/data-quality?${params.toString()}`, {
+        headers: { "x-sablin-session-kind": "admin" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement qualité impossible.");
+      setRows(data.rows ?? []);
+      setMetrics(data.metrics ?? {});
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement qualité impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [commune, quality, query, status]);
+
+  useEffect(() => {
+    loadQuality();
+  }, [loadQuality]);
+
+  const markVerified = async (row: DataQualityRow) => {
+    const res = await fetch("/api/pharmacy-platform/actions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+      body: JSON.stringify({
+        action: "mark-data-quality",
+        label: "Marquer données vérifiées",
+        pharmacySlug: row.slug,
+        dataQuality: "Données à jour",
+        details: {
+          previousQuality: row.dataQuality,
+          computedScore: row.computedScore,
+        },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setMessage(res.ok ? "Qualité mise à jour et action journalisée." : data?.error ?? "Action qualité impossible.");
+    if (res.ok) await loadQuality();
+  };
+
+  const resetFilters = () => {
+    setQuery("");
+    setCommune("");
+    setStatus("");
+    setQuality("");
+  };
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -2863,29 +5687,153 @@ function Quality() {
         description="Surveillance des disponibilités, prix indicatifs, horaires, GPS, sources, fiabilité et publication. Les données anciennes ou incomplètes deviennent À confirmer côté utilisateur."
         icon={Database}
       />
-      <AdminFilterPanel filters={["Pharmacie", "Commune", "Source de donnée", "Fiabilité", "Dernière mise à jour"]} />
+      <Card className="border-border/70 bg-white p-4 shadow-card">
+        <div className="flex flex-wrap items-center gap-2">
+          <SlidersHorizontal className="size-4 text-brand-dark" />
+          <p className="text-sm font-extrabold text-foreground">Filtres qualité</p>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Pharmacie, responsable, commune..." className="bg-white text-foreground" />
+          <select value={commune} onChange={(event) => setCommune(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="">Toutes communes</option>
+            {["Cocody", "Yopougon", "Marcory", "Plateau", "Abobo", "Treichville", "Bingerville", "Koumassi"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="">Tous statuts</option>
+            {["Validée", "En attente de validation", "Incomplète", "Suspendue", "Refusée"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <select value={quality} onChange={(event) => setQuality(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="">Toutes qualités</option>
+            {["Données à jour", "Données anciennes", "Données incomplètes", "Disponibilités à confirmer", "Prix non renseignés", "Demandes en attente", "Validation requise"].map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={loadQuality}>Appliquer</Button>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={resetFilters}>Réinitialiser</Button>
+        </div>
+      </Card>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {["Pharmacies avec données anciennes", "Médicaments à confirmer", "Prix manquants", "Disponibilités non mises à jour", "Pharmacies sans horaires", "Pharmacies sans GPS", "Pharmacies non validées", "Demandes en attente"].map((item, index) => <Stat key={item} label={item} value={index + 3} badge={index % 2 ? "À vérifier" : "Données anciennes"} />)}
+        <Stat label="Score moyen" value={`${metrics.averageScore ?? 0}%`} badge="Qualité globale" />
+        <Stat label="Pharmacies avec données anciennes" value={metrics.oldData ?? 0} badge="Données anciennes" />
+        <Stat label="Médicaments à confirmer" value={metrics.toConfirm ?? 0} badge="À confirmer" />
+        <Stat label="Prix manquants" value={metrics.missingPrices ?? 0} badge="Prix non renseignés" />
+        <Stat label="Disponibilités non mises à jour" value={metrics.staleAvailability ?? 0} badge="À vérifier" />
+        <Stat label="Pharmacies sans horaires" value={metrics.missingHours ?? 0} badge="Incomplet" />
+        <Stat label="Pharmacies sans GPS" value={metrics.missingGps ?? 0} badge="Incomplet" />
+        <Stat label="Demandes en attente" value={metrics.pendingRequests ?? 0} badge="Demandes" />
       </div>
       <SectionBlock title="Sources et fiabilité" description="Ces valeurs contrôlent ce qui peut être publié côté utilisateur.">
         <div className="flex flex-wrap gap-2">{RELIABILITY_LEVELS.map((item) => <StatusBadge key={item} label={item} />)}{DATA_SOURCES.map((item) => <StatusBadge key={item} label={item} />)}</div>
       </SectionBlock>
-      <ActionQueue
-        title="Actions qualité prioritaires"
-        action="mark-data-quality"
-        items={adminPharmacies.slice(0, 4).map((pharmacy) => ({
-          title: pharmacy.name,
-          detail: `${pharmacy.commune} · ${pharmacy.updatedAt} · ${pharmacy.quality}`,
-          status: pharmacy.quality,
-          entityId: pharmacy.slug,
-        }))}
-      />
+      <SectionBlock title="Actions qualité prioritaires" description="Chaque correction est calculée côté serveur puis journalisée.">
+        {message && <p className="mb-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+        {loading ? (
+          <Card className="border-border/70 p-4 text-sm font-bold text-muted-foreground">Chargement des contrôles qualité...</Card>
+        ) : rows.length === 0 ? (
+          <Card className="border-dashed border-border p-4 text-sm font-bold text-foreground">Aucune anomalie ne correspond aux filtres.</Card>
+        ) : (
+          <div className="grid gap-3">
+            {rows.map((row) => (
+              <Card key={row.id} className="border-border/70 bg-white p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge label={row.dataQuality} />
+                      <StatusBadge label={row.accountStatus} />
+                      <StatusBadge label={`${row.computedScore}%`} />
+                    </div>
+                    <p className="mt-3 break-words font-extrabold text-foreground">{row.name}</p>
+                    <p className="text-sm font-medium text-muted-foreground">{row.commune} · {row.district} · Source : {row.creationSource}</p>
+                    <p className="mt-1 text-xs font-semibold text-muted-foreground">Dernière mise à jour : {formatDateTime(row.lastDataUpdate)}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => { window.location.href = `/admin/pharmacies/${row.slug}`; }}>
+                      Dossier
+                    </Button>
+                    <Button size="sm" className="bg-brand text-white hover:bg-brand-dark" onClick={() => markVerified(row)}>
+                      Marquer vérifié
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  <Stat label="Médicaments" value={row.totalMedications} badge="Inventaire" />
+                  <Stat label="À confirmer" value={row.toConfirmMedications} badge="Disponibilité" />
+                  <Stat label="Prix à revoir" value={row.missingPrices} badge="Prix" />
+                  <Stat label="Demandes ouvertes" value={row.pendingRequests} badge="Demandes" />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {row.missingHours && <StatusBadge label="Horaires incomplets" />}
+                  {row.missingGps && <StatusBadge label="GPS manquant" />}
+                  {row.publicMedia <= 0 && <StatusBadge label="Photo publique manquante" />}
+                  {row.isOnDuty && <StatusBadge label="De garde" />}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </SectionBlock>
     </div>
   );
 }
 
+type AdminValidationPharmacy = {
+  id: string;
+  name: string;
+  slug: string;
+  commune: string;
+  district?: string | null;
+  managerName?: string | null;
+  managerRole?: string | null;
+  professionalEmail?: string | null;
+  phone?: string | null;
+  creationSource: string;
+  accountStatus: string;
+  publicationStatus: string;
+  dataQuality: string;
+  qualityScore: number;
+  medicationCount: number;
+  requestCount?: number;
+  teamCount?: number;
+  publicMediaCount?: number;
+  adminOnlyMediaCount?: number;
+  lastDataUpdate?: string | null;
+};
+
+const adminValidationSummaryFallback = { total: 0, pending: 0, validated: 0, refused: 0, suspended: 0, incomplete: 0, published: 0, withPublicMedia: 0, visible: 0 };
+
 function PharmacyValidationsAdmin() {
-  const pending = adminPharmacies.filter((pharmacy) => pharmacy.status !== "Validée");
+  const [pharmacies, setPharmacies] = useState<AdminValidationPharmacy[]>([]);
+  const [summary, setSummary] = useState(adminValidationSummaryFallback);
+  const [recentActions, setRecentActions] = useState<Array<{ id: string; label: string; status: string; actorRole?: string | null; message?: string | null; pharmacySlug?: string | null; createdAt: string }>>([]);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("pending");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams({ accountStatus: statusFilter });
+    if (query.trim()) params.set("q", query.trim());
+    try {
+      const res = await fetch(`/api/pharmacy-platform/pharmacies?${params}`, {
+        headers: { "X-Sablin-Session-Kind": "admin" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des validations impossible.");
+      setPharmacies(data.pharmacies ?? []);
+      setSummary(data.summary ?? adminValidationSummaryFallback);
+      setRecentActions(data.recentActions ?? []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des validations impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [query, statusFilter]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -2893,42 +5841,179 @@ function PharmacyValidationsAdmin() {
         title="Validations pharmacies"
         description="Contrôlez les inscriptions, documents, images publiques, horaires, garde et qualité avant publication côté utilisateur."
         icon={ShieldCheck}
+        actions={
+          <>
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load} disabled={loading}>
+              <RefreshCw className="size-4" /> Actualiser
+            </Button>
+            <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => (window.location.href = "/admin/pharmacies/nouveau")}>Créer une pharmacie</Button>
+          </>
+        }
       />
+      <Card className="border-border/70 p-4 shadow-card">
+        <div className="grid gap-3 lg:grid-cols-[1fr_240px_auto]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") load();
+              }}
+              placeholder="Rechercher pharmacie, commune, responsable ou téléphone"
+              className="bg-white pl-9"
+            />
+          </div>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="pending">À valider / incomplet</option>
+            <option value="all">Toutes les pharmacies</option>
+            <option value="En attente de validation">En attente</option>
+            <option value="Incomplète">Incomplète</option>
+            <option value="Validée">Validée</option>
+            <option value="Refusée">Refusée</option>
+            <option value="Suspendue">Suspendue</option>
+          </select>
+          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load} disabled={loading}>
+            <Filter className="size-4" /> Filtrer
+          </Button>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
       <MetricsGrid
         metrics={[
-          { label: "À valider", value: pending.length, status: "En attente", icon: AlertTriangle },
-          { label: "Photos à vérifier", value: 6, status: "Images publiques", icon: ImageIcon },
-          { label: "Documents internes", value: 4, status: "Admin uniquement", icon: FileCheck2 },
-          { label: "Prêtes à publier", value: Math.max(0, pending.length - 1), status: "Contrôle OK", icon: CheckCircle2 },
+          { label: "À valider", value: summary.pending + summary.incomplete, status: "En attente", icon: AlertTriangle },
+          { label: "Validées", value: summary.validated, status: "Validée", icon: CheckCircle2 },
+          { label: "Suspendues / refusées", value: summary.suspended + summary.refused, status: "Bloqué", icon: ShieldCheck },
+          { label: "Avec photo publique", value: summary.withPublicMedia, status: "Images publiques", icon: ImageIcon },
         ]}
       />
       <div className="grid gap-3 md:grid-cols-2">
-        {pending.map((pharmacy) => (
+        {pharmacies.map((pharmacy) => (
           <Card key={pharmacy.slug} className="border-border/70 p-4 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <StatusBadge label={pharmacy.status} />
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge label={pharmacy.accountStatus} />
+                  <StatusBadge label={pharmacy.publicationStatus} />
+                  <StatusBadge label={pharmacy.dataQuality} />
+                </div>
                 <p className="mt-3 font-extrabold text-foreground">{pharmacy.name}</p>
-                <p className="text-sm font-medium text-muted-foreground">{pharmacy.commune} · {pharmacy.district} · {pharmacy.manager}</p>
-                <p className="mt-1 text-xs font-semibold text-muted-foreground">Source : {pharmacy.source} · qualité : {pharmacy.quality}</p>
+                <p className="text-sm font-medium text-muted-foreground">{pharmacy.commune} · {pharmacy.district ?? "Quartier non renseigné"} · {pharmacy.managerName ?? "Responsable non renseigné"}</p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">Source : {pharmacy.creationSource} · score qualité : {pharmacy.qualityScore}% · mise à jour : {formatDateTime(pharmacy.lastDataUpdate)}</p>
               </div>
               <Button size="sm" variant="outline" onClick={() => (window.location.href = `/admin/pharmacies/${pharmacy.slug}`)}>Dossier</Button>
             </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-4">
+              <MiniValidationInfo label="Médicaments" value={pharmacy.medicationCount} />
+              <MiniValidationInfo label="Photos publiques" value={pharmacy.publicMediaCount ?? 0} />
+              <MiniValidationInfo label="Docs internes" value={pharmacy.adminOnlyMediaCount ?? 0} />
+              <MiniValidationInfo label="Équipe" value={pharmacy.teamCount ?? 0} />
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <ProfessionalActionButton action="validate-pharmacy" label="Valider" pharmacySlug={pharmacy.slug} size="sm" className="bg-brand text-white hover:bg-brand-dark">Valider</ProfessionalActionButton>
-              <ProfessionalActionButton action="refuse-pharmacy" label="Refuser" pharmacySlug={pharmacy.slug} size="sm" variant="outline" className="border-red-300 text-red-700">Refuser</ProfessionalActionButton>
-              <ProfessionalActionButton action="review-documents" label="Demander correction" pharmacySlug={pharmacy.slug} size="sm" variant="outline">Demander correction</ProfessionalActionButton>
+              <ProfessionalActionButton action="validate-pharmacy" label="Valider" pharmacySlug={pharmacy.slug} size="sm" className="bg-brand text-white hover:bg-brand-dark" onSuccess={load}>Valider</ProfessionalActionButton>
+              <ProfessionalActionButton action="refuse-pharmacy" label="Refuser" pharmacySlug={pharmacy.slug} size="sm" variant="outline" className="border-red-300 text-red-700" onSuccess={load}>Refuser</ProfessionalActionButton>
+              <ProfessionalActionButton action="review-documents" label="Demander correction" pharmacySlug={pharmacy.slug} size="sm" variant="outline" onSuccess={load}>Demander correction</ProfessionalActionButton>
+              <ProfessionalActionButton action="suspend-pharmacy" label="Suspendre" pharmacySlug={pharmacy.slug} size="sm" variant="outline" className="border-red-300 text-red-700" onSuccess={load}>Suspendre</ProfessionalActionButton>
             </div>
           </Card>
         ))}
-        {!pending.length && <Card className="border-border/70 p-6 text-sm font-bold text-muted-foreground">Aucune pharmacie en attente.</Card>}
+        {!loading && !pharmacies.length && <Card className="border-border/70 p-6 text-sm font-bold text-muted-foreground">Aucune pharmacie dans ce filtre.</Card>}
       </div>
+      <SectionBlock title="Audit validation pharmacie" description="Les décisions de validation, refus, suspension ou correction sont journalisées.">
+        <ResponsiveTable
+          headers={["Date", "Action", "Pharmacie", "Rôle", "Statut", "Message"]}
+          rows={
+            recentActions.length
+              ? recentActions.map((action) => [
+                  formatDateTime(action.createdAt),
+                  <span key="label" className="font-bold text-foreground">{action.label}</span>,
+                  action.pharmacySlug ?? "Pharmacie",
+                  action.actorRole ?? "Admin",
+                  <StatusBadge key="status" label={action.status} />,
+                  action.message ?? "Action enregistrée",
+                ])
+              : [["-", "Aucune action récente", "-", "-", "-", ""]]
+          }
+        />
+      </SectionBlock>
       <ControlChecklist title="Checklist validation" items={["Identité et responsable vérifiés", "Photos publiques sans données sensibles", "Documents administratifs gardés admin uniquement", "Horaires et garde renseignés", "Publication bloquée si compte suspendu ou refusé"]} />
     </div>
   );
 }
 
+function MiniValidationInfo({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/20 p-2">
+      <p className="text-xs font-extrabold uppercase text-muted-foreground">{label}</p>
+      <p className="mt-1 text-lg font-extrabold text-foreground">{value}</p>
+    </div>
+  );
+}
+
 function MedicationRequestsAdmin() {
+  const [requests, setRequests] = useState<AdminMedicationAddRequestRow[]>([]);
+  const [reference, setReference] = useState<AdminMedicationReferenceRow[]>([]);
+  const [summary, setSummary] = useState<Record<string, number>>({});
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [selectedMedication, setSelectedMedication] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const params = new URLSearchParams({ q: query, status });
+      const [requestsRes, referenceRes] = await Promise.all([
+        fetch(`/api/pharmacy-platform/medication-requests?${params}`, { headers: { "x-sablin-session-kind": "admin" } }),
+        fetch("/api/medications?scope=admin&limit=250", { headers: { "x-sablin-session-kind": "admin" } }),
+      ]);
+      const requestsData = await requestsRes.json().catch(() => ({}));
+      const referenceData = await referenceRes.json().catch(() => ({}));
+      if (!requestsRes.ok) throw new Error(requestsData?.error ?? "Chargement des demandes impossible.");
+      if (!referenceRes.ok) throw new Error(referenceData?.error ?? "Chargement du référentiel impossible.");
+      setRequests(requestsData.requests ?? []);
+      setSummary(requestsData.summary ?? {});
+      setReference(referenceData.medications ?? []);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des demandes impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [query, status]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const updateRequest = async (row: AdminMedicationAddRequestRow, nextStatus: string) => {
+    setSavingId(row.id);
+    setMessage("");
+    try {
+      const medicationId = selectedMedication[row.id] || row.medication?.slug || "";
+      const selected = reference.find((item) => item.id === selectedMedication[row.id] || item.slug === selectedMedication[row.id]);
+      const res = await fetch("/api/pharmacy-platform/medication-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-sablin-session-kind": "admin" },
+        body: JSON.stringify({
+          id: row.id,
+          status: nextStatus,
+          medicationId: selected?.id ?? medicationId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Mise à jour impossible.");
+      setMessage(`Demande “${row.proposedName}” mise à jour : ${data.request?.status ?? nextStatus}.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Mise à jour impossible.");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -2939,29 +6024,81 @@ function MedicationRequestsAdmin() {
       />
       <MetricsGrid
         metrics={[
-          { label: "Demandes", value: medicationRequestRows.length, status: "Référentiel", icon: ClipboardList },
-          { label: "En attente", value: medicationRequestRows.filter((row) => row.status === "En attente").length, status: "À traiter", icon: AlertTriangle },
-          { label: "À vérifier", value: medicationRequestRows.filter((row) => row.status === "À vérifier").length, status: "Ambigu", icon: Search },
-          { label: "Fusionnées", value: medicationRequestRows.filter((row) => row.status === "Fusionné").length, status: "Alias", icon: CheckCircle2 },
+          { label: "Demandes", value: summary.total ?? requests.length, status: `${summary.visible ?? requests.length} visibles`, icon: ClipboardList },
+          { label: "En attente", value: summary.pending ?? 0, status: "À traiter", icon: AlertTriangle },
+          { label: "En analyse", value: summary.analysis ?? 0, status: "Contrôle", icon: Search },
+          { label: "Fusionnées", value: summary.merged ?? 0, status: "Alias ajouté", icon: CheckCircle2 },
         ]}
       />
-      <AdminFilterPanel filters={["Nom proposé", "Pharmacie demandeuse", "DCI", "Dosage", "Statut"]} />
+      <Card className="border-border/70 bg-white p-4 shadow-card">
+        <div className="grid gap-3 md:grid-cols-[1fr_220px_auto]">
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom proposé, DCI, pharmacie, dosage..." className="bg-white" />
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Tous les statuts</option>
+            {["En attente", "En analyse", "Validée", "Refusée", "Fusionnée avec un médicament existant"].map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+          <Button onClick={load} disabled={loading} className="bg-brand text-white hover:bg-brand-dark">
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+            Actualiser
+          </Button>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-muted/30 p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
       <div className="grid gap-3 md:grid-cols-2">
-        {medicationRequestRows.map((row) => (
-          <Card key={`${row.medication}-${row.pharmacy}`} className="border-border/70 p-4 shadow-card">
+        {loading && <Card className="border-border/70 p-4 text-sm font-bold text-muted-foreground">Chargement des demandes...</Card>}
+        {!loading && requests.length === 0 && (
+          <Card className="border-dashed border-border p-4">
+            <p className="font-extrabold text-foreground">Aucune demande à afficher.</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Les propositions envoyées par les pharmacies apparaîtront ici pour validation, fusion ou refus.</p>
+          </Card>
+        )}
+        {requests.map((row) => (
+          <Card key={row.id} className="border-border/70 p-4 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <StatusBadge label={row.status} />
-                <p className="mt-3 font-extrabold text-foreground">{row.medication}</p>
-                <p className="text-sm font-medium text-muted-foreground">{row.pharmacy} · confiance {row.confidence}</p>
-                <p className="mt-1 text-xs font-semibold text-muted-foreground">{row.action}</p>
+                <p className="mt-3 break-words font-extrabold text-foreground">{row.proposedName}</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  {row.pharmacy?.name ?? "Pharmacie non rattachée"} · {[row.genericName, row.dosage, row.form].filter(Boolean).join(" · ") || "Informations à compléter"}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">
+                  Créée par {row.createdByRole} le {formatDateTime(row.createdAt)}
+                  {row.reviewedAt ? ` · revue par ${row.reviewedBy ?? "Admin"} le ${formatDateTime(row.reviewedAt)}` : ""}
+                </p>
+                {row.remark && <p className="mt-2 rounded-lg bg-muted/30 p-2 text-xs font-semibold text-foreground">{row.remark}</p>}
               </div>
-              <Badge className="border border-border bg-white text-foreground">{row.confidence}</Badge>
+              <Badge className="border border-border bg-white text-foreground">{row.medication?.name ?? "Non associé"}</Badge>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <ProfessionalActionButton action="reference-update" label="Valider" entityType="medication-request" entityId={row.medication} size="sm" className="bg-brand text-white hover:bg-brand-dark">Valider</ProfessionalActionButton>
-              <ProfessionalActionButton action="merge-medication-request" label="Fusionner" entityType="medication-request" entityId={row.medication} size="sm" variant="outline">Fusionner</ProfessionalActionButton>
-              <ProfessionalActionButton action="reference-disable" label="Refuser" entityType="medication-request" entityId={row.medication} size="sm" variant="outline" className="border-red-300 text-red-700">Refuser</ProfessionalActionButton>
+            <div className="mt-3 grid gap-2">
+              <select
+                value={selectedMedication[row.id] ?? ""}
+                onChange={(event) => setSelectedMedication((current) => ({ ...current, [row.id]: event.target.value }))}
+                className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground"
+              >
+                <option value="">Associer à un médicament existant si nécessaire</option>
+                {reference.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} · {item.genericName} · {item.dosage} · {item.form}
+                  </option>
+                ))}
+              </select>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" disabled={savingId === row.id} onClick={() => updateRequest(row, "En analyse")}>
+                  Analyser
+                </Button>
+                <Button size="sm" disabled={savingId === row.id} onClick={() => updateRequest(row, "Validée")} className="bg-brand text-white hover:bg-brand-dark">
+                  {savingId === row.id ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                  Valider
+                </Button>
+                <Button size="sm" variant="outline" disabled={savingId === row.id || !selectedMedication[row.id]} onClick={() => updateRequest(row, "Fusionnée avec un médicament existant")}>
+                  Fusionner
+                </Button>
+                <Button size="sm" variant="outline" disabled={savingId === row.id} onClick={() => updateRequest(row, "Refusée")} className="border-red-300 text-red-700">
+                  Refuser
+                </Button>
+              </div>
             </div>
           </Card>
         ))}
@@ -2987,6 +6124,13 @@ function AdminSynchronizations() {
           { label: "Webhooks", value: 4, status: "Sécurisés", icon: ShieldCheck },
         ]}
       />
+      <PlatformUxSyncPanel
+        scope="admin"
+        compact
+        title="État central des synchronisations"
+        description="Vue consolidée des données qui alimentent les espaces Pharmacie et Utilisateur : compteurs, imports, images, paiements, demandes et garde-fous."
+      />
+      <PlatformCoverageMatrix />
       <InventorySyncPanel kind="admin" />
       <WorkflowBoard
         title="Flux synchronisés"
@@ -3025,6 +6169,38 @@ function AdminUserRequests() {
 }
 
 function AdminHistory() {
+  const [filter, setFilter] = useState("Tous");
+  const [query, setQuery] = useState("");
+  const [rows, setRows] = useState<HistoryRow[]>([]);
+  const [stats, setStats] = useState<{ total?: number; success?: number; review?: number; imports?: number }>({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (filter === "Réussi" || filter === "À vérifier") params.set("status", filter.toLowerCase() === "réussi" ? "réussi" : "à vérifier");
+    if (filter === "Import pharmacie" || filter === "Demande utilisateur") params.set("source", filter);
+    if (query.trim()) params.set("q", query.trim());
+    try {
+      const suffix = params.toString() ? `?${params}` : "";
+      const res = await fetch(`/api/pharmacy-platform/history${suffix}`, { headers: { "X-Sablin-Session-Kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement de l’historique global impossible.");
+      setRows(data.rows ?? []);
+      setStats(data.stats ?? {});
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement de l’historique global impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, query]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -3033,26 +6209,110 @@ function AdminHistory() {
         description="Journal des actions utilisateurs, pharmacies, admins, imports, validations, suspensions, transactions, confirmations et publications."
         icon={History}
       />
-      <AdminFilterPanel filters={["Date", "Auteur", "Rôle", "Action", "Entité", "Statut"]} />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Actions tracées" value={stats.total ?? rows.length} badge="Historique" />
+        <Stat label="Réussies" value={stats.success ?? 0} badge="Réussi" />
+        <Stat label="À vérifier" value={stats.review ?? 0} badge="Contrôle" />
+        <Stat label="Imports" value={stats.imports ?? 0} badge="Inventaire" />
+      </div>
       <Card className="border-border/70 p-5 shadow-card">
-        <ResponsiveTable
-          headers={["Date", "Auteur", "Rôle", "Action", "Entité", "Statut", "Détail"]}
-          rows={adminHistoryRows.map((row) => [
-            row.date,
-            <span key="actor" className="font-bold text-foreground">{row.actor}</span>,
-            row.role,
-            row.action,
-            row.entity,
-            <StatusBadge key="status" label={row.status} />,
-            <ProfessionalActionButton key="btn" action="process-admin-card" label="Consulter" entityType="audit-log" entityId={row.entity} size="sm" variant="outline">Consulter</ProfessionalActionButton>,
-          ])}
-        />
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <Heading level="h2">Journal centralisé</Heading>
+            <Muted className="mt-1">Lecture consolidée des actions professionnelles et audits, avec ancienne valeur, nouvelle valeur et source.</Muted>
+          </div>
+          <div className="flex w-full flex-wrap gap-2 lg:max-w-3xl lg:justify-end">
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Action, auteur, commentaire..." className="h-9 w-full bg-white sm:w-72" />
+            {["Tous", "Réussi", "À vérifier", "Import pharmacie", "Demande utilisateur"].map((item) => (
+              <Button key={item} size="sm" variant={filter === item ? "default" : "outline"} className={filter === item ? "bg-brand text-white hover:bg-brand-dark" : "border-brand/30 text-brand-dark hover:bg-brand-light"} onClick={() => setFilter(item)}>
+                {item}
+              </Button>
+            ))}
+            <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load}>Actualiser</Button>
+          </div>
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-white">
+        <div className="hidden grid-cols-[150px_1fr_150px_170px_1fr_1fr_110px] gap-0 bg-muted/40 px-4 py-3 text-xs font-extrabold uppercase text-muted-foreground lg:grid">
+          <span>Date</span><span>Action</span><span>Auteur</span><span>Source</span><span>Avant</span><span>Après</span><span>Statut</span>
+        </div>
+        <div className="divide-y divide-border">
+          {loading && <div className="p-4 text-sm font-bold text-muted-foreground">Chargement de l’historique global...</div>}
+          {!loading && rows.length === 0 && <div className="p-8 text-center text-sm font-bold text-foreground">Aucune action journalisée dans ce filtre.</div>}
+          {rows.map((item) => (
+            <div key={item.id} className="grid gap-3 p-4 text-sm lg:grid-cols-[150px_1fr_150px_170px_1fr_1fr_110px] lg:items-center">
+              <p className="font-bold text-foreground">{formatDateTime(item.date)}</p>
+              <div>
+                <p className="font-extrabold text-foreground">{item.action}</p>
+                {item.message && <p className="mt-1 text-xs font-semibold text-muted-foreground">{item.message}</p>}
+              </div>
+              <p className="text-muted-foreground">{item.author}</p>
+              <StatusBadge label={item.source} />
+              <p className="break-words text-muted-foreground">{stringifyCell(item.oldValue)}</p>
+              <p className="break-words font-bold text-foreground">{stringifyCell(item.newValue)}</p>
+              <StatusBadge label={item.status} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <Card className="border-border/70 bg-muted/20 p-4">
+        <p className="text-sm font-bold text-foreground">Synchronisation : les actions pharmacie, corrections admin, imports et validations alimentent ce journal sans exposer de secrets ni de contacts côté utilisateur.</p>
       </Card>
     </div>
   );
 }
 
 function AdminNotifications() {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [type, setType] = useState("all");
+  const [items, setItems] = useState<AdminSecurityNotification[]>([]);
+  const [stats, setStats] = useState<{ total?: number; listed?: number; unread?: number; critical?: number; archived?: number }>({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (filter !== "all") params.set("status", filter);
+    if (type !== "all") params.set("type", type);
+    if (query.trim()) params.set("q", query.trim());
+    try {
+      const res = await fetch(`/api/admin/notifications?${params}`, { headers: { "X-Sablin-Session-Kind": "admin" } });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Chargement des notifications impossible.");
+      setItems(data.notifications ?? []);
+      setStats(data.stats ?? {});
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Chargement des notifications impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, query, type]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const updateNotification = async (notificationId: string, action: "read" | "archive") => {
+    try {
+      const res = await fetch("/api/admin/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "admin" },
+        body: JSON.stringify({ notificationId, action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Action impossible.");
+      setMessage(action === "archive" ? "Notification archivée." : "Notification marquée comme lue.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Action impossible.");
+    }
+  };
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -3061,26 +6321,188 @@ function AdminNotifications() {
         description="Alertes opérationnelles liées aux validations, imports, données anciennes, paiements suspects et publications."
         icon={Bell}
       />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Stat label="Notifications" value={stats.total ?? items.length} badge="Plateforme" />
+        <Stat label="Affichées" value={stats.listed ?? items.length} badge="Filtre" />
+        <Stat label="Non lues" value={stats.unread ?? 0} badge="non_lue" />
+        <Stat label="Critiques" value={stats.critical ?? 0} badge="Alerte" />
+      </div>
+      <Card className="border-border/70 p-5 shadow-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <Heading level="h2">Centre d’alertes global</Heading>
+            <Muted className="mt-1">Alertes admin, support pharmacie, paiements et qualité sans créer de session pharmacie.</Muted>
+          </div>
+          <div className="grid w-full gap-2 sm:grid-cols-[1fr_150px_160px_auto] lg:max-w-3xl">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Titre, message, type..." className="bg-white pl-9" />
+            </div>
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="all">Toutes</option>
+              <option value="non_lue">Non lues</option>
+              <option value="lue">Lues</option>
+              <option value="archivée">Archivées</option>
+            </select>
+            <select value={type} onChange={(event) => setType(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+              <option value="all">Tous types</option>
+              <option value="support">Support</option>
+              <option value="payment_security">Paiements</option>
+              <option value="critical">Critique</option>
+              <option value="alert">Alerte</option>
+            </select>
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load}>Actualiser</Button>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <StatusBadge label="Administration SABLIN" />
+          <StatusBadge label="Support pharmacie" />
+          <StatusBadge label="Paiements & fraudes" />
+          <StatusBadge label="Qualité données" />
+        </div>
+        {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
+      </Card>
       <div className="grid gap-3 md:grid-cols-2">
-        {adminNotificationRows.map((item) => (
-          <Card key={item.title} className="border-border/70 p-4 shadow-card">
+        {loading && <Card className="border-border/70 p-5 text-sm font-bold text-muted-foreground">Chargement des notifications...</Card>}
+        {!loading && items.length === 0 && <Card className="border-dashed border-border p-8 text-center text-sm font-bold text-foreground">Aucune notification réelle dans ce filtre.</Card>}
+        {items.map((item) => (
+          <Card key={item.id} className="border-border/70 p-4 shadow-card">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <StatusBadge label={item.status} />
+              <div className="min-w-0">
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge label={item.group ?? item.type} />
+                  <StatusBadge label={item.status} />
+                  {item.pharmacy && <StatusBadge label={item.pharmacy.accountStatus} />}
+                </div>
                 <p className="mt-3 font-extrabold text-foreground">{item.title}</p>
-                <p className="text-sm font-medium text-muted-foreground">{item.detail}</p>
+                <p className="text-sm font-medium text-muted-foreground">{item.message}</p>
+                {item.pharmacy && (
+                  <p className="mt-2 text-xs font-bold text-brand-dark">
+                    {item.pharmacy.name} · {item.pharmacy.dataQuality}
+                  </p>
+                )}
+                <p className="mt-2 text-xs font-bold text-muted-foreground">{formatDateTime(item.createdAt)}</p>
               </div>
               <Bell className="size-5 text-brand-dark" />
             </div>
-            <ProfessionalActionButton action="process-admin-card" label="Marquer traité" payload={{ details: item }} size="sm" className="mt-3 bg-brand text-white hover:bg-brand-dark">Marquer traité</ProfessionalActionButton>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => updateNotification(item.id, "read")}>Marquer lu</Button>
+              <Button size="sm" variant="outline" onClick={() => updateNotification(item.id, "archive")}>Archiver</Button>
+            </div>
           </Card>
         ))}
       </div>
+      <Card className="border-border/70 bg-muted/20 p-4">
+        <p className="text-sm font-bold text-foreground">Synchronisation : ces alertes proviennent des espaces pharmacie, de la qualité des données, des imports et de la sécurité. Les documents internes et contacts restent protégés.</p>
+      </Card>
     </div>
   );
 }
 
 function AdminSettings() {
+  const [settings, setSettings] = useState<AdminSettingsData>(adminSettingsFallback);
+  const [form, setForm] = useState({
+    warningDays: String(adminSettingsFallback.dataFreshness.warningDays),
+    staleDays: String(adminSettingsFallback.dataFreshness.staleDays),
+    veryStaleDays: String(adminSettingsFallback.dataFreshness.veryStaleDays),
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        headers: { "x-sablin-session-kind": "admin" },
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Paramètres Admin indisponibles.");
+      const next = { ...adminSettingsFallback, ...data };
+      setSettings(next);
+      setForm({
+        warningDays: String(next.dataFreshness.warningDays),
+        staleDays: String(next.dataFreshness.staleDays),
+        veryStaleDays: String(next.dataFreshness.veryStaleDays),
+      });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Paramètres Admin indisponibles.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const save = async () => {
+    setSaving(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-sablin-session-kind": "admin",
+        },
+        body: JSON.stringify({
+          warningDays: Number(form.warningDays),
+          staleDays: Number(form.staleDays),
+          veryStaleDays: Number(form.veryStaleDays),
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Enregistrement impossible.");
+      setSettings({ ...adminSettingsFallback, ...data });
+      setMessage(data?.message ?? "Paramètres Admin enregistrés.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Enregistrement impossible.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const testEnrichment = async () => {
+    setTesting(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/enrichment/config", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-sablin-session-kind": "admin",
+        },
+        body: JSON.stringify({ action: "test" }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Test indisponible pour ce rôle.");
+      setMessage(data?.message ?? "Test d’enrichissement terminé.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Test indisponible pour ce rôle.");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const envCards = [
+    ["Base de données", settings.environment.databaseConfigured ? "Configurée" : "Manquante", "Connexion serveur requise pour synchroniser les trois espaces."],
+    ["Supabase", settings.environment.supabaseConfigured ? "Configuré" : "Non détecté", "Variables publiques uniquement côté client, clés sensibles côté serveur."],
+    ["Secret session", settings.environment.sessionSecretConfigured ? "Configuré" : "Manquant", "Les sessions Admin, Pharmacie et Utilisateur restent séparées."],
+    ["PayDunya", settings.environment.paydunyaConfigured ? "Configuré" : "Fallback test", `Mode ${settings.environment.paymentProviderMode}. Le choix du moyen de paiement reste côté PayDunya.`],
+    ["Webhook paiement", settings.environment.paymentWebhookConfigured ? "Configuré" : "À configurer", "Aucun crédit n’est ajouté sans confirmation serveur."],
+    ["Enrichissement", settings.enrichment.providerStatus === "active" ? "Actif" : "Fallback interne", settings.enrichment.reason],
+  ];
+
+  const metrics = [
+    { label: "Sessions admin actives", value: settings.security.activeAdminSessions, status: "Sessions séparées", icon: ShieldCheck },
+    { label: "Comptes admin", value: settings.security.adminAccounts, status: "Administration", icon: UserCog },
+    { label: "Comptes pharmacie", value: settings.security.pharmacyAccounts, status: "Espace Pharmacie", icon: Building2 },
+    { label: "Alertes non lues", value: settings.security.unreadAdminNotifications, status: settings.security.criticalAdminNotifications > 0 ? "À traiter" : "Stable", icon: Bell },
+  ];
+
   return (
     <div className="space-y-5">
       <AdminHero
@@ -3088,54 +6510,144 @@ function AdminSettings() {
         title="Paramètres"
         description="Configuration des règles de sécurité, publication, enrichissement, paiements, crédits, sessions et support interne. La modification de mot de passe admin n’est pas exposée ici."
         icon={Settings}
+        actions={
+          <>
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load} disabled={loading}>
+              <RefreshCw className="size-4" /> Actualiser
+            </Button>
+            <Button className="bg-brand text-white hover:bg-brand-dark" onClick={save} disabled={saving || !settings.canManage}>
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />} Enregistrer
+            </Button>
+          </>
+        }
       />
-      <div className="grid gap-4 xl:grid-cols-2">
-        <SectionBlock title="Règles plateforme" description="Paramètres appliqués aux trois espaces sans les mélanger dans la navigation.">
-          <div className="grid gap-3">
-            {[
-              ["Crédits SABLIN", "1 crédit = 100 FCFA, solde serveur uniquement."],
-              ["Pass Ordonnance Unique", "500 FCFA, une seule ordonnance, expiration après comparaison."],
-              ["Contacts pharmacie", "Verrouillés par crédits côté API et interface."],
-              ["Marketplace", "Information et orientation, aucune vente directe."],
-            ].map(([title, detail]) => (
+
+      {message && <Card className="border-border/70 bg-white p-3 text-sm font-bold text-foreground">{message}</Card>}
+
+      <MetricsGrid metrics={metrics} />
+
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <SectionBlock title="Seuils de fraîcheur des données" description="Seuils globaux audités. Les fiches pharmacie peuvent aussi porter un seuil spécifique quand l’Admin le décide.">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label htmlFor="warningDays">Avertissement</Label>
+              <Input
+                id="warningDays"
+                type="number"
+                min={1}
+                max={365}
+                value={form.warningDays}
+                onChange={(event) => setForm((current) => ({ ...current, warningDays: event.target.value }))}
+                className="mt-1 bg-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="staleDays">À confirmer</Label>
+              <Input
+                id="staleDays"
+                type="number"
+                min={1}
+                max={365}
+                value={form.staleDays}
+                onChange={(event) => setForm((current) => ({ ...current, staleDays: event.target.value }))}
+                className="mt-1 bg-white"
+              />
+            </div>
+            <div>
+              <Label htmlFor="veryStaleDays">Très ancien</Label>
+              <Input
+                id="veryStaleDays"
+                type="number"
+                min={1}
+                max={365}
+                value={form.veryStaleDays}
+                onChange={(event) => setForm((current) => ({ ...current, veryStaleDays: event.target.value }))}
+                className="mt-1 bg-white"
+              />
+            </div>
+          </div>
+          <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-sm font-bold text-foreground">Dernière mise à jour : {formatDateTime(settings.dataFreshness.updatedAt)}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Par : {settings.dataFreshness.updatedBy ?? "Système"}. Règle : avertissement ≤ à confirmer ≤ très ancien.</p>
+            {!settings.canManage && <p className="mt-2 text-sm font-bold text-amber-800">Votre rôle peut consulter ces paramètres, mais seul un super administrateur peut les modifier.</p>}
+          </div>
+        </SectionBlock>
+
+        <SectionBlock title="État serveur sécurisé" description="Les secrets ne sont jamais exposés : seuls les statuts configuré/manquant sont affichés.">
+          <div className="grid gap-3 md:grid-cols-2">
+            {envCards.map(([title, status, detail]) => (
               <div key={title} className="rounded-lg border border-border bg-white p-3">
-                <p className="font-extrabold text-foreground">{title}</p>
-                <p className="text-sm font-medium text-muted-foreground">{detail}</p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-extrabold text-foreground">{title}</p>
+                  <StatusBadge label={status} />
+                </div>
+                <p className="mt-2 text-sm font-medium text-muted-foreground">{detail}</p>
               </div>
             ))}
           </div>
         </SectionBlock>
-        <SectionBlock title="Actions sensibles" description="Chaque action doit être auditée et réservée au bon rôle.">
-          <div className="grid gap-2">
-            {["Révoquer toutes les sessions admin", "Relancer contrôle enrichissement", "Forcer fallback images", "Exporter audit sécurité"].map((item) => (
-              <ProfessionalActionButton key={item} action="process-admin-card" label={item} payload={{ details: { item } }} variant="outline" className="justify-start border-brand/30 text-brand-dark hover:bg-brand-light">
-                {item}
-              </ProfessionalActionButton>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SectionBlock title="État de l’enrichissement externe" description="Google/Web reste côté serveur. Les images externes restent candidates tant qu’un admin ne les valide pas.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-border bg-white p-3">
+              <p className="text-xs font-extrabold uppercase text-muted-foreground">Mode actuel</p>
+              <p className="mt-2 text-lg font-extrabold text-foreground">{settings.enrichment.modeLabel}</p>
+              <p className="mt-1 text-sm font-medium text-muted-foreground">{settings.enrichment.adminMessage}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-white p-3">
+              <p className="text-xs font-extrabold uppercase text-muted-foreground">Fournisseurs</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <StatusBadge label={settings.enrichment.googleApiConfigured && settings.enrichment.googleSearchEngineConfigured ? "Google configuré" : "Google incomplet"} />
+                <StatusBadge label={settings.enrichment.braveApiConfigured ? "Brave configuré" : "Brave absent"} />
+                <StatusBadge label={settings.enrichment.openverseEnabled ? "Openverse actif" : "Openverse désactivé"} />
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-sm font-bold text-foreground">Dernier test : {settings.enrichment.lastTest?.message ?? "Non testé"}</p>
+            {settings.enrichment.lastTest?.at && <p className="text-xs font-bold text-muted-foreground">{formatDateTime(settings.enrichment.lastTest.at)}</p>}
+            {settings.enrichment.lastError && <p className="mt-1 text-sm font-bold text-red-700">Dernière erreur : {settings.enrichment.lastError}</p>}
+          </div>
+          <Button variant="outline" className="mt-4 border-brand/30 text-brand-dark hover:bg-brand-light" onClick={testEnrichment} disabled={testing}>
+            {testing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />} Tester la configuration
+          </Button>
+        </SectionBlock>
+
+        <SectionBlock title="Politiques appliquées" description="Garde-fous réellement portés par les routes, sessions et API serveur.">
+          <div className="grid gap-3">
+            {settings.policies.map((policy) => (
+              <div key={policy.title} className="rounded-lg border border-border bg-white p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-extrabold text-foreground">{policy.title}</p>
+                  <StatusBadge label={policy.status} />
+                </div>
+                <p className="mt-2 text-sm font-medium text-muted-foreground">{policy.detail}</p>
+              </div>
             ))}
           </div>
         </SectionBlock>
       </div>
+
+      <SectionBlock title="Audit récent des paramètres et actions sensibles" description="Les changements de configuration et actions Admin sont historisés côté serveur.">
+        <ResponsiveTable
+          headers={["Date", "Action", "Rôle", "Statut", "Message"]}
+          rows={
+            settings.recentActions.length
+              ? settings.recentActions.map((item) => [
+                  formatDateTime(item.createdAt),
+                  <span key="label" className="font-bold text-foreground">{item.label}</span>,
+                  item.actorRole ?? "Admin",
+                  <StatusBadge key="status" label={item.status} />,
+                  item.message ?? item.action,
+                ])
+              : [["-", "Aucune action récente", "-", "-", ""]]
+          }
+        />
+      </SectionBlock>
       <ControlChecklist title="Sécurité globale" items={adminRiskControls} />
     </div>
-  );
-}
-
-function SimpleAdmin({ title, items, pharmacySlug }: { title: string; items: string[]; pharmacySlug?: string }) {
-  return (
-    <Card className="border-border/70 p-5 shadow-card">
-      <Heading level="h2">{title}</Heading>
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {items.map((item, index) => (
-          <Card key={item} className="border-border/70 p-4">
-            <StatusBadge label={index % 2 ? "En attente" : "Validée"} />
-            <p className="mt-3 font-bold text-foreground">{item}</p>
-            <ProfessionalActionButton action="process-admin-card" label="Traiter" pharmacySlug={pharmacySlug} payload={{ details: { title, item } }} className="mt-3 bg-brand text-white hover:bg-brand-dark">
-              Traiter
-            </ProfessionalActionButton>
-          </Card>
-        ))}
-      </div>
-    </Card>
   );
 }
 
@@ -3147,6 +6659,9 @@ function PharmacySpecificPage({ page, pharmacyId }: { page: AdminPage; pharmacyI
     if (page === "pharmacy-demandes") return "demandes";
     if (page === "pharmacy-confirmations") return "confirmations";
     if (page === "pharmacy-horaires-garde") return "horaires-garde";
+    if (page === "pharmacy-profil") return "profil";
+    if (page === "pharmacy-photos") return "photos";
+    if (page === "pharmacy-equipe") return "equipe";
     if (page === "pharmacy-historique") return "historique";
     return "dashboard";
   }, [page]);

@@ -19,6 +19,7 @@ import {
   Mail,
   MessageCircle,
   Pill,
+  RefreshCw,
   Save,
   Search,
   Send,
@@ -34,6 +35,10 @@ import { InventorySyncPanel } from "@/components/views/inventory-sync-panels";
 import { ProfessionalRequestsPanel } from "@/components/views/professional-requests-panel";
 import { ProfessionalActionButton } from "@/components/shared/professional-action-button";
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
+import { PlatformUxSyncPanel } from "@/components/shared/platform-ux-sync-panel";
+import { PlatformSectionGuide } from "@/components/shared/platform-section-guide";
+import { PlatformCoverageMatrix } from "@/components/shared/platform-coverage-matrix";
+import { PlatformSectionWorkflowPanel } from "@/components/shared/platform-section-workflow-panel";
 import {
   ImportValidationPanel,
   safePublishLineNumbers,
@@ -183,14 +188,24 @@ const defaultSchedule: Record<string, DaySchedule> = Object.fromEntries(
   ])
 ) as Record<string, DaySchedule>;
 
+function toDateTimeInput(value: unknown, fallback = "") {
+  if (!value) return fallback;
+  const raw = String(value);
+  return raw.includes("T") ? raw.slice(0, 16) : fallback;
+}
+
 const teamPermissions = [
-  "Modifier les médicaments",
-  "Importer l’inventaire",
-  "Modifier les horaires",
-  "Répondre aux demandes",
-  "Modifier le profil",
-  "Voir l’historique",
+  { key: "pharmacy.inventory.update", label: "Modifier les médicaments" },
+  { key: "pharmacy.inventory.import", label: "Importer l’inventaire" },
+  { key: "pharmacy.schedule.update", label: "Modifier les horaires" },
+  { key: "pharmacy.requests.respond", label: "Répondre aux demandes" },
+  { key: "pharmacy.profile.update", label: "Modifier le profil" },
+  { key: "pharmacy.history.read", label: "Voir l’historique" },
 ] as const;
+
+function permissionLabel(permission: string) {
+  return teamPermissions.find((item) => item.key === permission)?.label ?? permission;
+}
 
 type ProfessionalRequestItem = {
   id: string;
@@ -264,6 +279,42 @@ type TeamInvitation = {
   status: string;
   expiresAt: string;
   createdAt: string;
+};
+
+type PharmacyWorkspaceSettings = {
+  autoPublishSafeInventory: boolean;
+  requireManagerReviewForImages: boolean;
+  dailyOperationsDigest: boolean;
+  allowAdminAssistance: boolean;
+  publicProfileChecklist: boolean;
+  reminderFrequency: string;
+  preferredSupportChannel: string;
+  supportPriority: string;
+  supportTopic: string;
+  supportMessage: string;
+};
+
+type PharmacySettingsSnapshot = {
+  pharmacy?: {
+    name: string;
+    accountStatus: string;
+    publicationStatus: string;
+    dataQuality: string;
+    qualityScore: number;
+    mediaCount: number;
+    medicationCount: number;
+    requestCount: number;
+    teamCount: number;
+    lastDataUpdate?: string | null;
+  };
+  security?: {
+    role?: string | null;
+    permissions?: string[];
+    activeSessions?: number;
+    sessionExpiresAt?: number | null;
+  };
+  workspaceSettings?: PharmacyWorkspaceSettings;
+  recentActions?: Array<{ id: string; label: string; action: string; status: string; createdAt: string }>;
 };
 
 type PharmacyProfileData = {
@@ -836,7 +887,11 @@ function PharmacyShell({ page, children }: { page: PharmacyPage; children: React
             </nav>
           </Card>
         </aside>
-        <main className="min-w-0">{children}</main>
+        <main className="min-w-0 space-y-5">
+          <PlatformSectionGuide scope="pharmacy" pageKey={page} />
+          <PlatformSectionWorkflowPanel scope="pharmacy" pageKey={page} />
+          {children}
+        </main>
       </div>
     </div>
   );
@@ -1029,6 +1084,11 @@ function Dashboard() {
         </SectionBlock>
       </div>
       <OperationalLanes />
+      <PlatformUxSyncPanel
+        scope="pharmacy"
+        title="Synchronisation de ma pharmacie"
+        description="Cet espace reste limité à votre pharmacie : vos horaires, photos, médicaments, demandes et confirmations alimentent l’utilisateur uniquement après les règles de publication et de protection."
+      />
       <DataVisibilityBlocks />
       <SectionBlock title="Connexion avec la plateforme utilisateur" description="Seules les données validées et non confidentielles sont publiées côté utilisateur.">
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -1676,6 +1736,8 @@ function AdviceCenter() {
   const [requests, setRequests] = useState<ProfessionalRequestItem[]>([]);
   const [stats, setStats] = useState<RequestStats>({});
   const [filter, setFilter] = useState("Tous");
+  const [priority, setPriority] = useState("all");
+  const [query, setQuery] = useState("");
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -1684,6 +1746,8 @@ function AdviceCenter() {
     setLoading(true);
     const params = new URLSearchParams({ pharmacySlug: PHARMACY_SESSION_SLUG, workflow: "advice" });
     if (filter !== "Tous") params.set("status", filter);
+    if (priority !== "all") params.set("priority", priority);
+    if (query.trim()) params.set("q", query.trim());
     try {
       const res = await fetch(`/api/pharmacy-platform/user-requests?${params}`, { headers: { "X-Sablin-Session-Kind": "pharmacy" } });
       const data = await res.json().catch(() => ({}));
@@ -1695,7 +1759,7 @@ function AdviceCenter() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, priority, query]);
 
   useEffect(() => {
     load();
@@ -1729,6 +1793,26 @@ function AdviceCenter() {
     }
   };
 
+  const updateRequestStatus = async (request: ProfessionalRequestItem, action: "mark-received" | "take" | "accept") => {
+    try {
+      const res = await fetch("/api/pharmacy-platform/user-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({
+          reference: request.reference,
+          pharmacySlug: PHARMACY_SESSION_SLUG,
+          action,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Action impossible.");
+      setMessage(`Demande ${request.reference} mise à jour : ${data.status}.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Action impossible.");
+    }
+  };
+
   return (
     <div className="space-y-5">
       <Card className="border-border/70 p-5 shadow-card">
@@ -1739,11 +1823,37 @@ function AdviceCenter() {
           </div>
           <div className="flex flex-wrap gap-2">
             <StatusBadge label="Responsabilité pharmacien" />
-            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={load}>
+              <RefreshCw className="size-4" /> Actualiser
+            </Button>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1.2fr_0.8fr_0.8fr_auto]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") load();
+              }}
+              placeholder="Rechercher une référence, un médicament ou un message"
+              className="bg-white pl-9"
+            />
+          </div>
+          <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
               <option value="Tous">Tous les statuts</option>
               {REQUEST_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
-            </select>
-          </div>
+          </select>
+          <select value={priority} onChange={(event) => setPriority(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+            <option value="all">Toutes priorités</option>
+            <option value="Haute">Haute</option>
+            <option value="Normale">Normale</option>
+            <option value="Basse">Basse</option>
+          </select>
+          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={load}>
+            <Filter className="size-4" /> Filtrer
+          </Button>
         </div>
         {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
         <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-800">
@@ -1755,6 +1865,8 @@ function AdviceCenter() {
         <Stat label="Nouveaux" value={stats.new ?? 0} badge="Nouvelle" />
         <Stat label="En cours" value={stats.inProgress ?? 0} badge="En cours" />
         <Stat label="Répondus" value={stats.answered ?? 0} badge="Répondue" />
+        <Stat label="Priorité haute" value={stats.highPriority ?? 0} badge="Haute" />
+        <Stat label="Expirés / annulés" value={stats.expired ?? 0} badge="À traiter" />
       </div>
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-3">
@@ -1769,12 +1881,26 @@ function AdviceCenter() {
                   <div className="flex flex-wrap gap-2"><StatusBadge label={item.status} /><StatusBadge label={item.priority} /><StatusBadge label={`${item.creditCost} crédits`} /></div>
                   <h3 className="mt-3 font-extrabold text-foreground">{item.serviceName}</h3>
                   <p className="text-sm font-medium text-muted-foreground">{item.user?.name ?? "Utilisateur"} · {item.medication?.name ?? "Question libre"} · {formatDateTime(item.createdAt)}</p>
+                  <p className="mt-1 text-xs font-bold text-muted-foreground">Référence : {item.reference} · Expire : {formatDateTime(item.expiresAt)}</p>
                 </div>
                 <MessageCircle className="size-5 text-brand" />
               </div>
               {item.userMessage && <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm font-semibold text-foreground">{item.userMessage}</p>}
+              {item.responses?.[0] && (
+                <div className="mt-3 rounded-lg border border-brand/20 bg-brand-light/40 p-3 text-sm">
+                  <p className="font-extrabold text-brand-dark">Dernière réponse envoyée</p>
+                  <p className="mt-1 font-medium text-foreground">{item.responses[0].responseMessage}</p>
+                  <p className="mt-1 text-xs font-bold text-muted-foreground">{formatDateTime(item.responses[0].createdAt)}</p>
+                </div>
+              )}
               <Textarea className="mt-4 min-h-24 bg-white" value={draft} onChange={(event) => setResponses((current) => ({ ...current, [item.reference]: event.target.value }))} />
               <div className="mt-3 flex flex-wrap gap-2">
+                <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => updateRequestStatus(item, "mark-received")}>
+                  Marquer reçue
+                </Button>
+                <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => updateRequestStatus(item, "take")}>
+                  Prendre en charge
+                </Button>
                 <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => sendAdvice(item, draft)}>
                   <Send className="size-4" /> Envoyer conseil
                 </Button>
@@ -1793,10 +1919,26 @@ function AdviceCenter() {
               "SABLIN PHARMA ne remplace pas un professionnel de santé.",
               "Si les symptômes persistent, consultez un médecin.",
               "Le prix indiqué reste indicatif et peut varier.",
+              "Cette réponse est une orientation générale et ne constitue pas une prescription.",
             ].map((template) => (
               <button key={template} type="button" onClick={() => setSelectedTemplate(template)} className="rounded-lg border border-border bg-white p-3 text-left text-sm font-bold text-foreground hover:border-brand/40">
                 {template}
               </button>
+            ))}
+          </div>
+        </SectionBlock>
+        <SectionBlock title="Workflow conseillé" description="Un conseil utilisateur doit rester court, sûr et historisé.">
+          <div className="grid gap-2 text-sm font-semibold text-foreground">
+            {[
+              "Lire la demande et vérifier le médicament concerné.",
+              "Marquer reçue puis prendre en charge si une réponse est possible.",
+              "Utiliser un modèle prudent ou rédiger une réponse validée par le pharmacien.",
+              "Orienter vers un professionnel de santé si la question dépasse le cadre de conseil.",
+            ].map((step) => (
+              <div key={step} className="flex gap-2 rounded-lg border border-border bg-muted/20 p-3">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand" />
+                <span>{step}</span>
+              </div>
             ))}
           </div>
         </SectionBlock>
@@ -2203,10 +2345,14 @@ function Profile() {
 function Schedule() {
   const [schedule, setSchedule] = useState<Record<string, DaySchedule>>(defaultSchedule);
   const [dutyEnabled, setDutyEnabled] = useState(true);
-  const [dutyStart, setDutyStart] = useState("2026-06-19");
-  const [dutyEnd, setDutyEnd] = useState("2026-06-20");
+  const [dutyStart, setDutyStart] = useState("2026-06-19T20:00");
+  const [dutyEnd, setDutyEnd] = useState("2026-06-20T08:00");
+  const [exceptionalClosureStart, setExceptionalClosureStart] = useState("");
+  const [exceptionalClosureEnd, setExceptionalClosureEnd] = useState("");
+  const [exceptionalOpeningMessage, setExceptionalOpeningMessage] = useState("");
   const [specialMessage, setSpecialMessage] = useState("Pharmacie de garde cette nuit. Confirmez avant tout déplacement.");
   const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [savingSchedule, setSavingSchedule] = useState(false);
   const [message, setMessage] = useState("");
 
   const loadSchedule = useCallback(async () => {
@@ -2219,8 +2365,11 @@ function Schedule() {
       if (!res.ok) throw new Error(data?.error ?? "Chargement des horaires impossible.");
       setSchedule({ ...defaultSchedule, ...(data.schedule ?? {}) });
       setDutyEnabled(Boolean(data.duty?.enabled));
-      setDutyStart(data.duty?.start ? String(data.duty.start).slice(0, 10) : "2026-06-19");
-      setDutyEnd(data.duty?.end ? String(data.duty.end).slice(0, 10) : "2026-06-20");
+      setDutyStart(toDateTimeInput(data.duty?.start, "2026-06-19T20:00"));
+      setDutyEnd(toDateTimeInput(data.duty?.end, "2026-06-20T08:00"));
+      setExceptionalClosureStart(toDateTimeInput(data.exceptions?.closureStart));
+      setExceptionalClosureEnd(toDateTimeInput(data.exceptions?.closureEnd));
+      setExceptionalOpeningMessage(data.exceptions?.openingMessage || "");
       setSpecialMessage(data.duty?.message || "");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Chargement des horaires impossible.");
@@ -2241,6 +2390,41 @@ function Schedule() {
         ...patch,
       },
     }));
+  };
+
+  const saveSchedule = async () => {
+    setSavingSchedule(true);
+    try {
+      const res = await fetch(`/api/pharmacy-platform/schedule?pharmacySlug=${encodeURIComponent(PHARMACY_SESSION_SLUG)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({
+          schedule,
+          dutyEnabled,
+          dutyStart,
+          dutyEnd,
+          specialMessage,
+          exceptionalClosureStart,
+          exceptionalClosureEnd,
+          exceptionalOpeningMessage,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Enregistrement impossible.");
+      setSchedule({ ...defaultSchedule, ...(data.schedule ?? {}) });
+      setDutyEnabled(Boolean(data.duty?.enabled));
+      setDutyStart(toDateTimeInput(data.duty?.start, dutyStart));
+      setDutyEnd(toDateTimeInput(data.duty?.end, dutyEnd));
+      setExceptionalClosureStart(toDateTimeInput(data.exceptions?.closureStart));
+      setExceptionalClosureEnd(toDateTimeInput(data.exceptions?.closureEnd));
+      setExceptionalOpeningMessage(data.exceptions?.openingMessage || "");
+      setSpecialMessage(data.duty?.message || specialMessage);
+      setMessage(data?.message ?? "Horaires, garde et exceptions synchronisés.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Enregistrement impossible.");
+    } finally {
+      setSavingSchedule(false);
+    }
   };
 
   return (
@@ -2320,26 +2504,28 @@ function Schedule() {
             Activer le statut pharmacie de garde
           </label>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Field label="Début de garde" type="datetime-local" value={`${dutyStart}T20:00`} onChange={(value) => setDutyStart(value.slice(0, 10))} />
-            <Field label="Fin de garde" type="datetime-local" value={`${dutyEnd}T08:00`} onChange={(value) => setDutyEnd(value.slice(0, 10))} />
-            <Field label="Ouverture exceptionnelle" placeholder="Exemple : dimanche 08:00 - 14:00" />
-            <Field label="Fermeture exceptionnelle" placeholder="Exemple : inventaire annuel" />
+            <Field label="Début de garde" type="datetime-local" value={dutyStart} onChange={setDutyStart} />
+            <Field label="Fin de garde" type="datetime-local" value={dutyEnd} onChange={setDutyEnd} />
+            <Field label="Début fermeture exceptionnelle" type="datetime-local" value={exceptionalClosureStart} onChange={setExceptionalClosureStart} />
+            <Field label="Fin fermeture exceptionnelle" type="datetime-local" value={exceptionalClosureEnd} onChange={setExceptionalClosureEnd} />
           </div>
+          <Label className="mt-4 block text-xs font-bold text-foreground">Ouverture exceptionnelle ou précision horaire</Label>
+          <Textarea
+            value={exceptionalOpeningMessage}
+            onChange={(event) => setExceptionalOpeningMessage(event.target.value)}
+            className="mt-2 min-h-20 bg-white"
+            placeholder="Exemple : ouverture exceptionnelle dimanche 08:00 - 14:00, service limité au comptoir."
+          />
           <Label className="mt-4 block text-xs font-bold text-foreground">Message spécial visible si validé</Label>
           <Textarea value={specialMessage} onChange={(event) => setSpecialMessage(event.target.value)} className="mt-2 min-h-24 bg-white" />
-          <ProfessionalActionButton
-            action="schedule-save"
-            label="Enregistrer horaires et garde"
-            pharmacySlug={PHARMACY_SESSION_SLUG}
-            payload={{ schedule, dutyEnabled, dutyStart, dutyEnd, specialMessage }}
-            onSuccess={() => {
-              setMessage("Horaires enregistrés et synchronisés.");
-              void loadSchedule();
-            }}
+          <Button
+            onClick={saveSchedule}
+            disabled={savingSchedule || loadingSchedule}
             className="mt-4 w-full bg-brand text-white hover:bg-brand-dark sm:w-auto"
           >
-            <Save className="size-4" /> Enregistrer horaires et garde
-          </ProfessionalActionButton>
+            {savingSchedule ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            Enregistrer horaires, garde et exceptions
+          </Button>
         </Card>
 
         <SectionBlock title="Règles de publication" description="Ce qui est publié côté utilisateur reste contrôlé.">
@@ -2366,11 +2552,14 @@ function TeamManagement() {
   const [name, setName] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [role, setRole] = useState("PHARMACY_EMPLOYEE");
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(["Modifier les médicaments", "Répondre aux demandes", "Voir l’historique"]);
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>(["pharmacy.inventory.update", "pharmacy.requests.respond", "pharmacy.history.read"]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editRole, setEditRole] = useState("PHARMACY_EMPLOYEE");
+  const [editPermissions, setEditPermissions] = useState<string[]>([]);
 
   const loadTeam = useCallback(async () => {
     setLoading(true);
@@ -2399,6 +2588,19 @@ function TeamManagement() {
     );
   };
 
+  const toggleEditPermission = (permission: string) => {
+    setEditPermissions((current) =>
+      current.includes(permission) ? current.filter((item) => item !== permission) : [...current, permission]
+    );
+  };
+
+  const beginEditMember = (member: TeamMember) => {
+    setEditingMemberId(member.id);
+    setEditRole(member.role);
+    setEditPermissions(member.permissions.length ? member.permissions : []);
+    setMessage("");
+  };
+
   const inviteMember = async () => {
     setMessage("");
     const isEmail = identifier.includes("@");
@@ -2420,30 +2622,48 @@ function TeamManagement() {
       setMessage(`Invitation créée. Jeton temporaire : ${data.activationTokenPreview ?? "envoyé par canal sécurisé"}`);
       setName("");
       setIdentifier("");
+      setSelectedPermissions(["pharmacy.inventory.update", "pharmacy.requests.respond", "pharmacy.history.read"]);
       await loadTeam();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Invitation impossible.");
     }
   };
 
-  const updateMember = async (member: TeamMember, nextStatus?: string) => {
+  const updateMember = async (member: TeamMember, nextStatus?: string, nextRole = member.role, nextPermissions = member.permissions) => {
     try {
       const res = await fetch("/api/professional/team", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
         body: JSON.stringify({
           membershipId: member.id,
-          role: member.role,
-          permissions: member.permissions,
+          role: nextRole,
+          permissions: nextPermissions,
           status: nextStatus ?? member.status,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error ?? "Modification impossible.");
-      setMessage(nextStatus === "Révoqué" ? "Accès révoqué et journalisé." : "Rôle équipe mis à jour.");
+      setMessage(nextStatus === "Révoqué" ? "Accès révoqué et journalisé." : "Rôle et permissions mis à jour.");
+      setEditingMemberId(null);
       await loadTeam();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Modification impossible.");
+    }
+  };
+
+  const updateInvitation = async (invitationId: string, status: "Annulée" | "Renvoyée") => {
+    try {
+      const res = await fetch("/api/professional/team", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Sablin-Session-Kind": "pharmacy" },
+        body: JSON.stringify({ invitationId, status }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Mise à jour de l’invitation impossible.");
+      setMessage(status === "Renvoyée" ? "Invitation renvoyée avec un nouveau délai." : "Invitation annulée.");
+      await loadTeam();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Mise à jour de l’invitation impossible.");
     }
   };
 
@@ -2473,6 +2693,7 @@ function TeamManagement() {
               <Label className="text-xs font-bold text-foreground">Rôle</Label>
               <select value={role} onChange={(event) => setRole(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
                 <option value="PHARMACY_OWNER">Pharmacien responsable</option>
+                <option value="PHARMACIST_MANAGER">Responsable pharmacie</option>
                 <option value="PHARMACY_EMPLOYEE">Employé pharmacie</option>
                 <option value="PHARMACY_STOCK_MANAGER">Assistant stock</option>
                 <option value="PHARMACY_SUPPORT_AGENT">Agent demandes et conseils</option>
@@ -2483,9 +2704,9 @@ function TeamManagement() {
             <Label className="text-xs font-bold text-foreground">Permissions</Label>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               {teamPermissions.map((permission) => (
-                <label key={permission} className="flex items-start gap-2 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">
-                  <input type="checkbox" checked={selectedPermissions.includes(permission)} onChange={() => togglePermission(permission)} className="mt-0.5 size-4 accent-brand" />
-                  <span>{permission}</span>
+                <label key={permission.key} className="flex items-start gap-2 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">
+                  <input type="checkbox" checked={selectedPermissions.includes(permission.key)} onChange={() => togglePermission(permission.key)} className="mt-0.5 size-4 accent-brand" />
+                  <span>{permission.label}</span>
                 </label>
               ))}
             </div>
@@ -2535,10 +2756,41 @@ function TeamManagement() {
                 <StatusBadge label={member.status} />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {(member.permissions.length ? member.permissions : ["Permissions héritées du rôle"]).map((permission) => <StatusBadge key={permission} label={permission} />)}
+                {(member.permissions.length ? member.permissions : ["Permissions héritées du rôle"]).map((permission) => <StatusBadge key={permission} label={permissionLabel(permission)} />)}
               </div>
+              {editingMemberId === member.id && (
+                <div className="mt-4 rounded-xl border border-brand/20 bg-brand-light/40 p-3">
+                  <div className="grid gap-3 sm:grid-cols-[0.85fr_1.15fr]">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-foreground">Rôle mis à jour</Label>
+                      <select value={editRole} onChange={(event) => setEditRole(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground">
+                        <option value="PHARMACY_OWNER">Pharmacien responsable</option>
+                        <option value="PHARMACIST_MANAGER">Responsable pharmacie</option>
+                        <option value="PHARMACY_EMPLOYEE">Employé pharmacie</option>
+                        <option value="PHARMACY_STOCK_MANAGER">Assistant stock</option>
+                        <option value="PHARMACY_SUPPORT_AGENT">Agent demandes et conseils</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-bold text-foreground">Permissions précises</Label>
+                      <div className="mt-2 grid gap-2">
+                        {teamPermissions.map((permission) => (
+                          <label key={permission.key} className="flex items-start gap-2 rounded-lg border border-border bg-white p-2 text-xs font-bold text-foreground">
+                            <input type="checkbox" checked={editPermissions.includes(permission.key)} onChange={() => toggleEditPermission(permission.key)} className="mt-0.5 size-4 accent-brand" />
+                            <span>{permission.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" className="bg-brand text-white hover:bg-brand-dark" onClick={() => updateMember(member, member.status, editRole, editPermissions)}>Enregistrer</Button>
+                    <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => setEditingMemberId(null)}>Annuler</Button>
+                  </div>
+                </div>
+              )}
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => updateMember(member)}>Modifier rôle</Button>
+                <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => beginEditMember(member)}>Modifier rôle</Button>
                 <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => updateMember(member, "Révoqué")}>Révoquer</Button>
               </div>
             </Card>
@@ -2558,6 +2810,13 @@ function TeamManagement() {
                     </div>
                     <StatusBadge label={invitation.status} />
                   </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(invitation.permissions.length ? invitation.permissions : ["Permissions héritées du rôle"]).map((permission) => <StatusBadge key={permission} label={permissionLabel(permission)} />)}
+                  </div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <Button size="sm" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => updateInvitation(invitation.id, "Renvoyée")}>Renvoyer</Button>
+                    <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50" onClick={() => updateInvitation(invitation.id, "Annulée")}>Annuler</Button>
+                  </div>
                 </Card>
               ))}
             </div>
@@ -2575,26 +2834,61 @@ function ProfessionalAccountSettings() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [snapshot, setSnapshot] = useState<PharmacySettingsSnapshot | null>(null);
+  const [workspaceSettings, setWorkspaceSettings] = useState<PharmacyWorkspaceSettings>({
+    autoPublishSafeInventory: true,
+    requireManagerReviewForImages: true,
+    dailyOperationsDigest: true,
+    allowAdminAssistance: true,
+    publicProfileChecklist: true,
+    reminderFrequency: "daily",
+    preferredSupportChannel: "email",
+    supportPriority: "normal",
+    supportTopic: "Synchronisation des données",
+    supportMessage: "",
+  });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loadingSettings, setLoadingSettings] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingWorkspace, setSavingWorkspace] = useState(false);
+  const [sendingSupport, setSendingSupport] = useState(false);
   const [sendingReset, setSendingReset] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    fetch("/api/professional/me", { headers: { "x-sablin-session-kind": "pharmacy" } })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!active || !data?.account) return;
-        setName(data.account.name ?? "");
-        setEmail(data.account.email ?? "");
-        setPhone(data.account.phone ?? "");
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
+  const loadSettings = useCallback(async () => {
+    setLoadingSettings(true);
+    try {
+      const [accountRes, settingsRes] = await Promise.all([
+        fetch("/api/professional/me", { headers: { "x-sablin-session-kind": "pharmacy" } }),
+        fetch(`/api/pharmacy-platform/settings?pharmacySlug=${encodeURIComponent(PHARMACY_SESSION_SLUG)}`, {
+          headers: { "x-sablin-session-kind": "pharmacy" },
+        }),
+      ]);
+      const [accountData, settingsData] = await Promise.all([
+        accountRes.json().catch(() => ({})),
+        settingsRes.json().catch(() => ({})),
+      ]);
+      if (!accountRes.ok) throw new Error(accountData?.error ?? "Session pharmacie introuvable.");
+      if (!settingsRes.ok) throw new Error(settingsData?.error ?? "Paramètres pharmacie indisponibles.");
+      if (accountData?.account) {
+        setName(accountData.account.name ?? "");
+        setEmail(accountData.account.email ?? "");
+        setPhone(accountData.account.phone ?? "");
+      }
+      setSnapshot(settingsData);
+      if (settingsData.workspaceSettings) {
+        setWorkspaceSettings((current) => ({ ...current, ...settingsData.workspaceSettings }));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Chargement des paramètres impossible.");
+    } finally {
+      setLoadingSettings(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
 
   async function saveIdentifiers() {
     setMessage("");
@@ -2613,6 +2907,54 @@ function ProfessionalAccountSettings() {
       setError(err instanceof Error ? err.message : "Modification impossible.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveWorkspaceSettings() {
+    setMessage("");
+    setError("");
+    setSavingWorkspace(true);
+    try {
+      const res = await fetch("/api/pharmacy-platform/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-sablin-session-kind": "pharmacy" },
+        body: JSON.stringify(workspaceSettings),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Enregistrement des préférences impossible.");
+      setWorkspaceSettings((current) => ({ ...current, ...(data.workspaceSettings ?? {}) }));
+      setMessage(data?.message ?? "Paramètres pharmacie enregistrés.");
+      await loadSettings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Enregistrement des préférences impossible.");
+    } finally {
+      setSavingWorkspace(false);
+    }
+  }
+
+  async function sendSupportRequest() {
+    setMessage("");
+    setError("");
+    setSendingSupport(true);
+    try {
+      const res = await fetch("/api/pharmacy-platform/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-sablin-session-kind": "pharmacy" },
+        body: JSON.stringify({
+          topic: workspaceSettings.supportTopic,
+          priority: workspaceSettings.supportPriority,
+          message: workspaceSettings.supportMessage,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Envoi au support impossible.");
+      setWorkspaceSettings((current) => ({ ...current, supportMessage: "" }));
+      setMessage(data?.message ?? "Demande support envoyée.");
+      await loadSettings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Envoi au support impossible.");
+    } finally {
+      setSendingSupport(false);
     }
   }
 
@@ -2636,6 +2978,17 @@ function ProfessionalAccountSettings() {
     }
   }
 
+  const setWorkspaceField = <K extends keyof PharmacyWorkspaceSettings>(key: K, value: PharmacyWorkspaceSettings[K]) => {
+    setWorkspaceSettings((current) => ({ ...current, [key]: value }));
+  };
+
+  const accountStats = [
+    { label: "Médicaments suivis", value: snapshot?.pharmacy?.medicationCount ?? 0, badge: "Inventaire" },
+    { label: "Images pharmacie", value: snapshot?.pharmacy?.mediaCount ?? 0, badge: "Photos" },
+    { label: "Demandes reçues", value: snapshot?.pharmacy?.requestCount ?? 0, badge: "Demandes" },
+    { label: "Membres équipe", value: snapshot?.pharmacy?.teamCount ?? 0, badge: "Équipe" },
+  ];
+
   return (
     <div className="space-y-5">
       <Card className="border-border/70 p-5 shadow-card">
@@ -2643,10 +2996,18 @@ function ProfessionalAccountSettings() {
           <div>
             <Heading level="h2">Paramètres pharmacie</Heading>
             <Muted className="mt-1">
-              Modifiez les identifiants du compte pharmacie et réinitialisez le mot de passe uniquement par lien e-mail SABLIN PHARMA.
+              Gérez les identifiants, la sécurité, les préférences de publication, les alertes et le support de votre espace pharmacie.
             </Muted>
           </div>
-          <StatusBadge label="Espace Pharmacie" />
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge label="Espace Pharmacie" />
+            <StatusBadge label={snapshot?.pharmacy?.accountStatus ?? "Compte"} />
+            <StatusBadge label={snapshot?.pharmacy?.publicationStatus ?? "Publication"} />
+          </div>
+        </div>
+        {loadingSettings && <p className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm font-bold text-muted-foreground">Chargement des paramètres professionnels...</p>}
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {accountStats.map((stat) => <Stat key={stat.label} {...stat} />)}
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           <Field label="Nom du compte" value={name} onChange={setName} />
@@ -2667,21 +3028,168 @@ function ProfessionalAccountSettings() {
         {error && <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800">{error}</p>}
       </Card>
 
-      <Card className="border-border/70 p-5 shadow-card">
-        <Heading level="h3">Sécurité du compte</Heading>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {[
-            "Le mot de passe n’est jamais affiché en clair.",
-            "Le lien de réinitialisation expire après 30 minutes.",
-            "Après changement du mot de passe, les sessions professionnelles sont révoquées.",
-          ].map((item) => (
-            <Card key={item} className="border-border/70 p-4">
-              <KeyRound className="size-5 text-brand" />
-              <p className="mt-2 text-sm font-bold text-foreground">{item}</p>
-            </Card>
-          ))}
-        </div>
-      </Card>
+      <div className="grid gap-5 xl:grid-cols-[1fr_0.9fr]">
+        <Card className="border-border/70 p-5 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <Heading level="h3">Préférences opérationnelles</Heading>
+              <Muted className="mt-1">Ces réglages pilotent la publication contrôlée, les rappels, l’assistance admin et la qualité visible côté utilisateur.</Muted>
+            </div>
+            <StatusBadge label="Synchronisation pharmacie" />
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {([
+              ["autoPublishSafeInventory", "Publier automatiquement les lignes sûres", "Les produits reconnus, autorisés et complets peuvent être publiés sans intervention admin."],
+              ["requireManagerReviewForImages", "Validation responsable pour les images", "Une image web ou ambiguë reste bloquée tant qu’elle n’est pas validée."],
+              ["dailyOperationsDigest", "Résumé quotidien", "Recevoir un rappel sur demandes, confirmations, stocks anciens et imports."],
+              ["allowAdminAssistance", "Assistance admin autorisée", "L’administration peut corriger une donnée de votre pharmacie avec audit complet."],
+              ["publicProfileChecklist", "Checklist profil public", "Afficher les rappels utiles pour logo, façade, horaires, GPS et services."],
+            ] as Array<[keyof PharmacyWorkspaceSettings, string, string]>).map(([key, title, detail]) => (
+              <label key={key} className="rounded-xl border border-border bg-white p-4">
+                <input
+                  type="checkbox"
+                  checked={Boolean(workspaceSettings[key as keyof PharmacyWorkspaceSettings])}
+                  onChange={(event) => setWorkspaceSettings((current) => ({ ...current, [key]: event.target.checked }))}
+                  className="mr-2 size-4 accent-brand"
+                />
+                <span className="font-extrabold text-foreground">{title}</span>
+                <p className="mt-1 text-sm font-medium text-muted-foreground">{detail}</p>
+              </label>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div>
+              <Label className="text-xs font-bold text-foreground">Rythme des rappels</Label>
+              <select
+                value={workspaceSettings.reminderFrequency}
+                onChange={(event) => setWorkspaceField("reminderFrequency", event.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground"
+              >
+                <option value="daily">Chaque jour</option>
+                <option value="weekly">Chaque semaine</option>
+                <option value="critical-only">Urgences seulement</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-foreground">Canal support préféré</Label>
+              <select
+                value={workspaceSettings.preferredSupportChannel}
+                onChange={(event) => setWorkspaceField("preferredSupportChannel", event.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground"
+              >
+                <option value="email">E-mail</option>
+                <option value="phone">Téléphone</option>
+                <option value="whatsapp">WhatsApp interne</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs font-bold text-foreground">Priorité support</Label>
+              <select
+                value={workspaceSettings.supportPriority}
+                onChange={(event) => setWorkspaceField("supportPriority", event.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground"
+              >
+                <option value="normal">Normal</option>
+                <option value="urgent">Urgent</option>
+                <option value="blocking">Bloquant</option>
+              </select>
+            </div>
+          </div>
+          <Button onClick={saveWorkspaceSettings} disabled={savingWorkspace} className="mt-4 w-full bg-brand text-white hover:bg-brand-dark sm:w-auto">
+            {savingWorkspace ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            Enregistrer les préférences
+          </Button>
+        </Card>
+
+        <Card className="border-border/70 p-5 shadow-card">
+          <Heading level="h3">Sécurité du compte</Heading>
+          <div className="mt-4 grid gap-3">
+            {[
+              ["Rôle", snapshot?.security?.role ?? "Pharmacie"],
+              ["Permissions", `${snapshot?.security?.permissions?.length ?? 0} autorisations`],
+              ["Sessions actives", `${snapshot?.security?.activeSessions ?? 0}`],
+              ["Dernière mise à jour", snapshot?.pharmacy?.lastDataUpdate ? formatDateTime(snapshot.pharmacy.lastDataUpdate) : "Non renseignée"],
+            ].map(([label, value]) => (
+              <div key={label} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-white p-4">
+                <span className="text-sm font-bold text-muted-foreground">{label}</span>
+                <span className="text-sm font-extrabold text-foreground">{value}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-3">
+            {[
+              "Le mot de passe n’est jamais affiché en clair.",
+              "Le lien de réinitialisation expire après 30 minutes.",
+              "Après changement du mot de passe, les sessions professionnelles sont révoquées.",
+              "Une pharmacie ne peut pas accéder aux données d’une autre pharmacie.",
+            ].map((item) => (
+              <Card key={item} className="border-border/70 p-4">
+                <KeyRound className="size-5 text-brand" />
+                <p className="mt-2 text-sm font-bold text-foreground">{item}</p>
+              </Card>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[0.9fr_1fr]">
+        <Card className="border-border/70 p-5 shadow-card">
+          <Heading level="h3">Support pharmacie</Heading>
+          <Muted className="mt-1">Une demande envoyée ici arrive dans l’administration SABLIN PHARMA et reste visible dans l’historique.</Muted>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Field label="Sujet" value={workspaceSettings.supportTopic} onChange={(value) => setWorkspaceField("supportTopic", value)} />
+            <div>
+              <Label className="text-xs font-bold text-foreground">Priorité</Label>
+              <select
+                value={workspaceSettings.supportPriority}
+                onChange={(event) => setWorkspaceField("supportPriority", event.target.value)}
+                className="mt-1 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-bold text-foreground"
+              >
+                <option value="normal">Normal</option>
+                <option value="urgent">Urgent</option>
+                <option value="blocking">Bloquant</option>
+              </select>
+            </div>
+          </div>
+          <Label className="mt-4 block text-xs font-bold text-foreground">Message au support</Label>
+          <Textarea
+            value={workspaceSettings.supportMessage}
+            onChange={(event) => setWorkspaceField("supportMessage", event.target.value)}
+            className="mt-2 min-h-28 bg-white"
+            placeholder="Expliquez le blocage, l’import concerné, la donnée à corriger ou l’aide attendue."
+          />
+          <Button onClick={sendSupportRequest} disabled={sendingSupport || workspaceSettings.supportMessage.trim().length < 12} className="mt-4 w-full bg-brand text-white hover:bg-brand-dark sm:w-auto">
+            {sendingSupport ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+            Envoyer au support
+          </Button>
+        </Card>
+
+        <Card className="border-border/70 p-5 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <Heading level="h3">Dernières actions synchronisées</Heading>
+              <Muted className="mt-1">Chaque changement important est journalisé pour la pharmacie et l’administration.</Muted>
+            </div>
+            <StatusBadge label={snapshot?.pharmacy?.dataQuality ?? "Qualité"} />
+          </div>
+          <div className="mt-4 grid gap-3">
+            {(snapshot?.recentActions ?? []).length === 0 && (
+              <Card className="border-dashed border-border p-6 text-center text-sm font-bold text-muted-foreground">
+                Aucune action récente enregistrée.
+              </Card>
+            )}
+            {(snapshot?.recentActions ?? []).map((item) => (
+              <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-border bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-extrabold text-foreground">{item.label}</p>
+                  <p className="text-xs font-bold text-muted-foreground">{formatDateTime(item.createdAt)} · {item.action}</p>
+                </div>
+                <StatusBadge label={item.status} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -2718,7 +3226,22 @@ export function PharmacySpaceView({ page }: { page: PharmacyPage }) {
       {page === "medicaments-ajouter" && <Medications />}
       {page === "import-inventaire" && <ImportInventory />}
       {page === "enrichissement-inventaire" && <InventoryEnrichment />}
-      {page === "synchronisation-inventaire" && <InventorySyncPanel kind="pharmacy" pharmacySlug={PHARMACY_SESSION_SLUG} />}
+      {page === "synchronisation-inventaire" && (
+        <div className="space-y-5">
+          <PlatformUxSyncPanel
+            scope="pharmacy"
+            compact
+            title="Synchronisation de mes données"
+            description="Vos médicaments, horaires, photos, demandes et confirmations alimentent la plateforme utilisateur après les règles de publication, sans afficher les stocks exacts gratuitement."
+          />
+          <PlatformCoverageMatrix
+            scope="pharmacy"
+            title="Couverture UX de mon espace pharmacie"
+            description="Toutes les sections de l’espace pharmacie sont listées avec leurs actions, données synchronisées et protections."
+          />
+          <InventorySyncPanel kind="pharmacy" pharmacySlug={PHARMACY_SESSION_SLUG} />
+        </div>
+      )}
       {page === "demandes" && <ProfessionalRequestsPanel kind="pharmacy" pharmacySlug={PHARMACY_SESSION_SLUG} />}
       {page === "confirmations" && <ConfirmationCenter />}
       {page === "conseils" && <AdviceCenter />}

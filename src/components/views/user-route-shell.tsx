@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { PlatformUserSectionStrip } from "@/components/shared/platform-user-section-strip";
 import { useNav } from "@/store/nav";
 import { useAuth } from "@/store/auth";
 import { useNotifications } from "@/store/notifications";
@@ -30,6 +31,23 @@ import { SettingsView } from "@/components/views/settings-view";
 import { DesignSystemView } from "@/components/views/design-system-view";
 import { WalletView } from "@/components/views/wallet-view";
 import type { View } from "@/lib/types";
+
+const USER_GUIDE_VIEWS = new Set<View>([
+  "medications",
+  "medication-detail",
+  "pharmacies",
+  "pharmacy-detail",
+  "prescription",
+  "prescription-result",
+  "profile",
+  "payment",
+  "notifications",
+  "requests",
+  "history",
+  "favorites",
+  "settings",
+  "wallet",
+]);
 
 export function UserRouteShell({ initialView = "home" }: { initialView?: View }) {
   const { view, navigate } = useNav();
@@ -87,6 +105,11 @@ export function UserRouteShell({ initialView = "home" }: { initialView?: View })
     <div className="sablin-user-ui flex min-h-screen flex-col bg-background">
       <Header />
       <main className="flex-1 pb-20 md:pb-0">
+        {USER_GUIDE_VIEWS.has(view) && (
+          <div className="mx-auto w-full max-w-7xl px-3 pt-3 sm:px-5 lg:px-6">
+            <PlatformUserSectionStrip pageKey={view} />
+          </div>
+        )}
         {view === "home" && <HomeView />}
         {view === "medications" && <MedicationsView />}
         {view === "medication-detail" && <MedicationDetailView />}

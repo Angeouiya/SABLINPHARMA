@@ -2,5 +2,5 @@ import { AdminSpaceView } from "@/components/views/admin-space-view";
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <AdminSpaceView page="pharmacie-detail" pharmacyId={id} />;
+  return <AdminSpaceView page="pharmacy-profil" pharmacyId={id} />;
 }

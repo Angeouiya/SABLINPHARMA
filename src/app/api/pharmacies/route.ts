@@ -4,6 +4,7 @@ import { lockedFeaturePayload } from "@/lib/credit-gates";
 import { isOpenNow } from "@/lib/format";
 import { isPublicPharmacyMedia } from "@/lib/pharmacy-platform";
 import { pharmacyRatingLabel } from "@/lib/pharmacy-ratings";
+import { publicPharmacyWhere } from "@/lib/public-platform-stats";
 
 function safeMedia(media: {
   id: string;
@@ -35,10 +36,7 @@ export async function GET(req: NextRequest) {
   const commune = searchParams.get("commune");
   const filter = searchParams.get("filter"); // "open" | "on-duty" | "247"
 
-  const where: Record<string, unknown> = {
-    accountStatus: "Validée",
-    publicationStatus: "Publiée",
-  };
+  const where: Record<string, unknown> = publicPharmacyWhere();
   if (q) {
     where.AND = [
       {

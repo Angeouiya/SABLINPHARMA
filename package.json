@@ -7,6 +7,8 @@
     "build": "prisma generate && next build --webpack",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
+    "verify:platform-sync": "tsx scripts/verify-platform-ux-sync.ts",
+    "verify:counts-sync": "tsx scripts/verify-counts-sync.ts",
     "verify:restrictions": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/verify-restrictions.mjs",
     "verify:public-gates": "node scripts/verify-public-credit-gates.mjs",
     "db:push": "prisma db push",

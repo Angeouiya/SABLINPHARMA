@@ -98,3 +98,18 @@ export async function disableProhibitedMedicationTerm(input: {
     },
   });
 }
+
+export async function enableProhibitedMedicationTerm(input: {
+  id: string;
+  enabledBy?: string | null;
+}) {
+  void input.enabledBy;
+  return db.prohibitedMedicationTerm.update({
+    where: { id: input.id },
+    data: {
+      active: true,
+      disabledAt: null,
+      disabledBy: null,
+    },
+  });
+}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { PHARMACY_ACCOUNT_STATUSES, PHARMACY_CREATION_SOURCES } from "@/lib/pharmacy-platform";
 import { requirePharmacyPermission } from "@/lib/pharmacy-access";
@@ -16,16 +17,78 @@ export async function GET(req: NextRequest) {
   const access = requirePharmacyPermission(req, "view_all_pharmacies");
   if (access.response) return access.response;
 
-  const pharmacies = await db.pharmacy.findMany({
-    orderBy: [{ accountStatus: "asc" }, { name: "asc" }],
-    include: { media: true, _count: { select: { medications: true } } },
-  });
+  const { searchParams } = new URL(req.url);
+  const q = searchParams.get("q")?.trim() ?? "";
+  const accountStatus = searchParams.get("accountStatus") || "all";
+  const publicationStatus = searchParams.get("publicationStatus") || "all";
+  const commune = searchParams.get("commune")?.trim() ?? "";
+  const where: Prisma.PharmacyWhereInput = {
+    ...(accountStatus === "pending"
+      ? { accountStatus: { in: ["En attente", "En attente de validation", "Incomplète"] } }
+      : accountStatus !== "all"
+        ? { accountStatus }
+        : {}),
+    ...(publicationStatus !== "all" ? { publicationStatus } : {}),
+    ...(commune ? { commune } : {}),
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q } },
+            { commune: { contains: q } },
+            { district: { contains: q } },
+            { managerName: { contains: q } },
+            { professionalEmail: { contains: q } },
+            { phone: { contains: q } },
+          ],
+        }
+      : {}),
+  };
+
+  const [pharmacies, total, pending, validated, refused, suspended, incomplete, published, withPublicMedia, recentActions] = await Promise.all([
+    db.pharmacy.findMany({
+      where,
+      orderBy: [{ accountStatus: "asc" }, { name: "asc" }],
+      include: { media: true, _count: { select: { medications: true, userRequests: true, professionalMemberships: true } } },
+      take: 180,
+    }),
+    db.pharmacy.count(),
+    db.pharmacy.count({ where: { accountStatus: { in: ["En attente", "En attente de validation"] } } }),
+    db.pharmacy.count({ where: { accountStatus: "Validée" } }),
+    db.pharmacy.count({ where: { accountStatus: "Refusée" } }),
+    db.pharmacy.count({ where: { accountStatus: "Suspendue" } }),
+    db.pharmacy.count({ where: { accountStatus: "Incomplète" } }),
+    db.pharmacy.count({ where: { publicationStatus: "Publiée" } }),
+    db.pharmacy.count({ where: { media: { some: { visibility: "public", isPublic: true, isValidated: true } } } }),
+    db.professionalActionLog.findMany({
+      where: { scope: "admin", action: { in: ["validate-pharmacy", "refuse-pharmacy", "suspend-pharmacy", "review-documents"] } },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: { id: true, label: true, action: true, status: true, actorRole: true, message: true, pharmacySlug: true, createdAt: true },
+    }),
+  ]);
 
   return NextResponse.json({
     pharmacies: pharmacies.map((pharmacy) => ({
       ...pharmacy,
       medicationCount: pharmacy._count.medications,
+      requestCount: pharmacy._count.userRequests,
+      teamCount: pharmacy._count.professionalMemberships,
+      publicMediaCount: pharmacy.media.filter((media) => media.visibility === "public" && media.isPublic && media.isValidated).length,
+      adminOnlyMediaCount: pharmacy.media.filter((media) => media.visibility === "admin_only" || media.containsSensitiveData).length,
     })),
+    summary: {
+      total,
+      pending,
+      validated,
+      refused,
+      suspended,
+      incomplete,
+      published,
+      withPublicMedia,
+      visible: pharmacies.length,
+    },
+    recentActions,
+    filters: { q, accountStatus, publicationStatus, commune },
   });
 }
 

@@ -33,6 +33,16 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Loader } from "@/components/shared/loader";
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
@@ -98,8 +108,7 @@ const NOTIF_ROWS: SwitchRow[] = [
     key: "priceAlerts",
     label: "Alertes de prix sur mes favoris",
     description:
-      "Soyez prévenu quand le prix d'un médicament favori baisse.",
-    avanceLocked: true,
+      "Préférence gratuite. Le coût d’une alerte avancée est affiché avant validation.",
   },
   {
     key: "promoAlerts",
@@ -119,6 +128,9 @@ export function SettingsView() {
 
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [deletionOpen, setDeletionOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -174,15 +186,49 @@ export function SettingsView() {
     navigate("home");
   };
 
-  const handleDeleteAccount = () => {
-    const ok = window.confirm(
-      "Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible."
-    );
-    if (ok) {
-      toast.info("Fonctionnalité bientôt disponible.", {
-        description:
-          "La suppression de compte sera disponible dans une prochaine version.",
+  const handleExportData = async () => {
+    if (!user) return;
+    const userId = user.id;
+    setExporting(true);
+    try {
+      const res = await fetch("/api/account/export", { cache: "no-store" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? "Export impossible.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `sablin-pharma-export-${userId}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Export généré.", {
+        description: "Le fichier contient vos données utilisateur, sans mot de passe ni secret technique.",
       });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export impossible.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/account/deletion-request", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? "Demande impossible.");
+      toast.success(data?.alreadyRequested ? "Demande déjà enregistrée." : "Demande enregistrée.", {
+        description: data?.message ?? "L’équipe SABLIN PHARMA vérifiera votre compte avant toute suppression.",
+      });
+      setDeletionOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Demande impossible.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -259,7 +305,6 @@ export function SettingsView() {
             <CardContent className="px-6 pb-4 pt-2">
               <div className="divide-y divide-border/60">
                 {NOTIF_ROWS.map((row) => {
-                  const locked = row.avanceLocked && !avance;
                   const checked = Boolean(settings[row.key]);
                   const isSaving = saving === row.key;
                   return (
@@ -273,7 +318,7 @@ export function SettingsView() {
                             {row.label}
                           </p>
                           {row.avanceLocked && (
-                            <Badge className="border-0 bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                          <Badge className="border-0 bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
                               <Crown className="mr-1 size-3" />
                               Crédits
                             </Badge>
@@ -291,7 +336,7 @@ export function SettingsView() {
                         )}
                         <Switch
                           checked={checked}
-                          disabled={locked || isSaving}
+                          disabled={isSaving}
                           onCheckedChange={(v) => patch(row.key, v)}
                           aria-label={row.label}
                         />
@@ -300,13 +345,10 @@ export function SettingsView() {
                   );
                 })}
               </div>
-              {avance && (
-                <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  <Crown className="size-3.5" />
-                  Les alertes de prix sur vos favoris sont activées avec
-                  Crédits.
-                </p>
-              )}
+              <p className="mt-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <Crown className="size-3.5" />
+                Les préférences sont gratuites. Les services avancés affichent leur coût en crédits avant validation.
+              </p>
             </CardContent>
           </Card>
 
@@ -336,13 +378,10 @@ export function SettingsView() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="fr">Français</SelectItem>
-                    <SelectItem value="en" disabled>
-                      English (Bientôt)
-                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  L&apos;anglais sera bientôt disponible.
+                  Le français est la langue active du MVP SABLIN PHARMA.
                 </p>
               </div>
 
@@ -430,24 +469,47 @@ export function SettingsView() {
                 <Button
                   variant="outline"
                   className="justify-start gap-2 border-border/70"
-                  onClick={() =>
-                    toast.info("Bientôt disponible", {
-                      description:
-                        "Le téléchargement de vos données sera disponible prochainement.",
-                    })
-                  }
-                >
-                  <Download className="size-4 text-brand" />
+                    onClick={handleExportData}
+                    disabled={exporting}
+                  >
+                  {exporting ? <Loader2 className="size-4 animate-spin text-brand" /> : <Download className="size-4 text-brand" />}
                   Télécharger mes données
                 </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                  onClick={handleDeleteAccount}
-                >
-                  <Trash2 className="size-4" />
-                  Supprimer mon compte
-                </Button>
+                <AlertDialog open={deletionOpen} onOpenChange={setDeletionOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="justify-start gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    >
+                      <Trash2 className="size-4" />
+                      Supprimer mon compte
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="border-border bg-white">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-foreground">Demander la suppression du compte</AlertDialogTitle>
+                      <AlertDialogDescription className="text-muted-foreground">
+                        SABLIN PHARMA va enregistrer une demande auditée. L’équipe vérifie d’abord les crédits,
+                        transactions, pass et demandes en cours avant toute suppression définitive.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-800">
+                      Cette action ne supprime pas brutalement votre compte immédiatement. Elle protège vos preuves de paiement
+                      et évite de perdre un historique utile pour le support.
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
+                      <Button
+                        className="bg-red-600 text-white hover:bg-red-700"
+                        onClick={handleDeleteAccount}
+                        disabled={deleting}
+                      >
+                        {deleting && <Loader2 className="size-4 animate-spin" />}
+                        Envoyer la demande
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
 
               <div className="mt-4 flex items-start gap-2 rounded-xl border border-brand/20 bg-brand-light/30 p-3">
@@ -472,55 +534,38 @@ export function SettingsView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-2">
-              {avance ? (
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-50 p-4">
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-amber-500 text-white">
-                      <Crown className="size-5" />
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-extrabold text-amber-900">
-                        Crédits actif
-                      </p>
-                      <p className="text-xs text-amber-800/80">
-                        Merci de votre confiance ! Profitez de toutes les
-                        fonctionnalités Crédits.
-                      </p>
-                    </div>
-                    <CheckCircle2 className="size-5 text-amber-600" />
-                  </div>
-                  <Button
-                    className="w-full bg-brand text-white hover:opacity-90"
-                    onClick={() => navigate("subscription")}
-                  >
-                    Mon portefeuille
-                    <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-50 p-4">
-                    <div className="flex items-center gap-2">
-                      <Crown className="size-4 text-amber-600" />
-                      <p className="text-sm font-bold text-amber-900">
-                        Passez à Crédits
-                      </p>
-                    </div>
-                    <p className="mt-1 text-xs leading-relaxed text-amber-800/80">
-                      Estimations par crédits, alertes de prix sur vos favoris,
-                      assistance prioritaire et bien plus — pour seulement
-                      500 FCFA.
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-50 p-4">
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-amber-500 text-white">
+                    <Crown className="size-5" />
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-sm font-extrabold text-amber-900">
+                      Solde : {user.credits ?? 0} crédit{(user.credits ?? 0) > 1 ? "s" : ""}
+                    </p>
+                    <p className="text-xs text-amber-800/80">
+                      1 crédit = 100 FCFA. Le Pass Ordonnance Unique coûte 500 FCFA et reste valable pour une seule ordonnance.
                     </p>
                   </div>
+                  {avance && <CheckCircle2 className="size-5 text-amber-600" />}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
                   <Button
-                    className="w-full bg-amber-500 text-white hover:bg-amber-600"
-                    onClick={() => navigate("subscription")}
+                    className="w-full bg-brand text-white hover:bg-brand-dark"
+                    onClick={() => navigate("wallet")}
                   >
-                    <Crown className="size-4" />
-                    Découvrir Crédits
+                    Recharger mes crédits
+                    <ChevronRight className="size-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full border-brand/30 text-brand-dark hover:bg-brand-light"
+                    onClick={() => navigate("wallet")}
+                  >
+                    Acheter un Pass Ordonnance Unique
                   </Button>
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
 

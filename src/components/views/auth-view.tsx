@@ -18,7 +18,6 @@ import {
   Timer,
   Heart,
   AlertCircle,
-  Smartphone,
   ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -242,12 +241,6 @@ export function AuthView() {
     window.location.href = "/api/auth/google/start";
   }
 
-  function handleQuickAuth(provider: string) {
-    toast.info(`${provider} bientôt disponible.`, {
-      description: "Utilisez le formulaire téléphone ou Gmail pour le moment.",
-    });
-  }
-
   return (
     <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-2">
       {/* ---------- Left brand panel ---------- */}
@@ -409,7 +402,7 @@ export function AuthView() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid gap-2.5">
                     <Button
                       type="button"
                       variant="outline"
@@ -417,14 +410,6 @@ export function AuthView() {
                       onClick={handleGoogleAuth}
                     >
                       <GoogleIcon /> Google
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11"
-                      onClick={() => handleQuickAuth("Connexion par téléphone")}
-                    >
-                      <Smartphone className="size-4 text-brand" /> Téléphone
                     </Button>
                   </div>
 
@@ -672,7 +657,7 @@ export function AuthView() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid gap-2.5">
                     <Button
                       type="button"
                       variant="outline"
@@ -680,14 +665,6 @@ export function AuthView() {
                       onClick={handleGoogleAuth}
                     >
                       <GoogleIcon /> Google
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11"
-                      onClick={() => handleQuickAuth("Inscription par téléphone")}
-                    >
-                      <Smartphone className="size-4 text-brand" /> Téléphone
                     </Button>
                   </div>
 

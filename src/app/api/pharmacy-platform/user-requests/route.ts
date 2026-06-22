@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   const pharmacySlug = searchParams.get("pharmacySlug") || access.session?.pharmacySlug;
   const status = searchParams.get("status") || "all";
   const workflow = searchParams.get("workflow") || "all";
+  const priority = searchParams.get("priority") || "all";
   const query = (searchParams.get("q") || "").trim();
 
   if (!canManageAny(access.role) && access.session?.kind === "pharmacy" && pharmacySlug !== access.session.pharmacySlug) {
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
 
   const where: Prisma.PharmacyRequestWhereInput = canManageAny(access.role) && !pharmacySlug ? {} : { pharmacy: { slug: pharmacySlug ?? "" } };
   if (status !== "all") where.status = status;
+  if (priority !== "all") where.priority = priority;
   if (workflow === "confirmations") where.requestType = { in: ["confirm_availability", "confirm_price", "confirm_full"] };
   if (workflow === "advice") where.requestType = "advice_pharmacy";
   if (query) {
@@ -80,7 +82,7 @@ export async function GET(req: NextRequest) {
     requests: requests.map(serializeRequest),
     pending: fresh + inProgress,
     stats: { total, new: fresh, inProgress, answered, expired, highPriority },
-    filters: { status, workflow, query },
+    filters: { status, workflow, priority, query },
   });
 }
 

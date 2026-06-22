@@ -3,13 +3,72 @@ import { db } from "@/lib/db";
 import { hasPharmacyPermission, requirePharmacyPermission } from "@/lib/pharmacy-access";
 import { MEDICATION_ADD_REQUEST_STATUSES } from "@/lib/pharmacy-platform";
 
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+async function uniqueMedicationSlug(name: string) {
+  const base = slugify(name) || "medicament";
+  let slug = base;
+  let index = 1;
+  while (await db.medication.findUnique({ where: { slug }, select: { id: true } })) {
+    index += 1;
+    slug = `${base}-${index}`;
+  }
+  return slug;
+}
+
+async function defaultCategory() {
+  const slug = "autres";
+  const existing = await db.category.findUnique({ where: { slug } });
+  if (existing) return existing;
+  return db.category.create({
+    data: {
+      name: "Autres",
+      slug,
+      iconName: "Pill",
+      color: "#0f8a5f",
+      description: "Catégorie par défaut du référentiel SABLIN PHARMA.",
+    },
+  });
+}
+
 export async function GET(req: NextRequest) {
   const access = requirePharmacyPermission(req, "view_own_dashboard");
   if (access.response) return access.response;
 
   const isAdmin = hasPharmacyPermission(access.role, "view_all_pharmacies");
+  const { searchParams } = new URL(req.url);
+  const q = searchParams.get("q")?.trim() ?? "";
+  const status = searchParams.get("status")?.trim() ?? "all";
+  const pharmacySlug = searchParams.get("pharmacySlug")?.trim() ?? "";
+  const where = {
+    ...(isAdmin
+      ? pharmacySlug && pharmacySlug !== "all"
+        ? { pharmacy: { slug: pharmacySlug } }
+        : {}
+      : { pharmacy: { slug: access.session?.pharmacySlug } }),
+    ...(status && status !== "all" ? { status } : {}),
+    ...(q
+      ? {
+          OR: [
+            { proposedName: { contains: q } },
+            { genericName: { contains: q } },
+            { dosage: { contains: q } },
+            { form: { contains: q } },
+            { manufacturer: { contains: q } },
+            { pharmacy: { name: { contains: q } } },
+          ],
+        }
+      : {}),
+  };
   const requests = await db.medicationAddRequest.findMany({
-    where: isAdmin ? {} : { pharmacy: { slug: access.session?.pharmacySlug } },
+    where,
     include: {
       pharmacy: { select: { name: true, slug: true, commune: true, district: true } },
       medication: { select: { name: true, slug: true } },
@@ -18,7 +77,28 @@ export async function GET(req: NextRequest) {
     take: 100,
   });
 
-  return NextResponse.json({ requests, statuses: MEDICATION_ADD_REQUEST_STATUSES });
+  const [total, pending, analysis, validated, refused, merged] = await Promise.all([
+    db.medicationAddRequest.count({ where: isAdmin ? {} : { pharmacy: { slug: access.session?.pharmacySlug } } }),
+    db.medicationAddRequest.count({ where: { ...(isAdmin ? {} : { pharmacy: { slug: access.session?.pharmacySlug } }), status: "En attente" } }),
+    db.medicationAddRequest.count({ where: { ...(isAdmin ? {} : { pharmacy: { slug: access.session?.pharmacySlug } }), status: "En analyse" } }),
+    db.medicationAddRequest.count({ where: { ...(isAdmin ? {} : { pharmacy: { slug: access.session?.pharmacySlug } }), status: "Validée" } }),
+    db.medicationAddRequest.count({ where: { ...(isAdmin ? {} : { pharmacy: { slug: access.session?.pharmacySlug } }), status: "Refusée" } }),
+    db.medicationAddRequest.count({ where: { ...(isAdmin ? {} : { pharmacy: { slug: access.session?.pharmacySlug } }), status: "Fusionnée avec un médicament existant" } }),
+  ]);
+
+  return NextResponse.json({
+    requests,
+    statuses: MEDICATION_ADD_REQUEST_STATUSES,
+    summary: {
+      total,
+      pending,
+      analysis,
+      validated,
+      refused,
+      merged,
+      visible: requests.length,
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -88,15 +168,98 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Identifiant et statut valide obligatoires." }, { status: 400 });
   }
 
+  const current = await db.medicationAddRequest.findUnique({
+    where: { id },
+    include: { medication: true },
+  });
+  if (!current) return NextResponse.json({ error: "Demande introuvable." }, { status: 404 });
+
+  const requestedMedicationId = String(body.medicationId ?? "").trim();
+  let medicationId: string | null = requestedMedicationId || current.medicationId || null;
+  let finalStatus = status;
+
+  if (status === "Validée" && !medicationId) {
+    const genericName = current.genericName?.trim();
+    const dosage = current.dosage?.trim();
+    const form = current.form?.trim();
+    if (!genericName || !dosage || !form) {
+      return NextResponse.json(
+        { error: "DCI, dosage et forme sont obligatoires pour créer un médicament référentiel." },
+        { status: 400 }
+      );
+    }
+    const existing = await db.medication.findFirst({
+      where: {
+        OR: [
+          { name: { contains: current.proposedName } },
+          { genericName, dosage, form },
+        ],
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      medicationId = existing.id;
+      finalStatus = "Fusionnée avec un médicament existant";
+    } else {
+      const category = await defaultCategory();
+      const created = await db.medication.create({
+        data: {
+          name: current.proposedName,
+          slug: await uniqueMedicationSlug(`${current.proposedName}-${dosage}-${form}`),
+          genericName,
+          categoryId: category.id,
+          dosage,
+          form,
+          packSize: current.packaging?.trim() || "Conditionnement à préciser",
+          packaging: current.packaging?.trim() || null,
+          manufacturer: current.manufacturer?.trim() || null,
+          verificationStatus: "Validé",
+          verifiedAt: new Date(),
+          verifiedBy: access.session?.name ?? access.role ?? "Admin SABLIN",
+          confidenceLevel: 85,
+          status: "Actif",
+          description: `${current.proposedName} (${genericName}) ${dosage} ${form}. Les informations présentées sont indicatives et ne remplacent pas le conseil d’un pharmacien ou d’un professionnel de santé.`,
+          shortDescription: `${genericName} ${dosage} · ${form}`,
+          requiresRx: false,
+          avgPrice: 0,
+        },
+      });
+      medicationId = created.id;
+    }
+  }
+
+  if (status === "Fusionnée avec un médicament existant" && !medicationId) {
+    return NextResponse.json({ error: "Sélectionnez le médicament existant à fusionner." }, { status: 400 });
+  }
+
   const updated = await db.medicationAddRequest.update({
     where: { id },
     data: {
-      status,
-      medicationId: String(body.medicationId ?? "").trim() || undefined,
+      status: finalStatus,
+      medicationId: medicationId || undefined,
       reviewedBy: access.session?.name ?? access.role ?? null,
       reviewedAt: new Date(),
     },
   });
+
+  if (finalStatus === "Fusionnée avec un médicament existant" && medicationId) {
+    const alias = current.proposedName.trim();
+    const normalizedAlias = slugify(alias);
+    const existingAlias = await db.medicationAlias.findFirst({
+      where: { medicationId, normalizedAlias },
+      select: { id: true },
+    });
+    if (!existingAlias && normalizedAlias) {
+      await db.medicationAlias.create({
+        data: {
+          medicationId,
+          alias,
+          normalizedAlias,
+          source: "Demande pharmacie validée par l’administration",
+        },
+      });
+    }
+  }
 
   await db.professionalActionLog.create({
     data: {
@@ -107,8 +270,9 @@ export async function PATCH(req: NextRequest) {
       entityId: updated.id,
       actorRole: access.role,
       status: "réussi",
-      message: `Demande référentiel mise à jour : ${status}.`,
-      newValue: JSON.stringify(updated),
+      oldValue: JSON.stringify({ status: current.status, medicationId: current.medicationId }),
+      message: `Demande référentiel mise à jour : ${finalStatus}.`,
+      newValue: JSON.stringify({ status: updated.status, medicationId: updated.medicationId }),
     },
   });
 

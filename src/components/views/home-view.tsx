@@ -20,6 +20,7 @@ import { SearchBar } from "@/components/shared/search-bar";
 import { SectionHeader } from "@/components/shared/section-header";
 import { GoogleMap } from "@/components/shared/google-map";
 import { CreditCost } from "@/components/shared/credit-cost";
+import { PlatformUxSyncPanel } from "@/components/shared/platform-ux-sync-panel";
 import { CategoryIcon } from "@/components/category-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -303,6 +304,13 @@ export function HomeView() {
           </div>
         </Card>
       </section>
+
+      <PlatformUxSyncPanel
+        scope="user"
+        compact
+        title="Données fiables et services protégés"
+        description="SABLIN PHARMA affiche les informations générales gratuitement. Les prix détaillés, disponibilités réelles, contacts et comparaisons restent protégés par les crédits SABLIN."
+      />
     </div>
   );
 }

@@ -35,10 +35,6 @@ import { InventorySyncPanel } from "@/components/views/inventory-sync-panels";
 import { ProfessionalRequestsPanel } from "@/components/views/professional-requests-panel";
 import { ProfessionalActionButton } from "@/components/shared/professional-action-button";
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
-import { PlatformUxSyncPanel } from "@/components/shared/platform-ux-sync-panel";
-import { PlatformSectionGuide } from "@/components/shared/platform-section-guide";
-import { PlatformCoverageMatrix } from "@/components/shared/platform-coverage-matrix";
-import { PlatformSectionWorkflowPanel } from "@/components/shared/platform-section-workflow-panel";
 import {
   ImportValidationPanel,
   safePublishLineNumbers,
@@ -64,7 +60,6 @@ import {
   PUBLIC_PHARMACY_DATA,
   REQUEST_STATUSES,
   RELIABILITY_LEVELS,
-  USER_VISIBLE_MAPPING,
 } from "@/lib/pharmacy-platform";
 
 export type PharmacyPage =
@@ -137,22 +132,6 @@ const pharmacyDailyActions = [
   { title: "Traiter les confirmations", status: "En attente", detail: "Répondez aux demandes de disponibilité, prix ou confirmation complète.", href: "/pharmacie/confirmations" },
   { title: "Contrôler les horaires et la garde", status: "Aujourd’hui", detail: "Assurez-vous que les horaires et le statut de garde sont exacts.", href: "/pharmacie/horaires-garde" },
   { title: "Importer un inventaire", status: "Synchronisation", detail: "Chargez un fichier CSV, Excel, Word ou PowerPoint puis publiez les produits autorisés.", href: "/pharmacie/import-inventaire" },
-];
-
-const pharmacyQualityChecklist = [
-  "Les disponibilités récentes peuvent être publiées côté utilisateur",
-  "Le stock exact reste interne et n’est jamais affiché au public",
-  "Les prix affichés restent indicatifs et à confirmer auprès de la pharmacie",
-  "Les contacts restent verrouillés côté utilisateur par crédits SABLIN",
-  "Les images publiques doivent être propres et sans données confidentielles",
-  "Les données anciennes deviennent À confirmer côté utilisateur",
-];
-
-const pharmacyOperationalLanes = [
-  { title: "Inventaire", owner: "Équipe stock", status: "À vérifier", detail: "Disponibilités, prix indicatifs, quantité interne et statut public." },
-  { title: "Demandes utilisateurs", owner: "Comptoir", status: "Nouvelle", detail: "Conseils, confirmations, appels et demandes liées à ordonnance." },
-  { title: "Qualité des données", owner: "Responsable", status: "Données à jour", detail: "Fiabilité, source, dernière mise à jour et publication autorisée." },
-  { title: "Synchronisation", owner: "SABLIN", status: "Connecté", detail: "Les données validées alimentent la marketplace et les fiches utilisateur." },
 ];
 
 const WEEK_DAYS = [
@@ -575,40 +554,6 @@ function DailyActionBoard() {
   );
 }
 
-function OperationalLanes() {
-  return (
-    <SectionBlock title="Organisation opérationnelle" description="Vue simple de ce qui doit être suivi par l’équipe pharmacie.">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {pharmacyOperationalLanes.map((lane) => (
-          <Card key={lane.title} className="border-border/70 bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <StatusBadge label={lane.status} />
-              <Badge className="border border-border bg-white text-foreground">{lane.owner}</Badge>
-            </div>
-            <p className="mt-3 font-extrabold text-foreground">{lane.title}</p>
-            <p className="mt-1 text-sm font-medium text-muted-foreground">{lane.detail}</p>
-          </Card>
-        ))}
-      </div>
-    </SectionBlock>
-  );
-}
-
-function QualityChecklist() {
-  return (
-    <SectionBlock title="Checklist qualité avant publication" description="Ces règles évitent les informations trompeuses côté utilisateur.">
-      <div className="grid gap-2 md:grid-cols-2">
-        {pharmacyQualityChecklist.map((item) => (
-          <div key={item} className="flex gap-3 rounded-lg border border-border bg-white p-3 text-sm font-semibold text-foreground">
-            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-brand" />
-            <span>{item}</span>
-          </div>
-        ))}
-      </div>
-    </SectionBlock>
-  );
-}
-
 function DataVisibilityBlocks() {
   return (
     <div className="grid gap-4 xl:grid-cols-2">
@@ -888,8 +833,6 @@ function PharmacyShell({ page, children }: { page: PharmacyPage; children: React
           </Card>
         </aside>
         <main className="min-w-0 space-y-5">
-          <PlatformSectionGuide scope="pharmacy" pageKey={page} />
-          <PlatformSectionWorkflowPanel scope="pharmacy" pageKey={page} />
           {children}
         </main>
       </div>
@@ -1083,24 +1026,6 @@ function Dashboard() {
           </div>
         </SectionBlock>
       </div>
-      <OperationalLanes />
-      <PlatformUxSyncPanel
-        scope="pharmacy"
-        title="Synchronisation de ma pharmacie"
-        description="Cet espace reste limité à votre pharmacie : vos horaires, photos, médicaments, demandes et confirmations alimentent l’utilisateur uniquement après les règles de publication et de protection."
-      />
-      <DataVisibilityBlocks />
-      <SectionBlock title="Connexion avec la plateforme utilisateur" description="Seules les données validées et non confidentielles sont publiées côté utilisateur.">
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {USER_VISIBLE_MAPPING.map(([source, target]) => (
-            <div key={source} className="rounded-lg border border-border bg-white p-3">
-              <p className="text-sm font-extrabold text-foreground">{source}</p>
-              <p className="text-xs font-semibold text-muted-foreground">{target}</p>
-            </div>
-          ))}
-        </div>
-      </SectionBlock>
-      <QualityChecklist />
     </div>
   );
 }
@@ -3228,17 +3153,6 @@ export function PharmacySpaceView({ page }: { page: PharmacyPage }) {
       {page === "enrichissement-inventaire" && <InventoryEnrichment />}
       {page === "synchronisation-inventaire" && (
         <div className="space-y-5">
-          <PlatformUxSyncPanel
-            scope="pharmacy"
-            compact
-            title="Synchronisation de mes données"
-            description="Vos médicaments, horaires, photos, demandes et confirmations alimentent la plateforme utilisateur après les règles de publication, sans afficher les stocks exacts gratuitement."
-          />
-          <PlatformCoverageMatrix
-            scope="pharmacy"
-            title="Couverture UX de mon espace pharmacie"
-            description="Toutes les sections de l’espace pharmacie sont listées avec leurs actions, données synchronisées et protections."
-          />
           <InventorySyncPanel kind="pharmacy" pharmacySlug={PHARMACY_SESSION_SLUG} />
         </div>
       )}

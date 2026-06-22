@@ -522,13 +522,20 @@ function downloadImportTemplate(fileName = "modele-import-sablin-pharma.csv") {
     "17/06/2026",
     "Prix indicatif à confirmer",
   ].join(";");
-  const blob = new Blob([`${header}\n${example}\n`], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([`\uFEFFsep=;\n${header}\n${example}\n`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  try {
+    link.href = url;
+    link.download = fileName;
+    link.rel = "noopener";
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
 }
 
 const adminPharmacies = PHARMACY_PORTAL_PHARMACIES.map((pharmacy, index) => ({
@@ -1146,6 +1153,18 @@ function GlobalAdminImports() {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewData | null>(null);
   const [selectedLineNumbers, setSelectedLineNumbers] = useState<Set<number>>(new Set());
+  const [fileInputKey, setFileInputKey] = useState(0);
+  const resetImport = (nextMessage = "Import réinitialisé.") => {
+    setFile(null);
+    setPreview(null);
+    setSelectedLineNumbers(new Set());
+    setMessage(nextMessage);
+    setFileInputKey((key) => key + 1);
+  };
+  const downloadTemplate = () => {
+    downloadImportTemplate(`modele-import-${pharmacySlug}.csv`);
+    setMessage("Modèle d’import téléchargé. Ouvrez-le dans Excel, remplissez les colonnes, puis importez le fichier.");
+  };
 
   const loadPharmacies = useCallback(async () => {
     const res = await fetch("/api/pharmacy-platform/pharmacies?accountStatus=all&publicationStatus=all", {
@@ -1195,7 +1214,7 @@ function GlobalAdminImports() {
       setUploading(false);
     }
   };
-  const submitImport = async (mode: "auto_publish_safe" | "draft") => {
+  const submitImport = async (mode: "publish_selected" | "draft") => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
       return;
@@ -1233,6 +1252,7 @@ function GlobalAdminImports() {
       );
       setFile(null);
       setSelectedLineNumbers(new Set());
+      setFileInputKey((key) => key + 1);
       setPreview(data.report);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import impossible.");
@@ -1240,7 +1260,7 @@ function GlobalAdminImports() {
       setUploading(false);
     }
   };
-  const uploadImport = async () => submitImport("auto_publish_safe");
+  const uploadImport = async () => submitImport("publish_selected");
   return (
     <div className="space-y-5">
       <Card className="border-border/70 p-5 shadow-card">
@@ -1256,10 +1276,10 @@ function GlobalAdminImports() {
           </select>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
-          <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); }} />
-          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate(`modele-import-${pharmacySlug}.csv`)}>Télécharger modèle Excel</Button>
-          <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Analyser le fichier"}</Button>
-          <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier les produits autorisés"}</Button>
+          <Input key={fileInputKey} type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); setMessage(""); }} />
+          <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={downloadTemplate}>Télécharger modèle Excel</Button>
+          <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading || !file}>{uploading ? "Analyse..." : "Analyser le fichier"}</Button>
+          <Button type="button" className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier les produits autorisés"}</Button>
         </div>
         {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
         {preview && (
@@ -1281,8 +1301,14 @@ function GlobalAdminImports() {
             preview={preview}
             selectedLineNumbers={selectedLineNumbers}
             onSelectionChange={setSelectedLineNumbers}
+            onResetSelection={() => setSelectedLineNumbers(safePublishLineNumbers(preview))}
           />
         ) : null}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button type="button" variant="outline" className="border-border text-foreground hover:bg-muted" onClick={() => resetImport()}>
+            Réinitialiser l’import
+          </Button>
+        </div>
       </Card>
       <AdminMediaUploadPanel pharmacySlug={pharmacySlug} />
       <WorkflowBoard
@@ -2993,6 +3019,20 @@ function AdminImportForPharmacy({ pharmacySlug, pharmacyName }: { pharmacySlug: 
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewData | null>(null);
   const [selectedLineNumbers, setSelectedLineNumbers] = useState<Set<number>>(new Set());
+  const [fileInputKey, setFileInputKey] = useState(0);
+
+  const resetImport = (nextMessage = "Import réinitialisé.") => {
+    setFile(null);
+    setPreview(null);
+    setSelectedLineNumbers(new Set());
+    setMessage(nextMessage);
+    setFileInputKey((key) => key + 1);
+  };
+
+  const downloadTemplate = () => {
+    downloadImportTemplate(`modele-import-${pharmacySlug}.csv`);
+    setMessage("Modèle d’import téléchargé. Ouvrez-le dans Excel, remplissez les colonnes, puis importez le fichier.");
+  };
 
   const previewImport = async () => {
     if (!file) {
@@ -3023,7 +3063,7 @@ function AdminImportForPharmacy({ pharmacySlug, pharmacyName }: { pharmacySlug: 
     }
   };
 
-  const submitImport = async (mode: "auto_publish_safe" | "draft") => {
+  const submitImport = async (mode: "publish_selected" | "draft") => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, XLSX, XLS, Word ou PowerPoint.");
       return;
@@ -3061,6 +3101,7 @@ function AdminImportForPharmacy({ pharmacySlug, pharmacyName }: { pharmacySlug: 
       );
       setFile(null);
       setSelectedLineNumbers(new Set());
+      setFileInputKey((key) => key + 1);
       setPreview(data.report);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Validation impossible.");
@@ -3077,12 +3118,12 @@ function AdminImportForPharmacy({ pharmacySlug, pharmacyName }: { pharmacySlug: 
         <AdminMediaUploadPanel pharmacySlug={pharmacySlug} helper="Chargez les photos des locaux ou documents liés à cette pharmacie sélectionnée." />
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]">
-        <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); }} />
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate(`modele-import-${pharmacySlug}.csv`)}>
+        <Input key={fileInputKey} type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); setMessage(""); }} />
+        <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={downloadTemplate}>
           Télécharger modèle Excel
         </Button>
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Analyser le fichier"}</Button>
-        <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => submitImport("auto_publish_safe")} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier les produits autorisés"}</Button>
+        <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading || !file}>{uploading ? "Analyse..." : "Analyser le fichier"}</Button>
+        <Button type="button" className="bg-brand text-white hover:bg-brand-dark" onClick={() => submitImport("publish_selected")} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier les produits autorisés"}</Button>
       </div>
       {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
       {preview && (
@@ -3105,13 +3146,17 @@ function AdminImportForPharmacy({ pharmacySlug, pharmacyName }: { pharmacySlug: 
             preview={preview}
             selectedLineNumbers={selectedLineNumbers}
             onSelectionChange={setSelectedLineNumbers}
+            onResetSelection={() => setSelectedLineNumbers(safePublishLineNumbers(preview))}
           />
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button className="bg-brand text-white hover:bg-brand-dark" onClick={() => submitImport("auto_publish_safe")} disabled={uploading}>
+            <Button type="button" className="bg-brand text-white hover:bg-brand-dark" onClick={() => submitImport("publish_selected")} disabled={uploading}>
               Publier la sélection sûre
             </Button>
-            <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => submitImport("draft")} disabled={uploading}>
+            <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => submitImport("draft")} disabled={uploading}>
               Enregistrer sans publication
+            </Button>
+            <Button type="button" variant="outline" className="border-border text-foreground hover:bg-muted" onClick={() => resetImport()}>
+              Réinitialiser l’import
             </Button>
           </div>
         </div>

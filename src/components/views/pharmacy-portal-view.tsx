@@ -47,6 +47,7 @@ import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 import {
   DATA_SOURCES,
+  IMPORT_TEMPLATE_COLUMNS,
   PHARMACY_ACCOUNT_STATUSES,
   PHARMACY_CREATION_SOURCES,
   PHARMACY_OPERATION_STATUSES,
@@ -91,6 +92,39 @@ const tabs: { value: PortalTab; label: string; icon: typeof LayoutDashboard }[] 
   { value: "settings", label: "Paramètres", icon: Settings },
   { value: "admin", label: "Administration", icon: Users },
 ];
+
+function downloadPortalImportTemplate(fileName = "modele-import-pharmacie.csv") {
+  const header = IMPORT_TEMPLATE_COLUMNS.join(";");
+  const example = [
+    "Paracétamol 500 mg",
+    "Paracétamol",
+    "500 mg",
+    "Comprimé",
+    "Boîte de 20",
+    "Laboratoire exemple",
+    "6180000000000",
+    "500",
+    "Disponible",
+    "20",
+    "5",
+    "17/06/2026",
+    "Prix indicatif à confirmer",
+  ].join(";");
+  const blob = new Blob([`\uFEFFsep=;\n${header}\n${example}\n`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  try {
+    link.href = url;
+    link.download = fileName;
+    link.rel = "noopener";
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+}
 
 const importRows = [
   { file: "inventaire_cocody_juin.xlsx", status: "Import réussi", valid: 128, errors: 0, unknown: 0, author: "Pharmacie Sainte Marie" },
@@ -310,6 +344,7 @@ export function PharmacyPortalView() {
   const [tab, setTab] = useState<PortalTab>("dashboard");
   const [query, setQuery] = useState("");
   const [activeRole, setActiveRole] = useState<PharmacyRole | null>(null);
+  const [importMessage, setImportMessage] = useState("");
 
   const visibleMedications = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -580,10 +615,44 @@ export function PharmacyPortalView() {
           {tab === "import" && (
             <SectionCard title="Import inventaire Excel ou CSV" icon={Import}>
               <div className="grid gap-3 md:grid-cols-3">
-                <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light"><FileSpreadsheet className="size-4" /> Télécharger modèle Excel</Button>
-                <Button className="bg-brand text-white hover:bg-brand-dark"><Upload className="size-4" /> Importer fichier</Button>
-                <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light"><CheckCircle2 className="size-4" /> Valider après aperçu</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-brand/30 text-brand-dark hover:bg-brand-light"
+                  onClick={() => {
+                    downloadPortalImportTemplate();
+                    setImportMessage("Modèle téléchargé. Utilisez l’onglet Import inventaire avancé pour analyser et publier le fichier.");
+                  }}
+                >
+                  <FileSpreadsheet className="size-4" /> Télécharger modèle Excel
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-brand text-white hover:bg-brand-dark"
+                  onClick={() => {
+                    setImportMessage("Ouverture du module avancé d’import inventaire.");
+                    window.location.href = "/pharmacie/import-inventaire";
+                  }}
+                >
+                  <Upload className="size-4" /> Importer fichier
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-brand/30 text-brand-dark hover:bg-brand-light"
+                  onClick={() => {
+                    setImportMessage("Ouverture de la validation avancée après aperçu.");
+                    window.location.href = "/pharmacie/import-inventaire";
+                  }}
+                >
+                  <CheckCircle2 className="size-4" /> Valider après aperçu
+                </Button>
               </div>
+              {importMessage && (
+                <p className="mt-3 rounded-lg border border-brand/20 bg-brand-light/50 p-3 text-sm font-bold text-brand-dark">
+                  {importMessage}
+                </p>
+              )}
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {["Lignes valides", "Lignes avec erreurs", "Médicaments reconnus", "Doublons", "Prix manquants", "Statuts invalides", "Médicaments non reconnus", "Correction avant validation"].map((item) => (
                   <div key={item} className="rounded-xl border border-border bg-muted/20 p-4 text-sm font-semibold text-foreground">{item}</div>

@@ -376,13 +376,20 @@ function downloadImportTemplate(fileName = "modele-import-ma-pharmacie.csv") {
     "17/06/2026",
     "Prix indicatif à confirmer",
   ].join(";");
-  const blob = new Blob([`${header}\n${example}\n`], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([`\uFEFFsep=;\n${header}\n${example}\n`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  link.click();
-  URL.revokeObjectURL(url);
+  try {
+    link.href = url;
+    link.download = fileName;
+    link.rel = "noopener";
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
 }
 
 function statusClass(label: string) {
@@ -1278,6 +1285,14 @@ function ImportInventory() {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewData | null>(null);
   const [selectedLineNumbers, setSelectedLineNumbers] = useState<Set<number>>(new Set());
+  const [fileInputKey, setFileInputKey] = useState(0);
+  const resetImport = (nextMessage = "Import réinitialisé.") => {
+    setFile(null);
+    setPreview(null);
+    setSelectedLineNumbers(new Set());
+    setMessage(nextMessage);
+    setFileInputKey((key) => key + 1);
+  };
   const previewImport = async () => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, Excel, Word ou PowerPoint avant l’aperçu.");
@@ -1306,7 +1321,7 @@ function ImportInventory() {
       setUploading(false);
     }
   };
-  const submitImport = async (mode: "auto_publish_safe" | "draft") => {
+  const submitImport = async (mode: "publish_selected" | "draft") => {
     if (!file) {
       setMessage("Choisissez un fichier CSV, Excel, Word ou PowerPoint avant l’import.");
       return;
@@ -1344,6 +1359,7 @@ function ImportInventory() {
       );
       setFile(null);
       setSelectedLineNumbers(new Set());
+      setFileInputKey((key) => key + 1);
       setPreview(data.report);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Import impossible.");
@@ -1351,7 +1367,11 @@ function ImportInventory() {
       setUploading(false);
     }
   };
-  const uploadImport = async () => submitImport("auto_publish_safe");
+  const uploadImport = async () => submitImport("publish_selected");
+  const downloadTemplate = () => {
+    downloadImportTemplate();
+    setMessage("Modèle d’import téléchargé. Ouvrez-le dans Excel, remplissez les colonnes, puis importez le fichier.");
+  };
   return (
     <Card className="border-border/70 p-5 shadow-card">
       <Heading level="h2">Importer mes médicaments</Heading>
@@ -1373,8 +1393,8 @@ function ImportInventory() {
         ))}
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
-        <Input type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); }} />
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading}>{uploading ? "Analyse..." : "Analyser le fichier"}</Button>
+        <Input key={fileInputKey} type="file" accept=".csv,.xls,.xlsx,.docx,.pptx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation" onChange={(event) => { setFile(event.target.files?.[0] ?? null); setPreview(null); setSelectedLineNumbers(new Set()); setMessage(""); }} />
+        <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading || !file}>{uploading ? "Analyse..." : "Analyser le fichier"}</Button>
         <Button className="bg-brand text-white hover:bg-brand-dark" onClick={uploadImport} disabled={uploading || !preview}>{uploading ? "Publication..." : "Publier les produits autorisés"}</Button>
       </div>
       {message && <p className="mt-3 rounded-lg border border-border bg-white p-3 text-sm font-bold text-foreground">{message}</p>}
@@ -1397,14 +1417,18 @@ function ImportInventory() {
           preview={preview}
           selectedLineNumbers={selectedLineNumbers}
           onSelectionChange={setSelectedLineNumbers}
+          onResetSelection={() => setSelectedLineNumbers(safePublishLineNumbers(preview))}
         />
       ) : null}
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={() => downloadImportTemplate()}>
+        <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={downloadTemplate}>
           Télécharger modèle Excel
         </Button>
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport}>Analyser maintenant</Button>
-        <Button variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={uploadImport} disabled={uploading || !preview}>Publier les produits autorisés</Button>
+        <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={previewImport} disabled={uploading || !file}>Analyser maintenant</Button>
+        <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={uploadImport} disabled={uploading || !preview}>Publier les produits autorisés</Button>
+        <Button type="button" variant="outline" className="border-border text-foreground hover:bg-muted sm:col-span-3" onClick={() => resetImport()}>
+          Réinitialiser l’import
+        </Button>
       </div>
       <SectionBlock title="Colonnes recommandées" description="Plus votre fichier est complet, plus la publication automatique est fiable.">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

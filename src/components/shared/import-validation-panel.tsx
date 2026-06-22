@@ -90,20 +90,26 @@ export function ImportValidationPanel({
   preview,
   selectedLineNumbers,
   onSelectionChange,
+  onResetSelection,
 }: {
   preview: ImportPreviewData;
   selectedLineNumbers: Set<number>;
   onSelectionChange: (next: Set<number>) => void;
+  onResetSelection?: () => void;
 }) {
   const rows = preview.rows ?? [];
   const safeRows = rows.filter(isSafePublishRow);
-  const selectedCount = rows.filter((row) => selectedLineNumbers.has(row.lineNumber) && isSafePublishRow(row)).length;
   const selectedSafeCount = rows.filter((row) => selectedLineNumbers.has(row.lineNumber) && isSafePublishRow(row)).length;
-  const selectedNeedsReview = rows.filter((row) => !isSafePublishRow(row)).length;
+  const reviewCount = rows.filter((row) => !isSafePublishRow(row)).length;
   const prohibitedCount = rows.filter((row) => row.prohibitedTerm).length;
+  const removedSafeCount = safeRows.length - selectedSafeCount;
 
   const selectSafe = () => onSelectionChange(new Set(safeRows.map((row) => row.lineNumber)));
   const clearAll = () => onSelectionChange(new Set());
+  const resetSelection = () => {
+    if (onResetSelection) onResetSelection();
+    else selectSafe();
+  };
   const toggleLine = (lineNumber: number) => {
     const row = rows.find((item) => item.lineNumber === lineNumber);
     if (!row || !isSafePublishRow(row)) return;
@@ -125,7 +131,8 @@ export function ImportValidationPanel({
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge className="border-0 bg-brand text-white">{selectedSafeCount} à publier</Badge>
-          <Badge variant="outline" className="border-amber-300 bg-white text-amber-700">{selectedNeedsReview} non publié(s)</Badge>
+          <Badge variant="outline" className="border-amber-300 bg-white text-amber-700">{reviewCount} non publié(s)</Badge>
+          <Badge variant="outline" className="border-border bg-white text-foreground">{removedSafeCount} retiré(s)</Badge>
           <Badge variant="outline" className="border-red-200 bg-white text-red-700">{prohibitedCount} interdit(s)</Badge>
         </div>
       </div>
@@ -137,23 +144,26 @@ export function ImportValidationPanel({
         <Button type="button" variant="outline" className="border-border text-foreground hover:bg-muted" onClick={clearAll}>
           <XCircle className="size-4" /> Tout retirer
         </Button>
-        <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={selectSafe}>
+        <Button type="button" variant="outline" className="border-brand/30 text-brand-dark hover:bg-brand-light" onClick={resetSelection}>
           <RotateCcw className="size-4" /> Réinitialiser
         </Button>
       </div>
+      <p className="mt-2 rounded-lg border border-brand/20 bg-brand-light/50 p-3 text-xs font-bold text-brand-dark">
+        Sélection active : {selectedSafeCount} produit(s) sûr(s) seront publiés. Les produits retirés, interdits ou ambigus ne seront pas affichés côté utilisateur.
+      </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-border bg-white p-3">
           <p className="text-xs font-bold text-muted-foreground">Liste à publier</p>
-          <p className="mt-1 text-xl font-extrabold text-foreground">{selectedCount}</p>
+          <p className="mt-1 text-xl font-extrabold text-foreground">{selectedSafeCount}</p>
         </div>
         <div className="rounded-xl border border-border bg-white p-3">
-          <p className="text-xs font-bold text-muted-foreground">Publication automatique</p>
-          <p className="mt-1 text-xl font-extrabold text-brand-dark">{selectedSafeCount}</p>
+          <p className="text-xs font-bold text-muted-foreground">Produits sûrs détectés</p>
+          <p className="mt-1 text-xl font-extrabold text-brand-dark">{safeRows.length}</p>
         </div>
         <div className="rounded-xl border border-border bg-white p-3">
           <p className="text-xs font-bold text-muted-foreground">Non publiés</p>
-          <p className="mt-1 text-xl font-extrabold text-amber-700">{selectedNeedsReview}</p>
+          <p className="mt-1 text-xl font-extrabold text-amber-700">{reviewCount + removedSafeCount}</p>
         </div>
         <div className="rounded-xl border border-border bg-white p-3">
           <p className="text-xs font-bold text-muted-foreground">Interdits retirés</p>

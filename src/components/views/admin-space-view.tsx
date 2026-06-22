@@ -34,10 +34,6 @@ import { InventorySyncPanel } from "@/components/views/inventory-sync-panels";
 import { ProfessionalRequestsPanel } from "@/components/views/professional-requests-panel";
 import { ProfessionalActionButton } from "@/components/shared/professional-action-button";
 import { LogoutConfirmDialog } from "@/components/shared/logout-confirm-dialog";
-import { PlatformUxSyncPanel } from "@/components/shared/platform-ux-sync-panel";
-import { PlatformSectionGuide } from "@/components/shared/platform-section-guide";
-import { PlatformCoverageMatrix } from "@/components/shared/platform-coverage-matrix";
-import { PlatformSectionWorkflowPanel } from "@/components/shared/platform-section-workflow-panel";
 import {
   ImportValidationPanel,
   safePublishLineNumbers,
@@ -154,13 +150,6 @@ const managementNav: { mode: AdminPharmacyMode; label: string; href: (slug: stri
   { mode: "photos", label: "Photos", href: (slug) => `/admin/pharmacies/${slug}/photos` },
   { mode: "equipe", label: "Équipe", href: (slug) => `/admin/pharmacies/${slug}/equipe` },
   { mode: "historique", label: "Historique", href: (slug) => `/admin/pharmacies/${slug}/historique` },
-];
-
-const adminOperationalWorkflows = [
-  { title: "Validation pharmacie", status: "En attente", owner: "Données", detail: "Vérifier identité, photos publiques, documents internes et horaires." },
-  { title: "Import inventaire", status: "À vérifier", owner: "Marketplace", detail: "Publier les lignes sûres, retirer les interdits, isoler les ambiguës." },
-  { title: "Paiement suspect", status: "Vérification manuelle", owner: "Finance", detail: "Contrôler référence, montant, webhook et idempotence avant toute action." },
-  { title: "Images médicaments", status: "Licence à confirmer", owner: "Enrichissement", detail: "Aucune image web non validée ne doit être visible côté utilisateur." },
 ];
 
 const ADMIN_WEEK_DAYS = [
@@ -1517,8 +1506,6 @@ function AdminShell({ page, pharmacyId, children }: { page: AdminPage; pharmacyI
           </Card>
         </aside>
         <main className="min-w-0 space-y-5">
-          <PlatformSectionGuide scope="admin" pageKey={page} />
-          <PlatformSectionWorkflowPanel scope="admin" pageKey={page} />
           {children}
         </main>
       </div>
@@ -1680,32 +1667,6 @@ function Dashboard() {
           </div>
         </SectionBlock>
       </div>
-      <WorkflowBoard
-        title="Pilotage opérationnel"
-        description="Vue rapide des chantiers qui impactent directement l’espace utilisateur, pharmacie et marketplace."
-        items={adminOperationalWorkflows}
-      />
-      <PlatformUxSyncPanel
-        scope="admin"
-        title="Synchronisation maître des plateformes"
-        description="L’Admin reste l’espace central : il contrôle les données, les publications, les comptes, les crédits et les règles qui alimentent les espaces Pharmacie et Utilisateur sans mélanger leurs interfaces."
-      />
-      <SectionBlock title="Raccourcis de contrôle" description="Accès direct aux zones qui gouvernent la synchronisation entre Admin, Pharmacie et Utilisateur.">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ["Moteur Marketplace", "/admin/moteur-marketplace", "Imports, images, descriptions"],
-            ["Qualité données", "/admin/qualite-donnees", "Ancien, incomplet, à vérifier"],
-            ["Crédits & transactions", "/admin/credits-transactions", "Solde serveur et historique"],
-            ["Administrateurs", "/admin/administrateurs", "Rôles, sessions, permissions"],
-          ].map(([label, href, detail]) => (
-            <a key={label} href={href} className="rounded-xl border border-border bg-white p-4 hover:border-brand/40">
-              <p className="font-extrabold text-foreground">{label}</p>
-              <p className="mt-1 text-sm font-medium text-muted-foreground">{detail}</p>
-            </a>
-          ))}
-        </div>
-      </SectionBlock>
-      <ControlChecklist title="Garde-fous de production" items={adminRiskControls} />
     </div>
   );
 }
@@ -2221,17 +2182,6 @@ function AdminPharmacyModeView({ pharmacyId, mode }: { pharmacyId?: string; mode
       {mode === "import-inventaire" && <AdminImportForPharmacy pharmacySlug={pharmacy.slug} pharmacyName={pharmacy.name} />}
       {mode === "synchronisation-inventaire" && (
         <div className="space-y-5">
-          <PlatformUxSyncPanel
-            scope="admin"
-            compact
-            title={`Synchronisation contrôlée : ${pharmacy.name}`}
-            description="L’Admin agit sur cette pharmacie depuis l’espace maître, sans ouvrir de session pharmacie. Les publications sûres alimentent l’utilisateur, les données sensibles restent verrouillées."
-          />
-          <PlatformCoverageMatrix
-            scope="pharmacy"
-            title={`Couverture UX pharmacie : ${pharmacy.name}`}
-            description="Contrôle des sections pharmacie que l’Admin peut superviser pour cette pharmacie sélectionnée."
-          />
           <InventorySyncPanel kind="admin" pharmacySlug={pharmacy.slug} />
         </div>
       )}
@@ -6124,24 +6074,7 @@ function AdminSynchronizations() {
           { label: "Webhooks", value: 4, status: "Sécurisés", icon: ShieldCheck },
         ]}
       />
-      <PlatformUxSyncPanel
-        scope="admin"
-        compact
-        title="État central des synchronisations"
-        description="Vue consolidée des données qui alimentent les espaces Pharmacie et Utilisateur : compteurs, imports, images, paiements, demandes et garde-fous."
-      />
-      <PlatformCoverageMatrix />
       <InventorySyncPanel kind="admin" />
-      <WorkflowBoard
-        title="Flux synchronisés"
-        description="Les données visibles côté utilisateur passent par ces règles de publication."
-        items={[
-          { title: "Pharmacies validées", status: "Publiées", owner: "Admin", detail: "Seules les fiches validées et non suspendues sont visibles." },
-          { title: "Horaires & garde", status: "Temps réel", owner: "Pharmacie", detail: "Alimente pharmacies ouvertes et de garde." },
-          { title: "Inventaires", status: "Contrôlé", owner: "Moteur", detail: "Les statuts sensibles restent verrouillés par crédits côté utilisateur." },
-          { title: "Images", status: "Licence", owner: "Admin", detail: "Images web publiées seulement après validation source et licence." },
-        ]}
-      />
     </div>
   );
 }
